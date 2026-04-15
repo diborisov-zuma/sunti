@@ -17,7 +17,97 @@
     .folder-item.archived { color:#999; }
     .folder-item.archived.active { background:#f1f3f4;color:#666; }
     .folder-divider { font-size:0.72rem;font-weight:600;color:#bbb;text-transform:uppercase;letter-spacing:0.05em;padding:12px 16px 4px; }
+
+    .main-toolbar { display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap; }
+    .main-toolbar h2 { font-size:1.1rem;color:#222;flex:1; }
+    .toolbar-right { display:flex;align-items:center;gap:8px;flex-wrap:wrap; }
+
+    select.filter-select, input.filter-date {
+      border:1px solid #ddd;border-radius:6px;padding:6px 10px;font-size:0.85rem;color:#333;outline:none;background:#fff;cursor:pointer;
+    }
+    select.filter-select:focus, input.filter-date:focus { border-color:#1a73e8; }
+
+    .inv-wrap { background:#fff;border:1px solid #e8e8e8;border-radius:10px;overflow:hidden; }
+    .inv-table { width:100%;border-collapse:collapse; }
+    .inv-table thead { background:#f8f8f8;border-bottom:1px solid #e8e8e8; }
+    .inv-table th { padding:10px 14px;font-size:0.78rem;font-weight:600;color:#888;text-align:left;text-transform:uppercase;letter-spacing:0.04em; }
+    .inv-table td { padding:11px 14px;font-size:0.88rem;color:#333;border-bottom:1px solid #f0f0f0; }
+    .inv-table tr.trx-main-row:last-child td { border-bottom:none; }
+    .inv-table tr.trx-main-row:hover td { background:#fafafa; }
+    .inv-table tr.trx-main-row.direction-income td:first-child { border-left: 4px solid #1e8e3e; }
+    .inv-table tr.trx-main-row.direction-expense td:first-child { border-left: 4px solid #c5221f; }
+
+    .expand-btn { background:none;border:none;cursor:pointer;font-size:0.75rem;color:#bbb;padding:2px 6px;border-radius:4px;transition:all 0.15s; }
+    .expand-btn:hover { background:#e8e8e8;color:#555; }
+    .expand-btn.open { color:#1a73e8; }
+
+    .amount-col { text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap; }
+    .direction-income { color:#1e8e3e;font-weight:500; }
+    .direction-expense { color:#c5221f;font-weight:500; }
+
+    .trx-detail-row td { padding:0;background:#f8faff;border-bottom:1px solid #e0e8ff; }
+    .trx-detail-inner { padding:12px 12px 12px 40px; }
+
+    .file-card { display:flex;align-items:center;gap:8px;padding:7px 10px;background:#fff;border:1px solid #e8e8e8;border-radius:7px;margin-bottom:5px; }
+    .file-icon { font-size:1.2rem;flex-shrink:0; }
+    .file-info { flex:1;min-width:0; }
+    .file-info .fname { font-size:0.85rem;color:#222;font-weight:500; }
+    .file-info .fmeta { font-size:0.72rem;color:#999;margin-top:1px; }
+    .file-actions-row { display:flex;gap:5px;flex-shrink:0; }
+
+    .totals-bar { display:flex;gap:24px;padding:14px 16px;background:#fff;border:1px solid #e8e8e8;border-radius:10px;margin-top:16px;flex-wrap:wrap; }
+    .total-item { display:flex;flex-direction:column;gap:2px; }
+    .total-label { font-size:0.75rem;color:#888;text-transform:uppercase;letter-spacing:0.04em; }
+    .total-value { font-size:1rem;font-weight:500;color:#222; }
+    .total-value.red { color:#c5221f; }
+    .total-value.green { color:#1e8e3e; }
+
+    .pagination { display:flex;align-items:center;justify-content:center;gap:6px;margin-top:16px;flex-wrap:wrap; }
+    .page-btn { background:#fff;border:1px solid #ddd;border-radius:6px;padding:6px 12px;font-size:0.85rem;color:#555;cursor:pointer;transition:all 0.15s; }
+    .page-btn:hover { background:#f4f4f4; }
+    .page-btn.active { background:#1a73e8;border-color:#1a73e8;color:#fff; }
+    .page-btn:disabled { opacity:0.4;cursor:default; }
+
     .empty-state { text-align:center;padding:64px 24px;color:#bbb; }
+    .loading { text-align:center;padding:48px;color:#bbb; }
+
+    .field-group { margin-bottom:14px; }
+    .field-group label { display:block;font-size:0.82rem;color:#666;margin-bottom:4px; }
+    .field-group input, .field-group select { width:100%;border:1px solid #ddd;border-radius:6px;padding:9px 12px;font-size:0.9rem;outline:none;box-sizing:border-box; }
+    .field-group input:focus, .field-group select:focus { border-color:#1a73e8; }
+    .fields-row { display:grid;grid-template-columns:1fr 1fr;gap:12px; }
+
+    .chat-btn { background:none;border:none;cursor:pointer;font-size:0.95rem;padding:3px 5px;border-radius:4px;position:relative;transition:all 0.15s;color:#ccc; }
+    .chat-btn:hover { background:#f0f0f0;color:#888; }
+    .chat-btn.has-unread { color:#f57c00; }
+    .chat-badge { position:absolute;top:-4px;right:-4px;background:#f57c00;color:#fff;font-size:0.6rem;font-weight:700;border-radius:10px;padding:1px 4px;min-width:14px;text-align:center;line-height:1.4; }
+
+    .chat-drawer { position:fixed;top:56px;right:0;bottom:0;width:380px;background:#fff;border-left:1px solid #e8e8e8;box-shadow:-4px 0 16px rgba(0,0,0,0.08);display:flex;flex-direction:column;transform:translateX(100%);transition:transform 0.25s ease;z-index:150; }
+    .chat-drawer.open { transform:translateX(0); }
+    .chat-drawer-header { display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid #f0f0f0;flex-shrink:0; }
+    .chat-drawer-title { font-size:0.9rem;font-weight:600;color:#222;flex:1;min-width:0; }
+    .chat-drawer-subtitle { font-size:0.75rem;color:#999;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+    .chat-close-btn { background:none;border:none;cursor:pointer;font-size:1.1rem;color:#999;padding:4px;border-radius:4px; }
+    .chat-close-btn:hover { background:#f0f0f0;color:#333; }
+    .chat-messages { flex:1;overflow-y:auto;padding:12px 16px;display:flex;flex-direction:column;gap:10px; }
+    .chat-msg { max-width:85%;padding:8px 12px;border-radius:10px;font-size:0.85rem;line-height:1.5; }
+    .chat-msg.mine { align-self:flex-end;background:#e8f0fe;color:#1a3a6e;border-bottom-right-radius:3px; }
+    .chat-msg.theirs { align-self:flex-start;background:#f1f3f4;color:#333;border-bottom-left-radius:3px; }
+    .chat-msg-from { font-size:0.72rem;font-weight:600;color:#888;margin-bottom:3px; }
+    .chat-msg-time { font-size:0.68rem;color:#aaa;margin-top:3px;text-align:right; }
+    .chat-msg.unread { border-left:3px solid #f57c00; }
+    .chat-composer { padding:12px 16px;border-top:1px solid #f0f0f0;flex-shrink:0; }
+    .chat-recipients { margin-bottom:8px; }
+    .chat-recipients label { font-size:0.78rem;color:#666;display:block;margin-bottom:4px; }
+    .recipients-list { display:flex;flex-wrap:wrap;gap:4px; }
+    .recipient-chip { display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:20px;font-size:0.75rem;background:#e8f0fe;color:#1a73e8;cursor:pointer;border:1px solid #b3cdf5;transition:all 0.1s; }
+    .recipient-chip.selected { background:#1a73e8;color:#fff;border-color:#1a73e8; }
+    .chat-input-row { display:flex;gap:8px;align-items:flex-end; }
+    .chat-textarea { flex:1;border:1px solid #ddd;border-radius:8px;padding:8px 12px;font-size:0.88rem;resize:none;outline:none;font-family:inherit;max-height:100px;min-height:38px; }
+    .chat-textarea:focus { border-color:#1a73e8; }
+    .chat-send-btn { background:#1a73e8;border:none;color:#fff;border-radius:8px;padding:8px 14px;cursor:pointer;font-size:0.85rem;white-space:nowrap;transition:background 0.15s; }
+    .chat-send-btn:hover { background:#1557b0; }
+    .chat-empty { text-align:center;padding:32px 16px;color:#bbb;font-size:0.85rem; }
   </style>
 </head>
 <body>
@@ -45,9 +135,154 @@
     </div>
   </div>
 
+  <!-- Модалка: транзакция -->
+  <div class="modal-overlay" id="modal-trx">
+    <div class="modal" style="width:480px;max-width:95vw">
+      <h3 id="t-modal-trx-title"></h3>
+      <div class="fields-row">
+        <div class="field-group">
+          <label id="t-trx-date-label"></label>
+          <input type="date" id="trx-date">
+        </div>
+        <div class="field-group">
+          <label id="t-trx-direction-label"></label>
+          <select id="trx-direction">
+            <option value="income"  id="trx-opt-income"></option>
+            <option value="expense" id="trx-opt-expense"></option>
+          </select>
+        </div>
+      </div>
+      <div class="fields-row">
+        <div class="field-group">
+          <label id="t-trx-amount-label"></label>
+          <input type="number" id="trx-amount" min="0" step="0.01" placeholder="0.00">
+        </div>
+        <div class="field-group">
+          <label id="t-trx-cat-label"></label>
+          <select id="trx-category"><option value="">—</option></select>
+        </div>
+      </div>
+      <div class="field-group">
+        <label id="t-trx-desc-label"></label>
+        <input type="text" id="trx-desc">
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-outline" id="btn-trx-cancel"></button>
+        <button class="btn btn-primary" id="btn-trx-save"></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Модалка: файл -->
+  <div class="modal-overlay" id="modal-file">
+    <div class="modal">
+      <h3 id="t-modal-file-title"></h3>
+      <div class="field-group">
+        <label id="t-file-name-label"></label>
+        <input type="text" id="file-display-name">
+      </div>
+      <div class="field-group">
+        <label id="t-file-label"></label>
+        <input type="file" id="file-input" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" style="padding:6px">
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-outline" id="btn-file-cancel"></button>
+        <button class="btn btn-primary" id="btn-file-save"></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Chat Drawer -->
+  <div class="chat-drawer" id="chat-drawer">
+    <div class="chat-drawer-header">
+      <div style="flex:1;min-width:0">
+        <div class="chat-drawer-title" id="chat-drawer-title"></div>
+        <div class="chat-drawer-subtitle" id="chat-drawer-subtitle"></div>
+      </div>
+      <button class="chat-close-btn" onclick="closeChat()">✕</button>
+    </div>
+    <div class="chat-messages" id="chat-messages"></div>
+    <div class="chat-composer">
+      <div class="chat-recipients" id="chat-recipients-section">
+        <label id="t-chat-to"></label>
+        <div class="recipients-list" id="recipients-list"></div>
+      </div>
+      <div class="chat-input-row">
+        <textarea class="chat-textarea" id="chat-input" rows="1" placeholder=""></textarea>
+        <button class="chat-send-btn" id="chat-send-btn">→</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
   <script>
+    const STORAGE_BUCKET = 'https://storage.googleapis.com/sunti-site';
+
     let selectedFolderId   = null;
     let selectedFolderName = '';
+    let allTransactions    = [];
+    let currentTrxId       = null;
+    let currentTrxMode     = 'create';
+    let currentFileTarget  = null;
+    let expandedTrx        = {};
+    let currentPage        = 1;
+    let pageSize           = 25;
+    let filterDateFrom     = '';
+    let filterDateTo       = '';
+    let filterDirection    = 'all';
+    let filterCategory     = 'all';
+    let categoriesCache    = [];
+    let usersCache         = [];
+    let unreadMap          = {};
+
+    let chatDocId    = null;
+    let chatDocType  = null;
+    let chatDocName  = null;
+    let chatSelected = [];
+
+    function formatDate(val) {
+      if (!val) return '—';
+      const d = new Date(val.value || val);
+      if (isNaN(d)) return '—';
+      const day   = String(d.getUTCDate()).padStart(2, '0');
+      const month = String(d.getUTCMonth() + 1).padStart(2, '0');
+      const year  = d.getUTCFullYear();
+      return `${day}.${month}.${year}`;
+    }
+
+    function formatDateTime(val) {
+      if (!val) return '—';
+      const d = new Date(val.value || val);
+      if (isNaN(d)) return '—';
+      const day   = String(d.getUTCDate()).padStart(2, '0');
+      const month = String(d.getUTCMonth() + 1).padStart(2, '0');
+      const year  = d.getUTCFullYear();
+      const hours = String(d.getUTCHours()).padStart(2, '0');
+      const mins  = String(d.getUTCMinutes()).padStart(2, '0');
+      return `${day}.${month}.${year} ${hours}:${mins}`;
+    }
+
+    function fmt(n) { return parseFloat(n||0).toLocaleString('en-US', { minimumFractionDigits:2, maximumFractionDigits:2 }); }
+
+    function fileIcon(name) {
+      const ext = (name||'').split('.').pop().toLowerCase();
+      if (ext==='pdf') return '📄';
+      if (['jpg','jpeg','png','gif','webp'].includes(ext)) return '🖼';
+      if (['doc','docx'].includes(ext)) return '📝';
+      return '📎';
+    }
+
+    function showToast(msg, type) {
+      const el = document.getElementById('toast');
+      el.textContent = msg;
+      el.className = 'toast show' + (type ? ' ' + type : '');
+      clearTimeout(el._t);
+      el._t = setTimeout(() => el.className = 'toast', 3000);
+    }
+
+    function openModal(id)  { document.getElementById(id).classList.add('open'); }
+    function closeModal(id) { document.getElementById(id).classList.remove('open'); }
 
     function updateTexts() {
       document.getElementById('t-guest-title').textContent    = t('guestTitle');
@@ -55,9 +290,44 @@
       document.getElementById('t-login').textContent          = t('login');
       document.getElementById('t-sidebar-title').textContent  = t('navFolders');
       document.getElementById('t-select-project').textContent = t('selectProject');
+      document.getElementById('t-modal-trx-title').textContent  = t('transaction');
+      document.getElementById('t-trx-date-label').textContent   = t('date');
+      document.getElementById('t-trx-direction-label').textContent = t('direction');
+      document.getElementById('t-trx-amount-label').textContent = t('amount');
+      document.getElementById('t-trx-cat-label').textContent    = t('category');
+      document.getElementById('t-trx-desc-label').textContent   = t('description');
+      document.getElementById('trx-opt-income').textContent     = t('income');
+      document.getElementById('trx-opt-expense').textContent    = t('expense');
+      document.getElementById('btn-trx-cancel').textContent     = t('cancel');
+      document.getElementById('btn-trx-save').textContent       = t('save');
+      document.getElementById('t-modal-file-title').textContent = t('addFile');
+      document.getElementById('t-file-name-label').textContent  = t('fileName');
+      document.getElementById('t-file-label').textContent       = t('file');
+      document.getElementById('btn-file-cancel').textContent    = t('cancel');
+      document.getElementById('btn-file-save').textContent      = t('save');
+      document.getElementById('t-chat-to').textContent          = t('chatTo');
       updateHeaderTexts();
     }
 
+    // КАТЕГОРИИ
+    async function loadCategories() {
+      try { categoriesCache = await apiFetch('/categories'); }
+      catch(e) { categoriesCache = []; }
+    }
+
+    function fillCategorySelect(selectId, selectedId) {
+      const sel = document.getElementById(selectId);
+      if (!sel) return;
+      sel.innerHTML = `<option value="">— ${t('noCategory')} —</option>`;
+      categoriesCache.forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c.id; opt.textContent = c.name;
+        if (c.id === selectedId) opt.selected = true;
+        sel.appendChild(opt);
+      });
+    }
+
+    // ПАПКИ
     async function loadFolders() {
       const list = document.getElementById('folder-list');
       list.innerHTML = `<div style="padding:16px;color:#bbb;font-size:0.85rem">${t('loading')}</div>`;
@@ -82,16 +352,538 @@
       if (!item) return;
       selectedFolderId   = item.dataset.id;
       selectedFolderName = item.dataset.name;
+      currentPage = 1;
+      filterDateFrom = ''; filterDateTo = '';
+      filterDirection = 'all'; filterCategory = 'all';
+      expandedTrx = {};
       document.querySelectorAll('.folder-item').forEach(el => el.classList.remove('active'));
       item.classList.add('active');
-      document.getElementById('main-area').innerHTML = '';
+      renderMainArea();
     });
 
-    window.onLogin  = async () => { updateTexts(); await loadFolders(); };
+    function renderMainArea() {
+      const area = document.getElementById('main-area');
+      area.innerHTML = `
+        <div class="main-toolbar">
+          <h2>📁 ${selectedFolderName}</h2>
+          <div class="toolbar-right">
+            <input type="date" class="filter-date" id="filter-date-from" title="${t('dateFrom')}">
+            <input type="date" class="filter-date" id="filter-date-to"   title="${t('dateTo')}">
+            <select class="filter-select" id="filter-direction">
+              <option value="all">${t('allDirections')}</option>
+              <option value="income">${t('income')}</option>
+              <option value="expense">${t('expense')}</option>
+            </select>
+            <select class="filter-select" id="filter-category">
+              <option value="all">${t('allCategories')}</option>
+            </select>
+            <select class="filter-select" id="page-size-select">
+              <option value="25">25</option>
+              <option value="50">50</option>
+              <option value="100">100</option>
+            </select>
+            <button class="btn btn-primary" id="btn-create-trx">${t('createWithoutInvoice')}</button>
+          </div>
+        </div>
+        <div class="inv-wrap">
+          <table class="inv-table">
+            <thead>
+              <tr>
+                <th style="width:32px"></th>
+                <th>${t('date')}</th>
+                <th>${t('direction')}</th>
+                <th class="amount-col">${t('amount')}</th>
+                <th>${t('category')}</th>
+                <th>${t('description')}</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="trx-tbody"></tbody>
+          </table>
+        </div>
+        <div id="pagination-bar"></div>
+        <div class="totals-bar" id="totals-bar">
+          <div class="total-item">
+            <span class="total-label" style="color:#1e8e3e">${t('incomeTotal')}</span>
+            <span class="total-value green" id="income-sum">—</span>
+          </div>
+          <div style="width:1px;background:#e8e8e8;margin:0 8px"></div>
+          <div class="total-item">
+            <span class="total-label" style="color:#c5221f">${t('expenseTotal')}</span>
+            <span class="total-value red" id="expense-sum">—</span>
+          </div>
+          <div style="width:1px;background:#e8e8e8;margin:0 8px"></div>
+          <div class="total-item">
+            <span class="total-label">${t('transactionsCount')}</span>
+            <span class="total-value" id="total-count">—</span>
+          </div>
+        </div>
+      `;
+
+      const catSel = document.getElementById('filter-category');
+      categoriesCache.forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c.id; opt.textContent = c.name;
+        catSel.appendChild(opt);
+      });
+      catSel.value = filterCategory;
+
+      document.getElementById('filter-date-from').value = filterDateFrom;
+      document.getElementById('filter-date-to').value   = filterDateTo;
+      document.getElementById('filter-direction').value = filterDirection;
+      document.getElementById('page-size-select').value = pageSize;
+
+      document.getElementById('filter-date-from').addEventListener('change', e => { filterDateFrom = e.target.value; currentPage = 1; renderTransactions(); });
+      document.getElementById('filter-date-to').addEventListener('change',   e => { filterDateTo   = e.target.value; currentPage = 1; renderTransactions(); });
+      document.getElementById('filter-direction').addEventListener('change', e => { filterDirection = e.target.value; currentPage = 1; renderTransactions(); });
+      document.getElementById('filter-category').addEventListener('change',  e => { filterCategory  = e.target.value; currentPage = 1; renderTransactions(); });
+      document.getElementById('page-size-select').addEventListener('change', e => { pageSize = parseInt(e.target.value); currentPage = 1; renderTransactions(); });
+
+      document.getElementById('btn-create-trx').addEventListener('click', () => {
+        currentTrxMode = 'create'; currentTrxId = null;
+        document.getElementById('trx-date').value      = new Date().toISOString().split('T')[0];
+        document.getElementById('trx-direction').value = 'expense';
+        document.getElementById('trx-amount').value    = '';
+        document.getElementById('trx-desc').value      = '';
+        fillCategorySelect('trx-category', null);
+        openModal('modal-trx');
+        setTimeout(() => document.getElementById('trx-amount').focus(), 100);
+      });
+
+      loadTransactions();
+    }
+
+    async function loadTransactions() {
+      const tbody = document.getElementById('trx-tbody');
+      if (!tbody) return;
+      tbody.innerHTML = `<tr><td colspan="7" class="loading">${t('loading')}</td></tr>`;
+      try {
+        allTransactions = await apiFetch(`/transactions?folder_id=${selectedFolderId}`);
+        renderTransactions();
+      } catch(e) {
+        console.error(e);
+        tbody.innerHTML = `<tr><td colspan="7" class="empty-state">${e.message}</td></tr>`;
+      }
+    }
+
+    function applyFilters(rows) {
+      return rows.filter(r => {
+        const d = r.date ? (r.date.value || r.date).substring(0,10) : '';
+        if (filterDateFrom && d < filterDateFrom) return false;
+        if (filterDateTo   && d > filterDateTo)   return false;
+        if (filterDirection !== 'all' && r.direction !== filterDirection) return false;
+        if (filterCategory  !== 'all' && r.category_id !== filterCategory) return false;
+        return true;
+      });
+    }
+
+    function renderTransactions() {
+      const tbody = document.getElementById('trx-tbody');
+      if (!tbody) return;
+
+      const filtered = applyFilters(allTransactions);
+      const totalCount = filtered.length;
+
+      let sumIncome = 0, sumExpense = 0;
+      filtered.forEach(r => {
+        const a = parseFloat(r.amount || 0);
+        if (r.direction === 'income') sumIncome += a;
+        else sumExpense += a;
+      });
+      document.getElementById('income-sum').textContent  = fmt(sumIncome);
+      document.getElementById('expense-sum').textContent = fmt(sumExpense);
+      document.getElementById('total-count').textContent = totalCount;
+
+      const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+      if (currentPage > totalPages) currentPage = totalPages;
+      const pageRows = filtered.slice((currentPage-1)*pageSize, currentPage*pageSize);
+
+      renderPagination(totalCount);
+
+      if (!pageRows.length) {
+        tbody.innerHTML = `<tr><td colspan="7" class="empty-state">${t('noTransactions')}</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = '';
+      pageRows.forEach(tx => {
+        const isExp = expandedTrx[tx.id] || false;
+        const tr = document.createElement('tr');
+        tr.className = `trx-main-row direction-${tx.direction||'expense'}`;
+        tr.dataset.id = tx.id;
+        tr.innerHTML = `
+          <td><button class="expand-btn${isExp?' open':''}" data-trx-id="${tx.id}">${isExp?'▼':'▶'}</button></td>
+          <td>${formatDate(tx.date)}</td>
+          <td><span class="direction-${tx.direction}">${tx.direction==='income'?t('income'):t('expense')}</span></td>
+          <td class="amount-col">${fmt(tx.amount)}</td>
+          <td>${tx.category_name ? `<span class="cat-badge">${tx.category_name}</span>` : '<span style="color:#ccc">—</span>'}</td>
+          <td style="color:#666">${tx.description||'—'}</td>
+          <td>
+            <div style="display:flex;gap:6px;align-items:center">
+              <button class="btn btn-outline" data-action="edit-trx"
+                data-id="${tx.id}"
+                data-date="${tx.date ? (tx.date.value || tx.date) : ''}"
+                data-direction="${tx.direction}"
+                data-amount="${tx.amount}"
+                data-category="${tx.category_id||''}"
+                data-desc="${(tx.description||'').replace(/"/g,'&quot;')}">${t('edit')}</button>
+              <button class="btn btn-outline" style="color:#c5221f;border-color:#c5221f" data-action="delete-trx" data-id="${tx.id}">${t('markDeleted')}</button>
+              ${isAdmin ? `<button class="btn btn-danger" data-action="hard-delete-trx" data-id="${tx.id}">${t('hardDelete')}</button>` : ''}
+              <button class="chat-btn" data-doc-id="${tx.id}" data-doc-type="transaction" data-doc-name="${(tx.description||formatDate(tx.date)).replace(/"/g,'&quot;')}"
+                title="${t('chat')}">💬<span class="chat-badge" style="display:none"></span></button>
+            </div>
+          </td>
+        `;
+        tbody.appendChild(tr);
+
+        const trDetail = document.createElement('tr');
+        trDetail.className = 'trx-detail-row';
+        trDetail.dataset.detailFor = tx.id;
+        trDetail.style.display = isExp ? '' : 'none';
+        trDetail.innerHTML = `<td colspan="7"><div class="trx-detail-inner" id="detail-${tx.id}"><div class="loading" style="padding:12px">${t('loading')}</div></div></td>`;
+        tbody.appendChild(trDetail);
+
+        if (isExp) loadTrxFiles(tx.id);
+      });
+
+      loadUnreadForCurrentPage();
+    }
+
+    async function loadTrxFiles(trxId) {
+      const inner = document.getElementById(`detail-${trxId}`);
+      if (!inner) return;
+      try {
+        const files = await apiFetch(`/transaction_files?transaction_id=${trxId}`);
+        renderTrxFiles(trxId, files);
+      } catch(e) {
+        if (inner) inner.innerHTML = `<div style="color:#c33;font-size:0.83rem">${e.message}</div>`;
+      }
+    }
+
+    function renderTrxFiles(trxId, files) {
+      const inner = document.getElementById(`detail-${trxId}`);
+      if (!inner) return;
+      let html = `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+        <span style="font-size:0.78rem;color:#888;text-transform:uppercase;letter-spacing:0.04em">${t('files')}</span>
+        <button class="btn btn-outline" style="padding:3px 8px;font-size:0.78rem" data-action="add-trx-file" data-trx-id="${trxId}">${t('addFile')}</button>
+      </div>`;
+      if (!files.length) {
+        html += `<div style="color:#bbb;font-size:0.83rem">${t('noFiles')}</div>`;
+      } else {
+        files.forEach(f => {
+          const size = f.file_size > 1048576 ? (f.file_size/1048576).toFixed(1)+' MB' : (f.file_size/1024).toFixed(0)+' KB';
+          html += `
+            <div class="file-card" style="margin-bottom:4px">
+              <div class="file-icon">${fileIcon(f.file_name)}</div>
+              <div class="file-info">
+                <div class="fname">${f.name||f.file_name}</div>
+                <div class="fmeta">${f.file_name} · ${size} · ${formatDate(f.uploaded_at)}</div>
+              </div>
+              <div class="file-actions-row">
+                <a href="${f.file_url}" target="_blank" class="btn btn-outline" style="font-size:0.78rem;padding:3px 8px">${t('download')}</a>
+                <button class="btn btn-danger" style="font-size:0.78rem;padding:3px 8px" data-action="delete-trx-file" data-file-id="${f.id}" data-trx-id="${trxId}" data-file-url="${f.file_url}">${t('delete')}</button>
+              </div>
+            </div>
+          `;
+        });
+      }
+      inner.innerHTML = html;
+    }
+
+    function renderPagination(totalCount) {
+      const bar = document.getElementById('pagination-bar');
+      if (!bar) return;
+      const totalPages = Math.ceil(totalCount / pageSize);
+      if (totalPages <= 1) { bar.innerHTML = ''; return; }
+      let html = `<div class="pagination">`;
+      html += `<button class="page-btn" ${currentPage===1?'disabled':''} data-page="${currentPage-1}">‹</button>`;
+      for (let i = 1; i <= totalPages; i++) {
+        if (i===1 || i===totalPages || Math.abs(i-currentPage)<=1) {
+          html += `<button class="page-btn${i===currentPage?' active':''}" data-page="${i}">${i}</button>`;
+        } else if (Math.abs(i-currentPage)===2) {
+          html += `<span style="padding:0 4px;color:#bbb">…</span>`;
+        }
+      }
+      html += `<button class="page-btn" ${currentPage===totalPages?'disabled':''} data-page="${currentPage+1}">›</button>`;
+      html += `</div>`;
+      bar.innerHTML = html;
+      bar.onclick = e => {
+        const btn = e.target.closest('.page-btn');
+        if (!btn || btn.disabled) return;
+        currentPage = parseInt(btn.dataset.page);
+        expandedTrx = {};
+        renderTransactions();
+      };
+    }
+
+    // ========================
+    // CHAT
+    // ========================
+    async function openChat(docId, docType, docName) {
+      chatDocId = docId; chatDocType = docType; chatDocName = docName;
+      chatSelected = [];
+      document.getElementById('chat-drawer-title').textContent    = docName;
+      document.getElementById('chat-drawer-subtitle').textContent = docType;
+      document.getElementById('chat-drawer').classList.add('open');
+      document.getElementById('chat-input').value = '';
+      document.getElementById('t-chat-to').textContent = t('chatTo');
+      await Promise.all([loadChatUsers(), loadChatMessages()]);
+      markAsRead(docId, docType);
+    }
+
+    function closeChat() {
+      document.getElementById('chat-drawer').classList.remove('open');
+      chatDocId = null; chatDocType = null;
+    }
+
+    async function loadChatUsers() {
+      try {
+        if (!usersCache.length) usersCache = await apiFetch('/users');
+        renderRecipients();
+      } catch(e) { console.error(e); }
+    }
+
+    function renderRecipients() {
+      const list = document.getElementById('recipients-list');
+      if (!list) return;
+      list.innerHTML = usersCache.map(u => `
+        <div class="recipient-chip ${chatSelected.includes(u.email) ? 'selected' : ''}"
+             data-email="${u.email}" onclick="toggleRecipient('${u.email}')">
+          ${u.name || u.email}
+        </div>
+      `).join('');
+    }
+
+    function toggleRecipient(email) {
+      if (chatSelected.includes(email)) chatSelected = chatSelected.filter(e => e !== email);
+      else chatSelected.push(email);
+      renderRecipients();
+    }
+
+    async function loadChatMessages() {
+      const container = document.getElementById('chat-messages');
+      if (!container) return;
+      container.innerHTML = `<div class="chat-empty">${t('loading')}</div>`;
+      try {
+        const msgs = await apiFetch(`/messages?document_id=${chatDocId}&document_type=${chatDocType}`);
+        if (!msgs.length) { container.innerHTML = `<div class="chat-empty">${t('noMessages')}</div>`; return; }
+        container.innerHTML = msgs.map(m => {
+          const isMine   = m.from_user === currentUser.email;
+          const isUnread = !isMine && m.is_read === false;
+          const datetime = formatDateTime(m.created_at);
+          const fromName = isMine ? t('me') : (usersCache.find(u => u.email === m.from_user)?.name || m.from_user.split('@')[0]);
+          return `
+            <div class="chat-msg ${isMine ? 'mine' : 'theirs'} ${isUnread ? 'unread' : ''}">
+              <div class="chat-msg-from">${fromName}</div>
+              <div>${m.text}</div>
+              <div class="chat-msg-time">${datetime}</div>
+            </div>
+          `;
+        }).join('');
+        container.scrollTop = container.scrollHeight;
+      } catch(e) {
+        container.innerHTML = `<div class="chat-empty" style="color:#c33">${e.message}</div>`;
+      }
+    }
+
+    async function sendChatMessage() {
+      const text = document.getElementById('chat-input').value.trim();
+      if (!text) return;
+      if (!chatSelected.length) { showToast(t('selectRecipients'), 'error'); return; }
+      document.getElementById('chat-input').value = '';
+      try {
+        await apiFetch('/messages', {
+          method: 'POST',
+          body: JSON.stringify({
+            document_id: chatDocId, document_type: chatDocType, document_name: chatDocName,
+            text, to_users: chatSelected,
+          }),
+        });
+        await loadChatMessages();
+        await loadUnreadForCurrentPage();
+      } catch(e) { showToast(e.message, 'error'); }
+    }
+
+    async function markAsRead(docId, docType) {
+      try {
+        await apiFetch('/messages/read-all', {
+          method: 'PUT',
+          body: JSON.stringify({ document_id: docId, document_type: docType }),
+        });
+        delete unreadMap[docId];
+        updateChatIcon(docId);
+        if (typeof loadUnreadCount === 'function') loadUnreadCount();
+      } catch(e) { console.error(e); }
+    }
+
+    function updateChatIcon(docId) {
+      const btn = document.querySelector(`.chat-btn[data-doc-id="${docId}"]`);
+      if (!btn) return;
+      const count = unreadMap[docId] || 0;
+      const badge = btn.querySelector('.chat-badge');
+      if (count > 0) {
+        btn.classList.add('has-unread');
+        if (badge) { badge.textContent = count; badge.style.display = 'block'; }
+      } else {
+        btn.classList.remove('has-unread');
+        if (badge) badge.style.display = 'none';
+      }
+    }
+
+    async function loadUnreadForCurrentPage() {
+      const tbody = document.getElementById('trx-tbody');
+      if (!tbody) return;
+      const ids = [...tbody.querySelectorAll('tr.trx-main-row[data-id]')].map(r => r.dataset.id);
+      if (!ids.length) return;
+      try {
+        const data = await apiFetch(`/messages/unread?document_type=transaction&document_ids=${ids.join(',')}`);
+        unreadMap = { ...unreadMap, ...data };
+        ids.forEach(id => updateChatIcon(id));
+      } catch(e) { console.error(e); }
+    }
+
+    // ========================
+    // EVENTS
+    // ========================
+    document.addEventListener('click', e => {
+      const chatBtn = e.target.closest('.chat-btn');
+      if (chatBtn) { openChat(chatBtn.dataset.docId, chatBtn.dataset.docType, chatBtn.dataset.docName); return; }
+
+      const expandBtn = e.target.closest('.expand-btn');
+      if (expandBtn && expandBtn.dataset.trxId) {
+        const trxId = expandBtn.dataset.trxId;
+        expandedTrx[trxId] = !expandedTrx[trxId];
+        const detailRow = document.querySelector(`tr[data-detail-for="${trxId}"]`);
+        if (detailRow) detailRow.style.display = expandedTrx[trxId] ? '' : 'none';
+        expandBtn.textContent = expandedTrx[trxId] ? '▼' : '▶';
+        expandBtn.classList.toggle('open', expandedTrx[trxId]);
+        if (expandedTrx[trxId]) loadTrxFiles(trxId);
+        return;
+      }
+
+      const btn = e.target.closest('button[data-action]');
+      if (!btn) return;
+      const action = btn.dataset.action;
+
+      if (action === 'edit-trx') {
+        currentTrxMode = 'edit'; currentTrxId = btn.dataset.id;
+        document.getElementById('trx-date').value      = btn.dataset.date ? btn.dataset.date.split('T')[0] : '';
+        document.getElementById('trx-direction').value = btn.dataset.direction;
+        document.getElementById('trx-amount').value    = btn.dataset.amount;
+        document.getElementById('trx-desc').value      = btn.dataset.desc;
+        fillCategorySelect('trx-category', btn.dataset.category);
+        openModal('modal-trx');
+        setTimeout(() => document.getElementById('trx-amount').focus(), 100);
+      }
+
+      if (action === 'delete-trx') {
+        if (!confirm(t('confirmMarkDeleted'))) return;
+        apiFetch(`/transactions/${btn.dataset.id}`, { method: 'DELETE' })
+          .then(() => { showToast(t('markedDeleted'), 'success'); loadTransactions(); })
+          .catch(e => showToast(e.message, 'error'));
+      }
+
+      if (action === 'hard-delete-trx') {
+        if (!confirm(t('confirmHardDelete'))) return;
+        apiFetch(`/transactions/${btn.dataset.id}?hard=true`, { method: 'DELETE' })
+          .then(() => { showToast(t('deleted'), 'success'); loadTransactions(); })
+          .catch(e => showToast(e.message, 'error'));
+      }
+
+      if (action === 'add-trx-file') {
+        currentFileTarget = { type: 'transaction', id: btn.dataset.trxId };
+        document.getElementById('file-display-name').value = '';
+        document.getElementById('file-input').value = '';
+        openModal('modal-file');
+      }
+
+      if (action === 'delete-trx-file') {
+        if (!confirm(t('confirmDelete'))) return;
+        const trxId = btn.dataset.trxId;
+        apiFetch(`/transaction_files/${btn.dataset.fileId}`, { method: 'DELETE' })
+          .then(async () => {
+            await fetch(btn.dataset.fileUrl, { method: 'DELETE', headers: { Authorization: `Bearer ${window._accessToken}` } }).catch(()=>{});
+            showToast(t('deleted'), 'success');
+            loadTrxFiles(trxId);
+          })
+          .catch(e => showToast(e.message, 'error'));
+      }
+    });
+
+    // СОХРАНИТЬ ТРАНЗАКЦИЮ
+    document.getElementById('btn-trx-cancel').addEventListener('click', () => closeModal('modal-trx'));
+    document.getElementById('btn-trx-save').addEventListener('click', async () => {
+      const date        = document.getElementById('trx-date').value;
+      const direction   = document.getElementById('trx-direction').value;
+      const amount      = document.getElementById('trx-amount').value;
+      const description = document.getElementById('trx-desc').value;
+      const category_id = document.getElementById('trx-category').value || null;
+      if (!date || !amount) { showToast(t('fillAllFields'), 'error'); return; }
+      closeModal('modal-trx');
+      try {
+        if (currentTrxMode === 'create') {
+          await apiFetch('/transactions', {
+            method: 'POST',
+            body: JSON.stringify({ date, amount, direction, category_id, description, folder_id: selectedFolderId }),
+          });
+          showToast(t('saved'), 'success');
+        } else {
+          await apiFetch(`/transactions/${currentTrxId}`, {
+            method: 'PUT',
+            body: JSON.stringify({ date, amount, direction, category_id, description, folder_id: selectedFolderId }),
+          });
+          showToast(t('saved'), 'success');
+        }
+        loadTransactions();
+      } catch(e) { console.error(e); showToast(e.message, 'error'); }
+    });
+
+    // ЗАГРУЗИТЬ ФАЙЛ
+    document.getElementById('btn-file-cancel').addEventListener('click', () => closeModal('modal-file'));
+    document.getElementById('btn-file-save').addEventListener('click', async () => {
+      const displayName = document.getElementById('file-display-name').value.trim();
+      const file        = document.getElementById('file-input').files[0];
+      if (!file) { showToast(t('selectFile'), 'error'); return; }
+      closeModal('modal-file');
+      showToast(t('uploading'));
+      try {
+        const key      = `${selectedFolderId}/trx/${currentFileTarget.id}/${Date.now()}_${file.name}`;
+        const file_url = `${STORAGE_BUCKET}/${key}`;
+
+        await new Promise((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          xhr.open('PUT', file_url);
+          xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
+          xhr.setRequestHeader('Authorization', `Bearer ${window._accessToken}`);
+          xhr.onload  = () => xhr.status === 200 ? resolve() : reject(new Error('Upload failed: ' + xhr.status));
+          xhr.onerror = () => reject(new Error('Upload error'));
+          xhr.send(file);
+        });
+
+        await apiFetch('/transaction_files', {
+          method: 'POST',
+          body: JSON.stringify({ transaction_id: currentFileTarget.id, name: displayName||file.name, file_name: file.name, file_url, file_size: file.size }),
+        });
+        loadTrxFiles(currentFileTarget.id);
+        showToast(t('uploaded'), 'success');
+      } catch(e) { console.error(e); showToast(e.message, 'error'); }
+    });
+
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape') { closeModal('modal-trx'); closeModal('modal-file'); closeChat(); }
+    });
+
+    document.getElementById('chat-send-btn').addEventListener('click', sendChatMessage);
+    document.getElementById('chat-input').addEventListener('keydown', e => {
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChatMessage(); }
+    });
+
+    window.onLogin  = async () => { updateTexts(); await loadCategories(); await loadFolders(); };
     window.onLogout = () => {
       selectedFolderId = null;
       document.getElementById('folder-list').innerHTML = '';
       document.getElementById('main-area').innerHTML = `<div class="empty-state"><p>${t('selectProject')}</p></div>`;
+      closeChat();
       updateTexts();
     };
     window.onLangChange = () => updateTexts();
