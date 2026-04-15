@@ -10,6 +10,7 @@ function renderHeader(activePage) {
       <a href="invoices.html" class="nav-link ${activePage === 'invoices' ? 'active' : ''}" id="t-nav-invoices"></a>
       <a href="finance.html"  class="nav-link ${activePage === 'finance'  ? 'active' : ''}" id="t-nav-finance"></a>
       <a href="reports.html"  class="nav-link ${activePage === 'reports'  ? 'active' : ''}" id="t-nav-reports"></a>
+      <a href="companies.html" class="nav-link ${activePage === 'companies' ? 'active' : ''}" id="t-nav-companies" style="display:none"></a>
       <a href="users.html"    class="nav-link ${activePage === 'users'    ? 'active' : ''}" id="t-nav-users" style="display:none"></a>
     </nav>
 
@@ -76,6 +77,7 @@ function updateHeaderTexts() {
   const ni = document.getElementById('t-nav-invoices');
   const nfi = document.getElementById('t-nav-finance');
   const nr = document.getElementById('t-nav-reports');
+  const nc = document.getElementById('t-nav-companies');
   const nu = document.getElementById('t-nav-users');
   const lb = document.getElementById('logout-btn');
   const nt = document.getElementById('t-notifications-title');
@@ -83,6 +85,7 @@ function updateHeaderTexts() {
   if (ni) ni.textContent = t('navInvoices');
   if (nfi) nfi.textContent = t('navFinance');
   if (nr) nr.textContent = t('navReports');
+  if (nc) { nc.textContent = t('navCompanies'); if (typeof isAdmin !== 'undefined' && isAdmin) nc.style.display = 'inline-flex'; else nc.style.display = 'none'; }
   if (nu) { nu.textContent = t('navUsers'); if (typeof isAdmin !== 'undefined' && isAdmin) nu.style.display = 'inline-flex'; else nu.style.display = 'none'; }
   if (lb) lb.textContent = t('logout');
   if (nt) nt.textContent = t('notifications');
