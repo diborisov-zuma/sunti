@@ -142,16 +142,8 @@
   </div>
 
   <div id="app-view">
-    <div class="layout">
-      <div class="sidebar">
-        <div class="sidebar-header">
-          <span class="sidebar-title" id="t-sidebar-title"></span>
-        </div>
-        <div id="folder-list" style="flex:1;overflow-y:auto;padding:8px 0"></div>
-      </div>
-      <div class="main-area" id="main-area">
-        <div class="empty-state"><p id="t-select-project"></p></div>
-      </div>
+    <div class="main-area" id="main-area" style="padding:16px 24px;max-width:1600px;margin:0 auto;width:100%;box-sizing:border-box">
+      <div class="empty-state"><p id="t-select-project"></p></div>
     </div>
   </div>
 
@@ -271,6 +263,9 @@
     let filterAccount      = 'all';
     let accountsCache      = [];
     let foldersCache       = [];
+    let companiesCache     = [];
+    let filterCompany      = 'all';
+    let filterFolder       = 'all';
     let currentTrxInvoiceId = null;
     let searchDebounce     = null;
     let categoriesCache    = [];
@@ -422,68 +417,70 @@
     let modalCategoryCombo = null;
     let modalFolderCombo   = null;
 
-    function mountModalCombos(selectedCatId, selectedFolderId, showFolder) {
+    function mountModalCombos(selectedCatId, selectedFolderId, showFolder, folderList) {
       modalCategoryCombo = bindCombo('trx-category-input', 'trx-category-list',
         categoriesCache.map(c => ({ id: c.id, label: catLabel(c) })),
         { placeholder: t('noCategory'), allowAll: true, allLabel: '— ' + t('noCategory') + ' —', selectedId: selectedCatId || '' });
       document.getElementById('trx-folder-group').style.display = showFolder ? 'block' : 'none';
       if (showFolder) {
-        modalFolderCombo = bindCombo('trx-folder-input', 'trx-folder-list',
-          foldersCache.map(f => ({ id: f.id, label: f.name })),
+        const items = (folderList || foldersCache).map(f => ({ id: f.id, label: f.name }));
+        modalFolderCombo = bindCombo('trx-folder-input', 'trx-folder-list', items,
           { placeholder: t('navFolders'), allowAll: false, selectedId: selectedFolderId || '' });
       } else {
         modalFolderCombo = null;
       }
     }
 
-    // ПАПКИ
-    async function loadFolders() {
-      const list = document.getElementById('folder-list');
-      list.innerHTML = `<div style="padding:16px;color:#bbb;font-size:0.85rem">${t('loading')}</div>`;
-      try {
-        foldersCache = await apiFetch('/folders');
-        const folders = foldersCache;
-        const active  = folders.filter(f => f.status === 'active');
-        const archive = folders.filter(f => f.status === 'archive');
-        let html = '';
-        active.forEach(f => { html += `<div class="folder-item${selectedFolderId===f.id?' active':''}" data-id="${f.id}" data-name="${f.name}">📁 ${f.name}</div>`; });
-        if (archive.length) {
-          html += `<div class="folder-divider">${t('archive')}</div>`;
-          archive.forEach(f => { html += `<div class="folder-item archived${selectedFolderId===f.id?' active':''}" data-id="${f.id}" data-name="${f.name}">📁 ${f.name}</div>`; });
-        }
-        list.innerHTML = html || `<div style="padding:16px;color:#bbb;font-size:0.85rem">${t('noProjects')}</div>`;
-      } catch(e) {
-        list.innerHTML = `<div style="padding:16px;color:#c33;font-size:0.85rem">${e.message}</div>`;
-      }
+    function getWritableFolders() {
+      // Админ: все. Иначе: только с docs_access === 'editor'.
+      if (typeof isAdmin !== 'undefined' && isAdmin) return foldersCache.slice();
+      return foldersCache.filter(f => f.docs_access === 'editor');
     }
 
-    document.getElementById('folder-list').addEventListener('click', e => {
-      const item = e.target.closest('.folder-item');
-      if (!item) return;
-      selectedFolderId   = item.dataset.id;
-      selectedFolderName = item.dataset.name;
-      currentPage = 1;
-      filterDateFrom = today; filterDateTo = today;
-      filterDirection = 'all'; filterCategory = 'all';
-      filterAccount = 'all';
-      filterStatus = 'active';
-      expandedTrx = {};
-      document.querySelectorAll('.folder-item').forEach(el => el.classList.remove('active'));
-      item.classList.add('active');
-      renderMainArea();
-    });
+    function updateAccountFilter() {
+      const sel = document.getElementById('filter-account');
+      if (!sel) return;
+      let list = [];
+      if (filterCompany !== 'all') {
+        list = accountsCache.filter(a => a.company_id === filterCompany);
+      }
+      sel.innerHTML = `<option value="all">${t('allAccounts')}</option>` +
+        list.map(a => `<option value="${a.id}">${a.name}</option>`).join('');
+      sel.value = filterAccount;
+      sel.disabled = filterCompany === 'all';
+      sel.onchange = e => { filterAccount = e.target.value; currentPage = 1; renderTransactions(); };
+    }
+
+    // ПАПКИ
+    async function loadFolders() {
+      try { foldersCache = await apiFetch('/folders'); }
+      catch(e) { foldersCache = []; }
+    }
 
     function renderMainArea() {
       const area = document.getElementById('main-area');
+      const companyOpts = ['<option value="all">' + t('allCompanies') + '</option>']
+        .concat(companiesCache.map(c => `<option value="${c.id}">${c.name}</option>`)).join('');
+      const folderOpts = ['<option value="all">' + t('allFolders') + '</option>']
+        .concat(foldersCache.map(f => `<option value="${f.id}">${f.name}</option>`)).join('');
       area.innerHTML = `
         <div class="toolbar-rows">
           <div class="toolbar-row">
-            <h2>📁 ${selectedFolderName}</h2>
+            <h2 style="flex:1">💰 ${t('navFinance')}</h2>
+            <input type="text" class="filter-select" id="filter-search" placeholder="${t('search')}" style="min-width:200px">
             <input type="date" class="filter-date" id="filter-date-from" title="${t('dateFrom')}">
             <input type="date" class="filter-date" id="filter-date-to"   title="${t('dateTo')}">
           </div>
-          <div class="toolbar-row bottom">
-            <input type="text" class="filter-select" id="filter-search" placeholder="${t('search')}" style="min-width:160px">
+          <div class="toolbar-row">
+            <select class="filter-select" id="filter-company">${companyOpts}</select>
+            <select class="filter-select" id="filter-account" disabled>
+              <option value="all">${t('allAccounts')}</option>
+            </select>
+            <select class="filter-select" id="filter-folder">${folderOpts}</select>
+            <span style="flex:1"></span>
+            <button class="btn btn-primary" id="btn-create-trx">${t('createWithoutInvoice')}</button>
+          </div>
+          <div class="toolbar-row">
             <select class="filter-select" id="filter-status">
               <option value="active">${t('filterStatusActive')}</option>
               <option value="deleted">${t('filterStatusDeleted')}</option>
@@ -497,16 +494,11 @@
               <input type="text" class="filter-select" id="filter-category-input" placeholder="${t('allCategories')}">
               <ul id="filter-category-list"></ul>
             </span>
-            <select class="filter-select" id="filter-account">
-              <option value="all">${t('allAccounts')}</option>
-              ${accountsCache.map(a => `<option value="${a.id}">${a.name}</option>`).join('')}
-            </select>
             <select class="filter-select" id="page-size-select">
               <option value="25">25</option>
               <option value="50">50</option>
               <option value="100">100</option>
             </select>
-            <button class="btn btn-primary" id="btn-create-trx">${t('createWithoutInvoice')}</button>
           </div>
         </div>
         <div class="inv-wrap">
@@ -569,9 +561,23 @@
       document.getElementById('filter-date-to').addEventListener('change',   e => { filterDateTo   = e.target.value; currentPage = 1; renderTransactions(); });
       document.getElementById('filter-status').addEventListener('change',    e => { filterStatus   = e.target.value; currentPage = 1; loadTransactions(); });
       document.getElementById('filter-direction').addEventListener('change', e => { filterDirection = e.target.value; currentPage = 1; renderTransactions(); });
-      document.getElementById('filter-account').value = filterAccount;
-      document.getElementById('filter-account').addEventListener('change', e => { filterAccount = e.target.value; currentPage = 1; renderTransactions(); });
       document.getElementById('page-size-select').addEventListener('change', e => { pageSize = parseInt(e.target.value); currentPage = 1; renderTransactions(); });
+
+      document.getElementById('filter-company').value = filterCompany;
+      document.getElementById('filter-company').addEventListener('change', e => {
+        filterCompany = e.target.value;
+        filterAccount = 'all';
+        updateAccountFilter();
+        currentPage = 1;
+        renderTransactions();
+      });
+      document.getElementById('filter-folder').value = filterFolder;
+      document.getElementById('filter-folder').addEventListener('change', e => {
+        filterFolder = e.target.value;
+        currentPage = 1;
+        renderTransactions();
+      });
+      updateAccountFilter();
 
       document.getElementById('btn-create-trx').addEventListener('click', () => {
         currentTrxMode = 'create'; currentTrxId = null; currentTrxInvoiceId = null;
@@ -579,7 +585,10 @@
         document.getElementById('trx-direction').value = 'expense';
         document.getElementById('trx-amount').value    = '';
         document.getElementById('trx-desc').value      = '';
-        mountModalCombos(null, selectedFolderId, false); // create: folder fixed to current
+        const writableFolders = getWritableFolders();
+        if (!writableFolders.length) { showToast('—', 'error'); return; }
+        const defaultFolder = filterFolder !== 'all' ? filterFolder : writableFolders[0].id;
+        mountModalCombos(null, defaultFolder, true, writableFolders);
         openModal('modal-trx');
         setTimeout(() => document.getElementById('trx-amount').focus(), 100);
       });
@@ -592,7 +601,9 @@
       if (!tbody) return;
       tbody.innerHTML = `<tr><td colspan="7" class="loading">${t('loading')}</td></tr>`;
       try {
-        allTransactions = await apiFetch(`/transactions?folder_id=${selectedFolderId}&status=${filterStatus}`);
+        const ids = foldersCache.map(f => f.id).join(',');
+        if (!ids) { allTransactions = []; renderTransactions(); return; }
+        allTransactions = await apiFetch(`/transactions?folder_ids=${ids}&status=${filterStatus}`);
         renderTransactions();
       } catch(e) {
         console.error(e);
@@ -608,6 +619,11 @@
         if (filterDirection !== 'all' && r.direction !== filterDirection) return false;
         if (filterCategory  !== 'all' && r.category_id !== filterCategory) return false;
         if (filterAccount   !== 'all' && r.account_id  !== filterAccount)  return false;
+        if (filterFolder    !== 'all' && r.folder_id   !== filterFolder)   return false;
+        if (filterCompany   !== 'all') {
+          const acc = accountsCache.find(a => a.id === r.account_id);
+          if (!acc || acc.company_id !== filterCompany) return false;
+        }
         if (filterSearch && !(r.description||'').toLowerCase().includes(filterSearch.toLowerCase())) return false;
         return true;
       });
@@ -915,7 +931,7 @@
         document.getElementById('trx-amount').value    = btn.dataset.amount;
         document.getElementById('trx-desc').value      = btn.dataset.desc;
         const showFolderPicker = !currentTrxInvoiceId; // нет invoice → можно менять folder
-        mountModalCombos(btn.dataset.category || '', btn.dataset.folder || selectedFolderId, showFolderPicker);
+        mountModalCombos(btn.dataset.category || '', btn.dataset.folder || '', showFolderPicker, foldersCache);
         openModal('modal-trx');
         setTimeout(() => document.getElementById('trx-amount').focus(), 100);
       }
@@ -964,7 +980,7 @@
       const amount      = document.getElementById('trx-amount').value;
       const description = document.getElementById('trx-desc').value;
       const category_id = (modalCategoryCombo && modalCategoryCombo.getSelected()) || null;
-      const folder_id   = (modalFolderCombo && modalFolderCombo.getSelected()) || selectedFolderId;
+      const folder_id   = (modalFolderCombo && modalFolderCombo.getSelected()) || '';
       if (!date || !amount) { showToast(t('fillAllFields'), 'error'); return; }
       closeModal('modal-trx');
       try {
@@ -997,7 +1013,7 @@
         const contentType = file.type || 'application/octet-stream';
         const { upload_url, file_url } = await apiFetch('/transaction_files/signed-upload-url', {
           method: 'POST',
-          body: JSON.stringify({ transaction_id: currentFileTarget.id, folder_id: selectedFolderId, file_name: file.name, content_type: contentType }),
+          body: JSON.stringify({ transaction_id: currentFileTarget.id, folder_id: (allTransactions.find(x => x.id === currentFileTarget.id) || {}).folder_id || '', file_name: file.name, content_type: contentType }),
         });
 
         await new Promise((resolve, reject) => {
@@ -1031,18 +1047,26 @@
       try { accountsCache = await apiFetch('/company_accounts'); }
       catch(e) { accountsCache = []; }
     }
+    async function loadCompanies() {
+      try { companiesCache = await apiFetch('/companies'); }
+      catch(e) { companiesCache = []; }
+    }
 
-    window.onLogin  = async () => { updateTexts(); await Promise.all([loadCategories(), loadAccounts()]); await loadFolders(); };
+    window.onLogin  = async () => {
+      updateTexts();
+      await Promise.all([loadCategories(), loadAccounts(), loadCompanies(), loadFolders()]);
+      renderMainArea();
+      loadTransactions();
+    };
     window.onLogout = () => {
-      selectedFolderId = null;
-      document.getElementById('folder-list').innerHTML = '';
       document.getElementById('main-area').innerHTML = `<div class="empty-state"><p>${t('selectProject')}</p></div>`;
       closeChat();
       updateTexts();
     };
     window.onLangChange = () => {
       updateTexts();
-      if (selectedFolderId) renderMainArea();
+      renderMainArea();
+      loadTransactions();
     };
 
     renderHeader('finance');

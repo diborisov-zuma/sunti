@@ -37,6 +37,7 @@ exports.transactions = async (req, res) => {
     if (req.method === 'GET') {
       const invoiceId = req.query.invoice_id;
       const folderId  = req.query.folder_id;
+      const folderIds = (req.query.folder_ids || '').split(',').map(s => s.trim()).filter(Boolean);
       const status    = req.query.status || 'active';
 
       let where = '';
@@ -51,8 +52,11 @@ exports.transactions = async (req, res) => {
       } else if (folderId) {
         where = `WHERE t.folder_id = @folder_id AND ${statusClause}`;
         params.folder_id = folderId;
+      } else if (folderIds.length) {
+        where = `WHERE t.folder_id IN UNNEST(@folder_ids) AND ${statusClause}`;
+        params.folder_ids = folderIds;
       } else {
-        res.status(400).json({ error: 'invoice_id or folder_id is required' });
+        res.status(400).json({ error: 'invoice_id, folder_id or folder_ids is required' });
         return;
       }
 

@@ -63,6 +63,8 @@ const i18n = {
     editStatement: 'Редактировать выписку',
     replaceFile: 'Заменить файл',
     allAccounts: 'Все счета',
+    allCompanies: 'Все юр. лица',
+    allFolders: 'Все проекты',
     navReports: 'Отчёты',
     navUsers: 'Пользователи',
 
@@ -328,6 +330,8 @@ const i18n = {
     editStatement: 'Edit statement',
     replaceFile: 'Replace file',
     allAccounts: 'All accounts',
+    allCompanies: 'All companies',
+    allFolders: 'All projects',
     navReports: 'Reports',
     navUsers: 'Users',
 
@@ -507,6 +511,8 @@ const i18n = {
     editStatement: 'แก้ไขใบแจ้งยอด',
     replaceFile: 'แทนที่ไฟล์',
     allAccounts: 'บัญชีทั้งหมด',
+    allCompanies: 'นิติบุคคลทั้งหมด',
+    allFolders: 'โครงการทั้งหมด',
     navReports: 'รายงาน',
     navUsers: 'ผู้ใช้',
 
