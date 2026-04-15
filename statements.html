@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sunti — Банковские выписки</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <script src="_i18n.js"></script>
+  <script src="_config.js"></script>
+  <script src="_auth.js"></script>
+  <script src="_header.js"></script>
+  <style>
+    .folder-item { display:flex;align-items:center;gap:8px;padding:8px 16px;cursor:pointer;border-radius:6px;margin:1px 6px;font-size:0.88rem;color:#333;transition:background 0.1s; }
+    .folder-item:hover { background:#f4f4f4; }
+    .folder-item.active { background:#e8f0fe;color:#1a73e8;font-weight:500; }
+
+    .main-toolbar { display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap; }
+    .main-toolbar h2 { font-size:1.1rem;color:#222;flex:1; }
+    .toolbar-right { display:flex;align-items:center;gap:8px;flex-wrap:wrap; }
+
+    select.filter-select, input.filter-select, input.filter-date {
+      border:1px solid #ddd;border-radius:6px;padding:6px 10px;font-size:0.85rem;color:#333;outline:none;background:#fff;cursor:pointer;
+    }
+    select.filter-select:focus, input.filter-select:focus, input.filter-date:focus { border-color:#1a73e8; }
+
+    .st-wrap { background:#fff;border:1px solid #e8e8e8;border-radius:10px;overflow:hidden; }
+    .st-table { width:100%;border-collapse:collapse; }
+    .st-table thead { background:#f8f8f8;border-bottom:1px solid #e8e8e8; }
+    .st-table th { padding:10px 14px;font-size:0.78rem;font-weight:600;color:#888;text-align:left;text-transform:uppercase;letter-spacing:0.04em; }
+    .st-table td { padding:11px 14px;font-size:0.88rem;color:#333;border-bottom:1px solid #f0f0f0; }
+    .st-table tr:last-child td { border-bottom:none; }
+    .st-table tr:hover td { background:#fafafa; }
+
+    .empty-state { text-align:center;padding:64px 24px;color:#bbb; }
+    .loading { text-align:center;padding:48px;color:#bbb; }
+
+    .field-group { margin-bottom:14px; }
+    .field-group label { display:block;font-size:0.82rem;color:#666;margin-bottom:4px; }
+    .field-group input { width:100%;border:1px solid #ddd;border-radius:6px;padding:9px 12px;font-size:0.9rem;outline:none;box-sizing:border-box; }
+    .field-group input:focus { border-color:#1a73e8; }
+    .fields-row { display:grid;grid-template-columns:1fr 1fr;gap:12px; }
+
+    .icon-btn { background:#fff;border:1px solid #ddd;border-radius:6px;cursor:pointer;padding:5px 7px;display:inline-flex;align-items:center;justify-content:center;color:#666;transition:all 0.15s; }
+    .icon-btn:hover { border-color:#c5221f;color:#c5221f;background:#fef7f6; }
+    .icon-btn svg { width:16px;height:16px;display:block; }
+  </style>
+</head>
+<body>
+  <header id="header"></header>
+
+  <div id="guest-view">
+    <h2 id="t-guest-title"></h2>
+    <p id="t-guest-sub"></p>
+    <div style="display:flex;justify-content:center;margin-top:24px">
+      <a href="index.html" class="btn btn-primary" id="t-login"></a>
+    </div>
+  </div>
+
+  <div id="app-view">
+    <div class="layout">
+      <div class="sidebar">
+        <div class="sidebar-header">
+          <span class="sidebar-title" id="t-sidebar-title"></span>
+        </div>
+        <div id="company-list" style="flex:1;overflow-y:auto;padding:8px 0"></div>
+      </div>
+      <div class="main-area" id="main-area">
+        <div class="empty-state"><p id="t-select-company"></p></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Модалка: создать/редактировать выписку -->
+  <div class="modal-overlay" id="modal-st">
+    <div class="modal" style="width:480px;max-width:95vw">
+      <h3 id="t-modal-st-title"></h3>
+      <div class="fields-row">
+        <div class="field-group">
+          <label id="t-st-name-label"></label>
+          <input type="text" id="st-name">
+        </div>
+        <div class="field-group">
+          <label id="t-st-date-label"></label>
+          <input type="date" id="st-date">
+        </div>
+      </div>
+      <div class="field-group">
+        <label id="t-st-file-label"></label>
+        <input type="file" id="st-file" accept=".pdf,.jpg,.jpeg,.png,.xls,.xlsx,.csv" style="padding:6px">
+        <div id="st-current-file" style="font-size:0.78rem;color:#999;margin-top:4px"></div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-outline" id="btn-st-cancel"></button>
+        <button class="btn btn-primary" id="btn-st-save"></button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    const ICON_TRASH = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>';
+
+    let companies         = [];
+    let selectedCompany   = null; // { id, name, statement_access }
+    let allStatements     = [];
+    let filterSearch      = '';
+    let filterDateFrom    = '';
+    let filterDateTo      = '';
+    let searchDebounce    = null;
+    let currentStId       = null;
+    let currentStMode     = 'create';
+    let currentStFileMeta = null;
+
+    function formatDate(val) {
+      if (!val) return '—';
+      const d = new Date(val.value || val);
+      if (isNaN(d)) return '—';
+      return `${String(d.getUTCDate()).padStart(2,'0')}.${String(d.getUTCMonth()+1).padStart(2,'0')}.${d.getUTCFullYear()}`;
+    }
+
+    function showToast(msg, type) {
+      const el = document.getElementById('toast');
+      el.textContent = msg;
+      el.className = 'toast show' + (type ? ' ' + type : '');
+      clearTimeout(el._t);
+      el._t = setTimeout(() => el.className = 'toast', 3000);
+    }
+
+    function openModal(id)  { document.getElementById(id).classList.add('open'); }
+    function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+    function setText(id, val) { const el = document.getElementById(id); if (el) el.textContent = val; }
+
+    function updateTexts() {
+      setText('t-guest-title',     t('guestTitle'));
+      setText('t-guest-sub',       t('guestSub'));
+      setText('t-login',           t('login'));
+      setText('t-sidebar-title',   t('companies'));
+      setText('t-select-company',  t('selectCompany'));
+      setText('t-st-name-label',   t('name'));
+      setText('t-st-date-label',   t('date'));
+      setText('t-st-file-label',   t('file'));
+      setText('btn-st-cancel',     t('cancel'));
+      setText('btn-st-save',       t('save'));
+      updateHeaderTexts();
+    }
+
+    async function loadCompanies() {
+      const list = document.getElementById('company-list');
+      list.innerHTML = `<div style="padding:16px;color:#bbb;font-size:0.85rem">${t('loading')}</div>`;
+      try {
+        companies = await apiFetch('/bank_statements/my-companies');
+        if (!companies.length) {
+          list.innerHTML = `<div style="padding:16px;color:#bbb;font-size:0.85rem">—</div>`;
+          return;
+        }
+        list.innerHTML = companies.map(c => `
+          <div class="folder-item${selectedCompany?.id===c.id?' active':''}" data-id="${c.id}">🏢 ${c.name}</div>
+        `).join('');
+      } catch(e) {
+        list.innerHTML = `<div style="padding:16px;color:#c33;font-size:0.85rem">${e.message}</div>`;
+      }
+    }
+
+    document.getElementById('company-list').addEventListener('click', e => {
+      const item = e.target.closest('.folder-item');
+      if (!item) return;
+      selectedCompany = companies.find(c => c.id === item.dataset.id);
+      document.querySelectorAll('.folder-item').forEach(el => el.classList.remove('active'));
+      item.classList.add('active');
+      filterSearch = ''; filterDateFrom = ''; filterDateTo = '';
+      renderMainArea();
+    });
+
+    function renderMainArea() {
+      if (!selectedCompany) return;
+      const canEdit = selectedCompany.statement_access === 'editor';
+      document.getElementById('main-area').innerHTML = `
+        <div class="main-toolbar">
+          <h2>🏢 ${selectedCompany.name}</h2>
+          <div class="toolbar-right">
+            <input type="text" class="filter-select" id="filter-search" placeholder="${t('search')}" style="min-width:160px">
+            <input type="date" class="filter-date"  id="filter-date-from" title="${t('dateFrom')}">
+            <input type="date" class="filter-date"  id="filter-date-to"   title="${t('dateTo')}">
+            ${canEdit ? `<button class="btn btn-primary" id="btn-add-st">${t('addStatement')}</button>` : ''}
+          </div>
+        </div>
+        <div class="st-wrap">
+          <table class="st-table">
+            <thead>
+              <tr>
+                <th>${t('date')}</th>
+                <th>${t('name')}</th>
+                <th>${t('file')}</th>
+                <th style="width:160px"></th>
+              </tr>
+            </thead>
+            <tbody id="st-tbody"></tbody>
+          </table>
+        </div>
+      `;
+      document.getElementById('filter-search').value = filterSearch;
+      document.getElementById('filter-date-from').value = filterDateFrom;
+      document.getElementById('filter-date-to').value = filterDateTo;
+      document.getElementById('filter-search').addEventListener('input', e => {
+        filterSearch = e.target.value.trim();
+        clearTimeout(searchDebounce);
+        searchDebounce = setTimeout(loadStatements, 300);
+      });
+      document.getElementById('filter-date-from').addEventListener('change', e => { filterDateFrom = e.target.value; loadStatements(); });
+      document.getElementById('filter-date-to').addEventListener('change',   e => { filterDateTo   = e.target.value; loadStatements(); });
+      if (canEdit) {
+        document.getElementById('btn-add-st').addEventListener('click', () => {
+          currentStMode = 'create'; currentStId = null; currentStFileMeta = null;
+          document.getElementById('t-modal-st-title').textContent = t('addStatement');
+          document.getElementById('st-name').value = '';
+          document.getElementById('st-date').value = new Date().toISOString().split('T')[0];
+          document.getElementById('st-file').value = '';
+          document.getElementById('st-current-file').textContent = '';
+          openModal('modal-st');
+        });
+      }
+      loadStatements();
+    }
+
+    async function loadStatements() {
+      const tbody = document.getElementById('st-tbody');
+      if (!tbody) return;
+      tbody.innerHTML = `<tr><td colspan="4" class="loading">${t('loading')}</td></tr>`;
+      try {
+        let url = `/bank_statements?company_id=${selectedCompany.id}`;
+        if (filterSearch)   url += `&search=${encodeURIComponent(filterSearch)}`;
+        if (filterDateFrom) url += `&date_from=${filterDateFrom}`;
+        if (filterDateTo)   url += `&date_to=${filterDateTo}`;
+        allStatements = await apiFetch(url);
+        renderStatements();
+      } catch(e) {
+        tbody.innerHTML = `<tr><td colspan="4" class="empty-state">${e.message}</td></tr>`;
+      }
+    }
+
+    function renderStatements() {
+      const tbody = document.getElementById('st-tbody');
+      if (!tbody) return;
+      const canEdit = selectedCompany.statement_access === 'editor';
+      if (!allStatements.length) {
+        tbody.innerHTML = `<tr><td colspan="4" class="empty-state">${t('noStatements')}</td></tr>`;
+        return;
+      }
+      tbody.innerHTML = allStatements.map(s => `
+        <tr data-id="${s.id}">
+          <td>${formatDate(s.date)}</td>
+          <td>${s.name}</td>
+          <td>${s.file_url
+            ? `<button class="btn btn-outline" style="padding:3px 8px;font-size:0.78rem" data-action="download" data-id="${s.id}">${t('download')}</button> <span style="color:#999;font-size:0.78rem">${s.file_name || ''}</span>`
+            : `<span style="color:#ccc">${t('noFile')}</span>`}</td>
+          <td>
+            <div style="display:flex;gap:6px;align-items:center;justify-content:flex-end">
+              ${canEdit ? `
+                <button class="btn btn-outline" data-action="edit"
+                  data-id="${s.id}"
+                  data-name="${(s.name||'').replace(/"/g,'&quot;')}"
+                  data-date="${s.date ? (s.date.value || s.date) : ''}"
+                  data-file-name="${(s.file_name||'').replace(/"/g,'&quot;')}"
+                  data-file-url="${s.file_url||''}">${t('edit')}</button>
+                <button class="icon-btn" data-action="delete" data-id="${s.id}" title="${t('delete')}">${ICON_TRASH}</button>
+              ` : ''}
+            </div>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    document.addEventListener('click', async e => {
+      const btn = e.target.closest('button[data-action]');
+      if (!btn) return;
+      const action = btn.dataset.action;
+      const id     = btn.dataset.id;
+
+      if (action === 'download') {
+        try {
+          const r = await apiFetch(`/bank_statements/${id}/signed-download-url`);
+          if (r.url) window.open(r.url, '_blank');
+        } catch(err) { showToast(err.message, 'error'); }
+      }
+
+      if (action === 'edit') {
+        currentStMode = 'edit'; currentStId = id;
+        currentStFileMeta = btn.dataset.fileUrl ? { name: btn.dataset.fileName, url: btn.dataset.fileUrl } : null;
+        document.getElementById('t-modal-st-title').textContent = t('editStatement');
+        document.getElementById('st-name').value = btn.dataset.name || '';
+        document.getElementById('st-date').value = btn.dataset.date ? btn.dataset.date.split('T')[0] : '';
+        document.getElementById('st-file').value = '';
+        document.getElementById('st-current-file').textContent = currentStFileMeta ? `${t('file')}: ${currentStFileMeta.name}` : '';
+        openModal('modal-st');
+      }
+
+      if (action === 'delete') {
+        if (!confirm(t('confirmDelete'))) return;
+        try {
+          await apiFetch(`/bank_statements/${id}`, { method: 'DELETE' });
+          showToast(t('deleted'), 'success');
+          loadStatements();
+        } catch(err) { showToast(err.message, 'error'); }
+      }
+    });
+
+    document.getElementById('btn-st-cancel').addEventListener('click', () => closeModal('modal-st'));
+
+    document.getElementById('btn-st-save').addEventListener('click', async () => {
+      const name = document.getElementById('st-name').value.trim();
+      const date = document.getElementById('st-date').value;
+      const file = document.getElementById('st-file').files[0];
+      if (!name) { showToast(t('fillAllFields'), 'error'); return; }
+      closeModal('modal-st');
+      showToast(t('uploading'));
+
+      try {
+        const isCreate   = currentStMode === 'create';
+        const statementId = isCreate ? crypto.randomUUID() : currentStId;
+
+        let fileMeta = null;
+        if (file) {
+          const contentType = file.type || 'application/octet-stream';
+          const { upload_url, file_url } = await apiFetch('/bank_statements/signed-upload-url', {
+            method: 'POST',
+            body: JSON.stringify({ company_id: selectedCompany.id, statement_id: statementId, file_name: file.name, content_type: contentType }),
+          });
+          await new Promise((resolve, reject) => {
+            const xhr = new XMLHttpRequest();
+            xhr.open('PUT', upload_url);
+            xhr.setRequestHeader('Content-Type', contentType);
+            xhr.onload  = () => xhr.status === 200 ? resolve() : reject(new Error('Upload failed: ' + xhr.status));
+            xhr.onerror = () => reject(new Error('Upload error'));
+            xhr.send(file);
+          });
+          fileMeta = { file_name: file.name, file_url, file_size: file.size };
+        }
+
+        if (isCreate) {
+          await apiFetch('/bank_statements', {
+            method: 'POST',
+            body: JSON.stringify({
+              id: statementId,
+              company_id: selectedCompany.id,
+              name, date,
+              file_name: fileMeta?.file_name || '',
+              file_url:  fileMeta?.file_url  || '',
+              file_size: fileMeta?.file_size || 0,
+            }),
+          });
+        } else {
+          await apiFetch(`/bank_statements/${statementId}`, {
+            method: 'PUT',
+            body: JSON.stringify({
+              name, date,
+              replace_file: !!fileMeta,
+              file_name: fileMeta?.file_name || '',
+              file_url:  fileMeta?.file_url  || '',
+              file_size: fileMeta?.file_size || 0,
+            }),
+          });
+        }
+        showToast(t('saved'), 'success');
+        loadStatements();
+      } catch(e) {
+        console.error(e);
+        showToast(e.message, 'error');
+      }
+    });
+
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape') closeModal('modal-st');
+    });
+
+    window.onLogin = async () => { updateTexts(); await loadCompanies(); };
+    window.onLogout = () => {
+      companies = []; selectedCompany = null;
+      document.getElementById('company-list').innerHTML = '';
+      document.getElementById('main-area').innerHTML = `<div class="empty-state"><p>${t('selectCompany')}</p></div>`;
+      updateTexts();
+    };
+    window.onLangChange = () => {
+      updateTexts();
+      if (selectedCompany) renderMainArea();
+    };
+
+    renderHeader('statements');
+    updateTexts();
+  </script>
+</body>
+</html>
