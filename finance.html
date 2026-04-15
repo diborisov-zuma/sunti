@@ -22,10 +22,18 @@
     .main-toolbar h2 { font-size:1.1rem;color:#222;flex:1; }
     .toolbar-right { display:flex;align-items:center;gap:8px;flex-wrap:wrap; }
 
-    select.filter-select, input.filter-date {
+    select.filter-select, input.filter-select, input.filter-date {
       border:1px solid #ddd;border-radius:6px;padding:6px 10px;font-size:0.85rem;color:#333;outline:none;background:#fff;cursor:pointer;
     }
-    select.filter-select:focus, input.filter-date:focus { border-color:#1a73e8; }
+    select.filter-select:focus, input.filter-select:focus, input.filter-date:focus { border-color:#1a73e8; }
+
+    .combo { position:relative; display:inline-block; }
+    .combo input { min-width:180px; }
+    .combo ul { position:absolute;top:100%;left:0;right:0;max-height:220px;overflow-y:auto;background:#fff;border:1px solid #ddd;border-radius:6px;margin-top:2px;box-shadow:0 4px 12px rgba(0,0,0,0.08);list-style:none;padding:4px 0;z-index:50;display:none; }
+    .combo.open ul { display:block; }
+    .combo li { padding:6px 10px;font-size:0.85rem;color:#333;cursor:pointer; }
+    .combo li:hover, .combo li.active { background:#e8f0fe;color:#1a73e8; }
+    .combo li.empty { color:#bbb;cursor:default; }
 
     .inv-wrap { background:#fff;border:1px solid #e8e8e8;border-radius:10px;overflow:hidden; }
     .inv-table { width:100%;border-collapse:collapse; }
@@ -171,8 +179,18 @@
         </div>
         <div class="field-group">
           <label id="t-trx-cat-label"></label>
-          <select id="trx-category"><option value="">—</option></select>
+          <span class="combo" style="display:block">
+            <input type="text" id="trx-category-input" style="width:100%;border:1px solid #ddd;border-radius:6px;padding:9px 12px;font-size:0.9rem;outline:none;box-sizing:border-box">
+            <ul id="trx-category-list"></ul>
+          </span>
         </div>
+      </div>
+      <div class="field-group" id="trx-folder-group" style="display:none">
+        <label id="t-trx-folder-label"></label>
+        <span class="combo" style="display:block">
+          <input type="text" id="trx-folder-input" style="width:100%;border:1px solid #ddd;border-radius:6px;padding:9px 12px;font-size:0.9rem;outline:none;box-sizing:border-box">
+          <ul id="trx-folder-list"></ul>
+        </span>
       </div>
       <div class="field-group">
         <label id="t-trx-desc-label"></label>
@@ -252,6 +270,8 @@
     let filterSearch       = '';
     let filterAccount      = 'all';
     let accountsCache      = [];
+    let foldersCache       = [];
+    let currentTrxInvoiceId = null;
     let searchDebounce     = null;
     let categoriesCache    = [];
     let usersCache         = [];
@@ -285,6 +305,63 @@
     }
 
     function fmt(n) { return parseFloat(n||0).toLocaleString('en-US', { minimumFractionDigits:2, maximumFractionDigits:2 }); }
+
+    function catLabel(c) {
+      if (!c) return '';
+      if (currentLang === 'en') return c.name_en || c.name;
+      if (currentLang === 'th') return c.name_th || c.name;
+      return c.name;
+    }
+    function catLabelById(id) {
+      if (!id) return '';
+      const c = categoriesCache.find(x => x.id === id);
+      return c ? catLabel(c) : '';
+    }
+
+    // Combo widget: searchable dropdown bound to a hidden id
+    function bindCombo(inputId, listId, items, { placeholder, selectedId, onSelect, allowAll = false, allLabel = '' } = {}) {
+      const input = document.getElementById(inputId);
+      const list  = document.getElementById(listId);
+      if (!input || !list) return { setSelected(){}, getSelected(){ return ''; } };
+      const wrap = input.closest('.combo');
+      let selected = selectedId || '';
+      input.placeholder = placeholder || '';
+      function labelFor(id) {
+        if (allowAll && !id) return allLabel;
+        const it = items.find(x => x.id === id);
+        return it ? it.label : '';
+      }
+      input.value = labelFor(selected);
+      function render(filter) {
+        const q = (filter || '').toLowerCase().trim();
+        let html = '';
+        if (allowAll) html += `<li data-id="" ${selected===''?'class="active"':''}>${allLabel}</li>`;
+        const filtered = items.filter(x => !q || x.label.toLowerCase().includes(q));
+        if (!filtered.length && !allowAll) html += `<li class="empty">—</li>`;
+        filtered.forEach(x => {
+          html += `<li data-id="${x.id}" ${x.id===selected?'class="active"':''}>${x.label}</li>`;
+        });
+        list.innerHTML = html;
+      }
+      render('');
+      input.addEventListener('focus', () => { render(''); wrap.classList.add('open'); });
+      input.addEventListener('input', () => { render(input.value); wrap.classList.add('open'); });
+      document.addEventListener('click', e => {
+        if (!wrap.contains(e.target)) wrap.classList.remove('open');
+      });
+      list.addEventListener('click', e => {
+        const li = e.target.closest('li[data-id]');
+        if (!li || li.classList.contains('empty')) return;
+        selected = li.dataset.id;
+        input.value = labelFor(selected);
+        wrap.classList.remove('open');
+        if (onSelect) onSelect(selected);
+      });
+      return {
+        setSelected(id) { selected = id || ''; input.value = labelFor(selected); },
+        getSelected()  { return selected; },
+      };
+    }
 
     function fileIcon(name) {
       const ext = (name||'').split('.').pop().toLowerCase();
@@ -321,6 +398,7 @@
       document.getElementById('t-trx-direction-label').textContent = t('direction');
       document.getElementById('t-trx-amount-label').textContent = t('amount');
       document.getElementById('t-trx-cat-label').textContent    = t('category');
+      setText('t-trx-folder-label',                                 t('navFolders'));
       document.getElementById('t-trx-desc-label').textContent   = t('description');
       document.getElementById('trx-opt-income').textContent     = t('income');
       document.getElementById('trx-opt-expense').textContent    = t('expense');
@@ -341,16 +419,21 @@
       catch(e) { categoriesCache = []; }
     }
 
-    function fillCategorySelect(selectId, selectedId) {
-      const sel = document.getElementById(selectId);
-      if (!sel) return;
-      sel.innerHTML = `<option value="">— ${t('noCategory')} —</option>`;
-      categoriesCache.forEach(c => {
-        const opt = document.createElement('option');
-        opt.value = c.id; opt.textContent = c.name;
-        if (c.id === selectedId) opt.selected = true;
-        sel.appendChild(opt);
-      });
+    let modalCategoryCombo = null;
+    let modalFolderCombo   = null;
+
+    function mountModalCombos(selectedCatId, selectedFolderId, showFolder) {
+      modalCategoryCombo = bindCombo('trx-category-input', 'trx-category-list',
+        categoriesCache.map(c => ({ id: c.id, label: catLabel(c) })),
+        { placeholder: t('noCategory'), allowAll: true, allLabel: '— ' + t('noCategory') + ' —', selectedId: selectedCatId || '' });
+      document.getElementById('trx-folder-group').style.display = showFolder ? 'block' : 'none';
+      if (showFolder) {
+        modalFolderCombo = bindCombo('trx-folder-input', 'trx-folder-list',
+          foldersCache.map(f => ({ id: f.id, label: f.name })),
+          { placeholder: t('navFolders'), allowAll: false, selectedId: selectedFolderId || '' });
+      } else {
+        modalFolderCombo = null;
+      }
     }
 
     // ПАПКИ
@@ -358,7 +441,8 @@
       const list = document.getElementById('folder-list');
       list.innerHTML = `<div style="padding:16px;color:#bbb;font-size:0.85rem">${t('loading')}</div>`;
       try {
-        const folders = await apiFetch('/folders');
+        foldersCache = await apiFetch('/folders');
+        const folders = foldersCache;
         const active  = folders.filter(f => f.status === 'active');
         const archive = folders.filter(f => f.status === 'archive');
         let html = '';
@@ -409,9 +493,10 @@
               <option value="income">${t('income')}</option>
               <option value="expense">${t('expense')}</option>
             </select>
-            <select class="filter-select" id="filter-category">
-              <option value="all">${t('allCategories')}</option>
-            </select>
+            <span class="combo">
+              <input type="text" class="filter-select" id="filter-category-input" placeholder="${t('allCategories')}">
+              <ul id="filter-category-list"></ul>
+            </span>
             <select class="filter-select" id="filter-account">
               <option value="all">${t('allAccounts')}</option>
               ${accountsCache.map(a => `<option value="${a.id}">${a.name}</option>`).join('')}
@@ -459,13 +544,14 @@
         </div>
       `;
 
-      const catSel = document.getElementById('filter-category');
-      categoriesCache.forEach(c => {
-        const opt = document.createElement('option');
-        opt.value = c.id; opt.textContent = c.name;
-        catSel.appendChild(opt);
+      const catItems = categoriesCache.map(c => ({ id: c.id, label: catLabel(c) }));
+      bindCombo('filter-category-input', 'filter-category-list', catItems, {
+        placeholder: t('allCategories'),
+        allowAll: true,
+        allLabel: t('allCategories'),
+        selectedId: filterCategory === 'all' ? '' : filterCategory,
+        onSelect: (id) => { filterCategory = id || 'all'; currentPage = 1; renderTransactions(); },
       });
-      catSel.value = filterCategory;
 
       document.getElementById('filter-search').value   = filterSearch;
       document.getElementById('filter-search').addEventListener('input', e => {
@@ -485,16 +571,15 @@
       document.getElementById('filter-direction').addEventListener('change', e => { filterDirection = e.target.value; currentPage = 1; renderTransactions(); });
       document.getElementById('filter-account').value = filterAccount;
       document.getElementById('filter-account').addEventListener('change', e => { filterAccount = e.target.value; currentPage = 1; renderTransactions(); });
-      document.getElementById('filter-category').addEventListener('change',  e => { filterCategory  = e.target.value; currentPage = 1; renderTransactions(); });
       document.getElementById('page-size-select').addEventListener('change', e => { pageSize = parseInt(e.target.value); currentPage = 1; renderTransactions(); });
 
       document.getElementById('btn-create-trx').addEventListener('click', () => {
-        currentTrxMode = 'create'; currentTrxId = null;
+        currentTrxMode = 'create'; currentTrxId = null; currentTrxInvoiceId = null;
         document.getElementById('trx-date').value      = new Date().toISOString().split('T')[0];
         document.getElementById('trx-direction').value = 'expense';
         document.getElementById('trx-amount').value    = '';
         document.getElementById('trx-desc').value      = '';
-        fillCategorySelect('trx-category', null);
+        mountModalCombos(null, selectedFolderId, false); // create: folder fixed to current
         openModal('modal-trx');
         setTimeout(() => document.getElementById('trx-amount').focus(), 100);
       });
@@ -571,7 +656,7 @@
           <td>${formatDate(tx.date)}</td>
           <td style="color:#666">${tx.account_name || '—'}</td>
           <td class="amount-col ${tx.direction==='expense'?'expense':'income'}">${tx.direction==='expense'?'-':''}${fmt(tx.amount)}</td>
-          <td>${tx.category_name ? `<span class="cat-badge">${tx.category_name}</span>` : '<span style="color:#ccc">—</span>'}</td>
+          <td>${tx.category_id ? `<span class="cat-badge">${catLabelById(tx.category_id) || tx.category_name || ''}</span>` : '<span style="color:#ccc">—</span>'}</td>
           <td style="color:#666">${tx.description||'—'}</td>
           <td>
             <div style="display:flex;gap:6px;align-items:center">
@@ -581,6 +666,8 @@
                 data-direction="${tx.direction}"
                 data-amount="${tx.amount}"
                 data-category="${tx.category_id||''}"
+                data-folder="${tx.folder_id||''}"
+                data-invoice="${tx.invoice_id||''}"
                 data-desc="${(tx.description||'').replace(/"/g,'&quot;')}">${t('edit')}</button>
               ${deletedOrMark}
               ${isAdmin ? `<button class="icon-btn" data-action="hard-delete-trx" data-id="${tx.id}" title="${t('hardDelete')}">${ICON_TRASH}</button>` : ''}
@@ -822,11 +909,13 @@
 
       if (action === 'edit-trx') {
         currentTrxMode = 'edit'; currentTrxId = btn.dataset.id;
+        currentTrxInvoiceId = btn.dataset.invoice || null;
         document.getElementById('trx-date').value      = btn.dataset.date ? btn.dataset.date.split('T')[0] : '';
         document.getElementById('trx-direction').value = btn.dataset.direction;
         document.getElementById('trx-amount').value    = btn.dataset.amount;
         document.getElementById('trx-desc').value      = btn.dataset.desc;
-        fillCategorySelect('trx-category', btn.dataset.category);
+        const showFolderPicker = !currentTrxInvoiceId; // нет invoice → можно менять folder
+        mountModalCombos(btn.dataset.category || '', btn.dataset.folder || selectedFolderId, showFolderPicker);
         openModal('modal-trx');
         setTimeout(() => document.getElementById('trx-amount').focus(), 100);
       }
@@ -874,20 +963,21 @@
       const direction   = document.getElementById('trx-direction').value;
       const amount      = document.getElementById('trx-amount').value;
       const description = document.getElementById('trx-desc').value;
-      const category_id = document.getElementById('trx-category').value || null;
+      const category_id = (modalCategoryCombo && modalCategoryCombo.getSelected()) || null;
+      const folder_id   = (modalFolderCombo && modalFolderCombo.getSelected()) || selectedFolderId;
       if (!date || !amount) { showToast(t('fillAllFields'), 'error'); return; }
       closeModal('modal-trx');
       try {
         if (currentTrxMode === 'create') {
           await apiFetch('/transactions', {
             method: 'POST',
-            body: JSON.stringify({ date, amount, direction, category_id, description, folder_id: selectedFolderId }),
+            body: JSON.stringify({ date, amount, direction, category_id, description, folder_id }),
           });
           showToast(t('saved'), 'success');
         } else {
           await apiFetch(`/transactions/${currentTrxId}`, {
             method: 'PUT',
-            body: JSON.stringify({ date, amount, direction, category_id, description, folder_id: selectedFolderId }),
+            body: JSON.stringify({ date, amount, direction, category_id, description, folder_id }),
           });
           showToast(t('saved'), 'success');
         }

@@ -33,10 +33,10 @@ exports.categories = async (req, res) => {
   try {
     if (req.method === 'GET') {
       const type = req.query.type;
-      let query = `SELECT id, name, type FROM ${table} ORDER BY type, name`;
+      let query = `SELECT id, name, name_en, name_th, type FROM ${table} ORDER BY type, name`;
       const params = {};
       if (type) {
-        query = `SELECT id, name, type FROM ${table} WHERE type = @type ORDER BY name`;
+        query = `SELECT id, name, name_en, name_th, type FROM ${table} WHERE type = @type ORDER BY name`;
         params.type = type;
       }
       const [rows] = await bigquery.query({ query, params });
