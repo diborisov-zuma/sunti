@@ -145,6 +145,7 @@ exports.bank_statements = async (req, res) => {
       if (search)    { where += ' AND LOWER(name) LIKE LOWER(@search)'; params.search = `%${search.trim()}%`; }
       if (date_from) { where += ' AND date >= @date_from'; params.date_from = date_from; }
       if (date_to)   { where += ' AND date <= @date_to';   params.date_to   = date_to; }
+      if (req.query.account_id) { where += ' AND account_id = @account_id'; params.account_id = req.query.account_id; }
 
       const [rows] = await bigquery.query({
         query: `SELECT id, company_id, account_id, name, date, file_name, file_url, file_size, uploaded_at, uploaded_by
