@@ -44,13 +44,16 @@ exports.categories = async (req, res) => {
     if (req.method === 'PUT' && path === '/reorder') {
       if (!(await isAdmin(email))) { res.status(403).json({ error: 'Forbidden' }); return; }
       const ids = (req.body && req.body.ids) || [];
-      if (!Array.isArray(ids)) { res.status(400).json({ error: 'ids must be an array' }); return; }
-      for (let i = 0; i < ids.length; i++) {
-        await bigquery.query({
-          query: `UPDATE ${table} SET sort_order = @pos WHERE id = @id`,
-          params: { id: ids[i], pos: (i + 1) * 1000 },
-        });
-      }
+      if (!Array.isArray(ids) || !ids.length) { res.status(400).json({ error: 'ids must be a non-empty array' }); return; }
+      const cases = ids.map((_, i) => `WHEN @id${i} THEN ${(i + 1) * 1000}`).join(' ');
+      const idParams = {};
+      ids.forEach((id, i) => { idParams['id' + i] = id; });
+      await bigquery.query({
+        query: `UPDATE ${table}
+                SET sort_order = CASE id ${cases} ELSE sort_order END
+                WHERE id IN UNNEST(@all_ids)`,
+        params: { ...idParams, all_ids: ids },
+      });
       res.json({ success: true });
       return;
     }
