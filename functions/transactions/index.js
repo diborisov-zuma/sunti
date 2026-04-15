@@ -42,10 +42,10 @@ exports.transactions = async (req, res) => {
       const params = {};
 
       if (invoiceId) {
-        where = 'WHERE t.invoice_id = @invoice_id';
+        where = 'WHERE t.invoice_id = @invoice_id AND IFNULL(t.status, \'active\') != \'deleted\'';
         params.invoice_id = invoiceId;
       } else if (folderId) {
-        where = 'WHERE t.folder_id = @folder_id';
+        where = 'WHERE t.folder_id = @folder_id AND IFNULL(t.status, \'active\') != \'deleted\'';
         params.folder_id = folderId;
       } else {
         res.status(400).json({ error: 'invoice_id or folder_id is required' });
@@ -130,15 +130,47 @@ exports.transactions = async (req, res) => {
       return;
     }
 
-    // DELETE
+    // DELETE — мягкое или полное удаление
     if (req.method === 'DELETE') {
-      const id = req.url.split('/').filter(Boolean).pop().split('?')[0];
+      const id   = req.url.split('/').filter(Boolean).pop().split('?')[0];
+      const hard = req.query.hard === 'true';
       if (!id) { res.status(400).json({ error: 'id is required' }); return; }
 
-      // Каскадное удаление файлов
-      const filesTable = `\`${PROJECT}.${DATASET}.transaction_files\``;
-      await bigquery.query({ query: `DELETE FROM ${filesTable} WHERE transaction_id = @id`, params: { id } });
-      await bigquery.query({ query: `DELETE FROM ${table} WHERE id = @id`, params: { id } });
+      if (hard) {
+        const filesTable = `\`${PROJECT}.${DATASET}.transaction_files\``;
+        await bigquery.query({ query: `DELETE FROM ${filesTable} WHERE transaction_id = @id`, params: { id } });
+        await bigquery.query({ query: `DELETE FROM ${table} WHERE id = @id`, params: { id } });
+      } else {
+        // Мягкое удаление — обновляем статус через DELETE+INSERT
+        const [rows] = await bigquery.query({
+          query: `SELECT date, amount, direction, account_id, counterparty_id, category_id,
+                         invoice_id, folder_id, description,
+                         FORMAT_TIMESTAMP('%Y-%m-%dT%H:%M:%S', created_at) as created_at
+                  FROM ${table} WHERE id = @id`,
+          params: { id },
+        });
+        if (!rows.length) { res.status(404).json({ error: 'Not found' }); return; }
+        const cur = rows[0];
+
+        await bigquery.query({ query: `DELETE FROM ${table} WHERE id = @id`, params: { id } });
+        await bigquery.query({
+          query: `INSERT INTO ${table} (id, date, amount, direction, account_id, counterparty_id, category_id, invoice_id, folder_id, description, status, created_at)
+                  VALUES (@id, @date, @amount, @direction, NULLIF(@account_id,''), NULLIF(@counterparty_id,''), NULLIF(@category_id,''), NULLIF(@invoice_id,''), NULLIF(@folder_id,''), @description, 'deleted', TIMESTAMP(@created_at))`,
+          params: {
+            id,
+            date:            cur.date,
+            amount:          cur.amount,
+            direction:       cur.direction,
+            account_id:      cur.account_id      || '',
+            counterparty_id: cur.counterparty_id || '',
+            category_id:     cur.category_id     || '',
+            invoice_id:      cur.invoice_id      || '',
+            folder_id:       cur.folder_id       || '',
+            description:     cur.description     || '',
+            created_at:      cur.created_at,
+          },
+        });
+      }
 
       res.json({ success: true });
       return;

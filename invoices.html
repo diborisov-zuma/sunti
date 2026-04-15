@@ -48,7 +48,8 @@
     .status-partial { background:#fef7e0;color:#b45309; }
     .status-paid    { background:#e6f4ea;color:#1e8e3e; }
 
-    .cat-badge { display:inline-block;padding:2px 8px;border-radius:20px;font-size:0.75rem;background:#f1f3f4;color:#555; }
+    .status-deleted { background:#f5f5f5;color:#999; }
+    .inv-table tr.inv-row.status-deleted td { opacity:0.6; }
 
     .amount-col { text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap; }
     .amount-remaining { color:#c5221f;font-weight:500; }
@@ -589,7 +590,7 @@
     }
 
     function statusLabel(s) {
-      const map = { active: t('invActive'), to_pay: t('invToPay'), partial: t('invPartial'), paid: t('invPaid') };
+      const map = { active: t('invActive'), to_pay: t('invToPay'), partial: t('invPartial'), paid: t('invPaid'), deleted: t('invDeleted') };
       return map[s] || s;
     }
 
@@ -696,6 +697,7 @@
               <option value="to_pay">${t('invToPay')}</option>
               <option value="partial">${t('invPartial')}</option>
               <option value="paid">${t('invPaid')}</option>
+              <option value="deleted">${t('invDeleted')}</option>
             </select>
             <select class="filter-select" id="filter-category">
               <option value="all">${t('allCategories')}</option>
@@ -848,7 +850,8 @@
                   data-direction="${r.direction||'expense'}"
                   data-total="${r.total_amount}" data-paid="${r.paid_amount}"
                   data-category="${r.category_id||''}">${t('edit')}</button>
-                <button class="btn btn-danger" data-action="delete-inv" data-id="${r.id}">${t('delete')}</button>
+                <button class="btn btn-outline" style="color:#c5221f;border-color:#c5221f" data-action="delete-inv" data-id="${r.id}">${t('markDeleted')}</button>
+                ${isAdmin ? `<button class="btn btn-danger" data-action="hard-delete-inv" data-id="${r.id}">${t('hardDelete')}</button>` : ''}
                 <button class="chat-btn" data-doc-id="${r.id}" data-doc-type="invoice" data-doc-name="${r.name}"
                   title="${t('chat')}">💬<span class="chat-badge" style="display:none"></span></button>
               </div>
@@ -934,7 +937,8 @@
                     data-date="${tx.date ? (tx.date.value || tx.date) : ''}" data-direction="${tx.direction}"
                     data-amount="${tx.amount}" data-category="${tx.category_id||''}"
                     data-desc="${tx.description||''}">${t('edit')}</button>
-                  <button class="btn btn-danger" style="padding:3px 8px;font-size:0.78rem" data-action="delete-trx" data-id="${tx.id}" data-inv-id="${invId}">${t('delete')}</button>
+                  <button class="btn btn-outline" style="padding:3px 8px;font-size:0.78rem;color:#c5221f;border-color:#c5221f" data-action="delete-trx" data-id="${tx.id}" data-inv-id="${invId}">${t('markDeleted')}</button>
+                  ${isAdmin ? `<button class="btn btn-danger" style="padding:3px 8px;font-size:0.78rem" data-action="hard-delete-trx" data-id="${tx.id}" data-inv-id="${invId}">${t('hardDelete')}</button>` : ''}
                   <button class="chat-btn" style="font-size:0.82rem;padding:2px 4px" data-doc-id="${tx.id}" data-doc-type="transaction" data-doc-name="${tx.description||formatDate(tx.date)}"
                     title="${t('chat')}">💬<span class="chat-badge" style="display:none"></span></button>
                 </div>
@@ -1109,8 +1113,15 @@
       }
 
       if (action === 'delete-inv') {
-        if (!confirm(t('confirmDelete'))) return;
+        if (!confirm(t('confirmMarkDeleted'))) return;
         apiFetch(`/invoices/${btn.dataset.id}`, { method: 'DELETE' })
+          .then(() => { showToast(t('markedDeleted'), 'success'); loadInvoices(); })
+          .catch(e => { showToast(e.message, 'error'); });
+      }
+
+      if (action === 'hard-delete-inv') {
+        if (!confirm(t('confirmHardDelete'))) return;
+        apiFetch(`/invoices/${btn.dataset.id}?hard=true`, { method: 'DELETE' })
           .then(() => { showToast(t('deleted'), 'success'); loadInvoices(); })
           .catch(e => { showToast(e.message, 'error'); });
       }
@@ -1138,9 +1149,17 @@
       }
 
       if (action === 'delete-trx') {
-        if (!confirm(t('confirmDelete'))) return;
+        if (!confirm(t('confirmMarkDeleted'))) return;
         const invId = btn.dataset.invId;
         apiFetch(`/transactions/${btn.dataset.id}`, { method: 'DELETE' })
+          .then(() => { showToast(t('markedDeleted'), 'success'); loadInvoiceDetail(invId); })
+          .catch(e => { showToast(e.message, 'error'); });
+      }
+
+      if (action === 'hard-delete-trx') {
+        if (!confirm(t('confirmHardDelete'))) return;
+        const invId = btn.dataset.invId;
+        apiFetch(`/transactions/${btn.dataset.id}?hard=true`, { method: 'DELETE' })
           .then(() => { showToast(t('deleted'), 'success'); loadInvoiceDetail(invId); })
           .catch(e => { showToast(e.message, 'error'); });
       }
