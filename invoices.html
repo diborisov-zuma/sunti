@@ -1219,7 +1219,7 @@
       closeModal('modal-trx');
       try {
         if (currentTrxMode === 'create') {
-          await apiFetch('/transactions', { method: 'POST', body: JSON.stringify({ date, amount, direction, category_id, description, invoice_id: currentTrxInvId }) });
+          await apiFetch('/transactions', { method: 'POST', body: JSON.stringify({ date, amount, direction, category_id, description, invoice_id: currentTrxInvId, folder_id: selectedFolderId }) });
           showToast(t('saved'), 'success');
         } else {
           await apiFetch(`/transactions/${currentTrxId}`, { method: 'PUT', body: JSON.stringify({ date, amount, direction, category_id, description }) });

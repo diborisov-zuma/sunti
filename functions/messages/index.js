@@ -6,7 +6,7 @@ const PROJECT        = 'project-9718e7d4-4cd7-4f52-8d6';
 const DATASET        = 'sunti';
 const TELEGRAM_TOKEN = '8766299522:AAGfJ9mdsOWv2f_HgNsRH0sjC3XweStQWRQ';
 const TELEGRAM_API   = `https://api.telegram.org/bot${TELEGRAM_TOKEN}`;
-const APP_URL        = 'http://localhost:3000';
+const APP_URL        = 'https://project-9718e7d4-4cd7-4f52-8d6.web.app';
 
 function setCors(res) {
   res.set('Access-Control-Allow-Origin', '*');
