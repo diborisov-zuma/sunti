@@ -60,6 +60,7 @@ exports.transactions = async (req, res) => {
         query: `SELECT t.id, t.date, t.amount, t.direction, t.account_id,
                        t.counterparty_id, t.category_id, t.invoice_id, t.folder_id,
                        t.description, t.created_at,
+                       IFNULL(t.status, 'active') AS status,
                        c.name as category_name
                 FROM ${table} t
                 LEFT JOIN ${catTable} c ON t.category_id = c.id

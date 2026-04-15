@@ -108,6 +108,12 @@
     .chat-send-btn { background:#1a73e8;border:none;color:#fff;border-radius:8px;padding:8px 14px;cursor:pointer;font-size:0.85rem;white-space:nowrap;transition:background 0.15s; }
     .chat-send-btn:hover { background:#1557b0; }
     .chat-empty { text-align:center;padding:32px 16px;color:#bbb;font-size:0.85rem; }
+
+    .icon-btn { background:#fff;border:1px solid #ddd;border-radius:6px;cursor:pointer;padding:5px 7px;display:inline-flex;align-items:center;justify-content:center;color:#666;transition:all 0.15s; }
+    .icon-btn:hover { border-color:#c5221f;color:#c5221f;background:#fef7f6; }
+    .icon-btn svg { width:16px;height:16px;display:block; }
+    .deleted-label { display:inline-block;padding:4px 12px;background:#fce8e6;color:#c5221f;border-radius:6px;font-weight:700;font-size:0.78rem;letter-spacing:0.08em;text-transform:uppercase; }
+    tr.trx-main-row.status-deleted td { opacity:0.6; }
   </style>
 </head>
 <body>
@@ -219,6 +225,9 @@
   <script>
     const STORAGE_BUCKET = 'https://storage.googleapis.com/sunti-site';
 
+    const ICON_EYE_OFF = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>';
+    const ICON_TRASH = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>';
+
     let selectedFolderId   = null;
     let selectedFolderName = '';
     let allTransactions    = [];
@@ -286,12 +295,17 @@
     function openModal(id)  { document.getElementById(id).classList.add('open'); }
     function closeModal(id) { document.getElementById(id).classList.remove('open'); }
 
+    function setText(id, val) {
+      const el = document.getElementById(id);
+      if (el) el.textContent = val;
+    }
+
     function updateTexts() {
-      document.getElementById('t-guest-title').textContent    = t('guestTitle');
-      document.getElementById('t-guest-sub').textContent      = t('guestSub');
-      document.getElementById('t-login').textContent          = t('login');
-      document.getElementById('t-sidebar-title').textContent  = t('navFolders');
-      document.getElementById('t-select-project').textContent = t('selectProject');
+      setText('t-guest-title',    t('guestTitle'));
+      setText('t-guest-sub',      t('guestSub'));
+      setText('t-login',          t('login'));
+      setText('t-sidebar-title',  t('navFolders'));
+      setText('t-select-project', t('selectProject'));
       document.getElementById('t-modal-trx-title').textContent  = t('transaction');
       document.getElementById('t-trx-date-label').textContent   = t('date');
       document.getElementById('t-trx-direction-label').textContent = t('direction');
@@ -373,8 +387,8 @@
             <input type="date" class="filter-date" id="filter-date-from" title="${t('dateFrom')}">
             <input type="date" class="filter-date" id="filter-date-to"   title="${t('dateTo')}">
             <select class="filter-select" id="filter-status">
-              <option value="active">${t('invActive')}</option>
-              <option value="deleted">${t('invDeleted')}</option>
+              <option value="active">${t('filterStatusActive')}</option>
+              <option value="deleted">${t('filterStatusDeleted')}</option>
             </select>
             <select class="filter-select" id="filter-direction">
               <option value="all">${t('allDirections')}</option>
@@ -518,8 +532,12 @@
       pageRows.forEach(tx => {
         const isExp = expandedTrx[tx.id] || false;
         const tr = document.createElement('tr');
-        tr.className = `trx-main-row direction-${tx.direction||'expense'}`;
+        const isDeleted = tx.status === 'deleted';
+        tr.className = `trx-main-row direction-${tx.direction||'expense'}${isDeleted?' status-deleted':''}`;
         tr.dataset.id = tx.id;
+        const deletedOrMark = isDeleted
+          ? `<span class="deleted-label">DELETED</span>`
+          : `<button class="icon-btn" data-action="delete-trx" data-id="${tx.id}" title="${t('markDeleted')}">${ICON_EYE_OFF}</button>`;
         tr.innerHTML = `
           <td><button class="expand-btn${isExp?' open':''}" data-trx-id="${tx.id}">${isExp?'▼':'▶'}</button></td>
           <td>${formatDate(tx.date)}</td>
@@ -536,8 +554,8 @@
                 data-amount="${tx.amount}"
                 data-category="${tx.category_id||''}"
                 data-desc="${(tx.description||'').replace(/"/g,'&quot;')}">${t('edit')}</button>
-              <button class="btn btn-outline" style="color:#c5221f;border-color:#c5221f" data-action="delete-trx" data-id="${tx.id}">${t('markDeleted')}</button>
-              ${isAdmin ? `<button class="btn btn-danger" data-action="hard-delete-trx" data-id="${tx.id}">${t('hardDelete')}</button>` : ''}
+              ${deletedOrMark}
+              ${isAdmin ? `<button class="icon-btn" data-action="hard-delete-trx" data-id="${tx.id}" title="${t('hardDelete')}">${ICON_TRASH}</button>` : ''}
               <button class="chat-btn" data-doc-id="${tx.id}" data-doc-type="transaction" data-doc-name="${(tx.description||formatDate(tx.date)).replace(/"/g,'&quot;')}"
                 title="${t('chat')}">💬<span class="chat-badge" style="display:none"></span></button>
             </div>
@@ -895,7 +913,10 @@
       closeChat();
       updateTexts();
     };
-    window.onLangChange = () => updateTexts();
+    window.onLangChange = () => {
+      updateTexts();
+      if (selectedFolderId) renderMainArea();
+    };
 
     renderHeader('finance');
     updateTexts();

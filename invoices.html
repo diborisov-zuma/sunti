@@ -208,6 +208,11 @@
     .chat-send-btn:hover { background: #1557b0; }
 
     .chat-empty { text-align: center; padding: 32px 16px; color: #bbb; font-size: 0.85rem; }
+
+    .icon-btn { background:#fff;border:1px solid #ddd;border-radius:6px;cursor:pointer;padding:5px 7px;display:inline-flex;align-items:center;justify-content:center;color:#666;transition:all 0.15s; }
+    .icon-btn:hover { border-color:#c5221f;color:#c5221f;background:#fef7f6; }
+    .icon-btn svg { width:16px;height:16px;display:block; }
+    .deleted-label { display:inline-block;padding:4px 12px;background:#fce8e6;color:#c5221f;border-radius:6px;font-weight:700;font-size:0.78rem;letter-spacing:0.08em;text-transform:uppercase; }
   </style>
 </head>
 <body>
@@ -366,6 +371,9 @@
 
   <script>
     const STORAGE_BUCKET = 'https://storage.googleapis.com/sunti-site';
+
+    const ICON_EYE_OFF = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>';
+    const ICON_TRASH = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>';
 
     function formatDate(val) {
       if (!val) return '—';
@@ -693,11 +701,11 @@
           <div class="toolbar-right">
             <select class="filter-select" id="filter-status">
               <option value="all">${t('allStatuses')}</option>
-              <option value="active">${t('invActive')}</option>
+              <option value="active">${t('filterStatusActive')}</option>
               <option value="to_pay">${t('invToPay')}</option>
               <option value="partial">${t('invPartial')}</option>
               <option value="paid">${t('invPaid')}</option>
-              <option value="deleted">${t('invDeleted')}</option>
+              <option value="deleted">${t('filterStatusDeleted')}</option>
             </select>
             <select class="filter-select" id="filter-category">
               <option value="all">${t('allCategories')}</option>
@@ -850,8 +858,10 @@
                   data-direction="${r.direction||'expense'}"
                   data-total="${r.total_amount}" data-paid="${r.paid_amount}"
                   data-category="${r.category_id||''}">${t('edit')}</button>
-                <button class="btn btn-outline" style="color:#c5221f;border-color:#c5221f" data-action="delete-inv" data-id="${r.id}">${t('markDeleted')}</button>
-                ${isAdmin ? `<button class="btn btn-danger" data-action="hard-delete-inv" data-id="${r.id}">${t('hardDelete')}</button>` : ''}
+                ${r.status === 'deleted'
+                  ? `<span class="deleted-label">DELETED</span>`
+                  : `<button class="icon-btn" data-action="delete-inv" data-id="${r.id}" title="${t('markDeleted')}">${ICON_EYE_OFF}</button>`}
+                ${isAdmin ? `<button class="icon-btn" data-action="hard-delete-inv" data-id="${r.id}" title="${t('hardDelete')}">${ICON_TRASH}</button>` : ''}
                 <button class="chat-btn" data-doc-id="${r.id}" data-doc-type="invoice" data-doc-name="${r.name}"
                   title="${t('chat')}">💬<span class="chat-badge" style="display:none"></span></button>
               </div>
@@ -937,8 +947,10 @@
                     data-date="${tx.date ? (tx.date.value || tx.date) : ''}" data-direction="${tx.direction}"
                     data-amount="${tx.amount}" data-category="${tx.category_id||''}"
                     data-desc="${tx.description||''}">${t('edit')}</button>
-                  <button class="btn btn-outline" style="padding:3px 8px;font-size:0.78rem;color:#c5221f;border-color:#c5221f" data-action="delete-trx" data-id="${tx.id}" data-inv-id="${invId}">${t('markDeleted')}</button>
-                  ${isAdmin ? `<button class="btn btn-danger" style="padding:3px 8px;font-size:0.78rem" data-action="hard-delete-trx" data-id="${tx.id}" data-inv-id="${invId}">${t('hardDelete')}</button>` : ''}
+                  ${tx.status === 'deleted'
+                    ? `<span class="deleted-label" style="font-size:0.7rem;padding:3px 9px">DELETED</span>`
+                    : `<button class="icon-btn" data-action="delete-trx" data-id="${tx.id}" data-inv-id="${invId}" title="${t('markDeleted')}">${ICON_EYE_OFF}</button>`}
+                  ${isAdmin ? `<button class="icon-btn" data-action="hard-delete-trx" data-id="${tx.id}" data-inv-id="${invId}" title="${t('hardDelete')}">${ICON_TRASH}</button>` : ''}
                   <button class="chat-btn" style="font-size:0.82rem;padding:2px 4px" data-doc-id="${tx.id}" data-doc-type="transaction" data-doc-name="${tx.description||formatDate(tx.date)}"
                     title="${t('chat')}">💬<span class="chat-badge" style="display:none"></span></button>
                 </div>
