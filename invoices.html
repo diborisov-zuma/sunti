@@ -214,6 +214,16 @@
 
     .chat-empty { text-align: center; padding: 32px 16px; color: #bbb; font-size: 0.85rem; }
 
+    .combo { position:relative; display:inline-block; }
+    .combo input { min-width:180px; }
+    .combo ul { position:absolute;top:100%;left:0;right:0;max-height:220px;overflow-y:auto;background:#fff;border:1px solid #ddd;border-radius:6px;margin-top:2px;box-shadow:0 4px 12px rgba(0,0,0,0.08);list-style:none;padding:4px 0;z-index:50;display:none; }
+    .combo.open ul { display:block; }
+    .combo li { padding:6px 10px;font-size:0.85rem;color:#333;cursor:pointer; }
+    .combo li:hover, .combo li.active { background:#e8f0fe;color:#1a73e8; }
+    .combo li.empty { color:#bbb;cursor:default; }
+    .combo li.group-label { font-size:0.7rem;font-weight:600;color:#bbb;text-transform:uppercase;letter-spacing:0.05em;padding:8px 10px 4px;cursor:default;background:#f8f8f8; }
+    .combo li.group-label:hover { background:#f8f8f8;color:#bbb; }
+
     .icon-btn { background:#fff;border:1px solid #ddd;border-radius:6px;cursor:pointer;padding:5px 7px;display:inline-flex;align-items:center;justify-content:center;color:#666;transition:all 0.15s; }
     .icon-btn:hover { border-color:#c5221f;color:#c5221f;background:#fef7f6; }
     .icon-btn svg { width:16px;height:16px;display:block; }
@@ -376,6 +386,77 @@
 
   <script>
     const STORAGE_BUCKET = 'https://storage.googleapis.com/sunti-site';
+
+    function catLabel(c) {
+      if (!c) return '';
+      if (currentLang === 'en') return c.name_en || c.name;
+      if (currentLang === 'th') return c.name_th || c.name;
+      return c.name;
+    }
+    function typeLabelForGroup(type) {
+      if (type === 'income')   return t('income');
+      if (type === 'expense')  return t('expense');
+      if (type === 'transfer') return t('navFinance');
+      return '—';
+    }
+    function catItemsGrouped() {
+      const ORDER = { expense: 1, income: 2, transfer: 3 };
+      const copy = categoriesCache.slice().sort((a, b) => {
+        const da = (ORDER[a.type] || 9), db = (ORDER[b.type] || 9);
+        if (da !== db) return da - db;
+        return (a.sort_order || 0) - (b.sort_order || 0);
+      });
+      return copy.map(c => ({ id: c.id, label: catLabel(c), group: typeLabelForGroup(c.type) }));
+    }
+
+    function bindCombo(inputId, listId, items, { placeholder, selectedId, onSelect, allowAll = false, allLabel = '' } = {}) {
+      const input = document.getElementById(inputId);
+      const list  = document.getElementById(listId);
+      if (!input || !list) return { setSelected(){}, getSelected(){ return ''; } };
+      const wrap = input.closest('.combo');
+      let selected = selectedId || '';
+      input.placeholder = placeholder || '';
+      function labelFor(id) {
+        if (allowAll && !id) return allLabel;
+        const it = items.find(x => x.id === id);
+        return it ? it.label : '';
+      }
+      input.value = labelFor(selected);
+      function render(filter) {
+        const q = (filter || '').toLowerCase().trim();
+        let html = '';
+        if (allowAll) html += `<li data-id="" ${selected===''?'class="active"':''}>${allLabel}</li>`;
+        const filtered = items.filter(x => !q || x.label.toLowerCase().includes(q));
+        if (!filtered.length && !allowAll) html += `<li class="empty">—</li>`;
+        let lastGroup = null;
+        filtered.forEach(x => {
+          if (!q && x.group && x.group !== lastGroup) {
+            html += `<li class="group-label">${x.group}</li>`;
+            lastGroup = x.group;
+          }
+          html += `<li data-id="${x.id}" ${x.id===selected?'class="active"':''}>${x.label}</li>`;
+        });
+        list.innerHTML = html;
+      }
+      render('');
+      input.addEventListener('focus', () => { render(''); wrap.classList.add('open'); });
+      input.addEventListener('input', () => { render(input.value); wrap.classList.add('open'); });
+      document.addEventListener('click', e => {
+        if (!wrap.contains(e.target)) wrap.classList.remove('open');
+      });
+      list.addEventListener('click', e => {
+        const li = e.target.closest('li[data-id]');
+        if (!li || li.classList.contains('empty')) return;
+        selected = li.dataset.id;
+        input.value = labelFor(selected);
+        wrap.classList.remove('open');
+        if (onSelect) onSelect(selected);
+      });
+      return {
+        setSelected(id) { selected = id || ''; input.value = labelFor(selected); },
+        getSelected()  { return selected; },
+      };
+    }
 
     const ICON_EYE_OFF = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>';
     const ICON_TRASH = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>';
@@ -752,9 +833,10 @@
               <option value="paid">${t('invPaid')}</option>
               <option value="deleted">${t('filterStatusDeleted')}</option>
             </select>
-            <select class="filter-select" id="filter-category">
-              <option value="all">${t('allCategories')}</option>
-            </select>
+            <span class="combo">
+              <input type="text" class="filter-select" id="filter-category-input" placeholder="${t('allCategories')}">
+              <ul id="filter-category-list"></ul>
+            </span>
             <select class="filter-select" id="page-size-select">
               <option value="25">25</option>
               <option value="50">50</option>
@@ -814,20 +896,17 @@
         </div>
       `;
 
-      // Заполняем фильтр категорий
-      const catSel = document.getElementById('filter-category');
-      categoriesCache.forEach(c => {
-        const opt = document.createElement('option');
-        opt.value = c.id; opt.textContent = c.name;
-        catSel.appendChild(opt);
+      bindCombo('filter-category-input', 'filter-category-list', catItemsGrouped(), {
+        placeholder: t('allCategories'),
+        allowAll: true, allLabel: t('allCategories'),
+        selectedId: filterCategory === 'all' ? '' : filterCategory,
+        onSelect: (id) => { filterCategory = id || 'all'; currentPage = 1; expandedInv = {}; loadInvoices(); },
       });
-      catSel.value = filterCategory;
 
       document.getElementById('filter-status').value    = filterStatus;
       document.getElementById('page-size-select').value = pageSize;
 
       document.getElementById('filter-status').addEventListener('change', e => { filterStatus = e.target.value; currentPage = 1; expandedInv = {}; loadInvoices(); });
-      document.getElementById('filter-category').addEventListener('change', e => { filterCategory = e.target.value; currentPage = 1; expandedInv = {}; loadInvoices(); });
       document.getElementById('page-size-select').addEventListener('change', e => { pageSize = parseInt(e.target.value); currentPage = 1; expandedInv = {}; loadInvoices(); });
       document.getElementById('filter-search').value    = filterSearch;
       document.getElementById('filter-date-from').value = filterDateFrom;

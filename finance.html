@@ -34,6 +34,8 @@
     .combo li { padding:6px 10px;font-size:0.85rem;color:#333;cursor:pointer; }
     .combo li:hover, .combo li.active { background:#e8f0fe;color:#1a73e8; }
     .combo li.empty { color:#bbb;cursor:default; }
+    .combo li.group-label { font-size:0.7rem;font-weight:600;color:#bbb;text-transform:uppercase;letter-spacing:0.05em;padding:8px 10px 4px;cursor:default;background:#f8f8f8; }
+    .combo li.group-label:hover { background:#f8f8f8;color:#bbb; }
 
     .inv-wrap { background:#fff;border:1px solid #e8e8e8;border-radius:10px;overflow:hidden; }
     .inv-table { width:100%;border-collapse:collapse; }
@@ -314,6 +316,23 @@
       if (currentLang === 'th') return c.name_th || c.name;
       return c.name;
     }
+    function typeLabel(type) {
+      if (type === 'income')   return t('income');
+      if (type === 'expense')  return t('expense');
+      if (type === 'transfer') return t('navFinance');
+      return '—';
+    }
+    function catItemsGrouped() {
+      // categoriesCache приходит уже упорядоченный по sort_order
+      const ORDER = { expense: 1, income: 2, transfer: 3 };
+      const copy = categoriesCache.slice().sort((a, b) => {
+        const da = (ORDER[a.type] || 9), db = (ORDER[b.type] || 9);
+        if (da !== db) return da - db;
+        return (a.sort_order || 0) - (b.sort_order || 0);
+      });
+      return copy.map(c => ({ id: c.id, label: catLabel(c), group: typeLabel(c.type) }));
+    }
+
     function catLabelById(id) {
       if (!id) return '';
       const c = categoriesCache.find(x => x.id === id);
@@ -340,7 +359,12 @@
         if (allowAll) html += `<li data-id="" ${selected===''?'class="active"':''}>${allLabel}</li>`;
         const filtered = items.filter(x => !q || x.label.toLowerCase().includes(q));
         if (!filtered.length && !allowAll) html += `<li class="empty">—</li>`;
+        let lastGroup = null;
         filtered.forEach(x => {
+          if (!q && x.group && x.group !== lastGroup) {
+            html += `<li class="group-label">${x.group}</li>`;
+            lastGroup = x.group;
+          }
           html += `<li data-id="${x.id}" ${x.id===selected?'class="active"':''}>${x.label}</li>`;
         });
         list.innerHTML = html;
@@ -447,7 +471,7 @@
 
     async function mountModalCombos(selectedCatId, selectedFolderId, showFolder, folderList, selectedInvoiceId) {
       modalCategoryCombo = bindCombo('trx-category-input', 'trx-category-list',
-        categoriesCache.map(c => ({ id: c.id, label: catLabel(c) })),
+        catItemsGrouped(),
         { placeholder: t('noCategory'), allowAll: true, allLabel: '— ' + t('noCategory') + ' —', selectedId: selectedCatId || '' });
       document.getElementById('trx-folder-group').style.display = showFolder ? 'block' : 'none';
       document.getElementById('trx-invoice-group').style.display = 'block';
@@ -568,7 +592,7 @@
         </div>
       `;
 
-      const catItems = categoriesCache.map(c => ({ id: c.id, label: catLabel(c) }));
+      const catItems = catItemsGrouped();
       bindCombo('filter-category-input', 'filter-category-list', catItems, {
         placeholder: t('allCategories'),
         allowAll: true,
