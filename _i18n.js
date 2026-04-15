@@ -53,6 +53,7 @@ const i18n = {
     // Навигация
     navFolders: 'Проекты',
     navInvoices: 'Документы',
+    navFinance: 'Финансы',
     navReports: 'Отчёты',
     navUsers: 'Пользователи',
 
@@ -129,6 +130,21 @@ const i18n = {
     addSubfolder: 'Добавить подпапку',
     deleteFolder: 'Удалить папку',
     confirmDelete: 'Удалить?',
+
+    // Модалка пользователя
+    sectionMain: 'Основное',
+    sectionDocAccess: 'Доступ к документам',
+    sectionDataVisibility: 'Видимость данных',
+    canSeeSalary: 'Видит зарплатные записи',
+    accessNone: 'Нет доступа',
+    accessViewer: 'Просмотр',
+    accessEditor: 'Редактирование',
+    isAdminYes: 'Да — полный доступ',
+    isAdminNo: 'Нет',
+    loadingAccess: 'Загрузка доступов…',
+    noFolders: 'Нет проектов',
+    accessLoadError: 'Ошибка загрузки доступов',
+    saving: 'Сохранение…',
   },
   en: {
     appName: 'Sunti',
@@ -242,6 +258,7 @@ const i18n = {
     incomeRemaining: 'Income (remaining)',
     navFolders: 'Projects',
     navInvoices: 'Documents',
+    navFinance: 'Finances',
     navReports: 'Reports',
     navUsers: 'Users',
 
@@ -257,6 +274,21 @@ const i18n = {
     addSubfolder: 'Add subfolder',
     deleteFolder: 'Delete folder',
     confirmDelete: 'Delete?',
+
+    // User modal
+    sectionMain: 'General',
+    sectionDocAccess: 'Document access',
+    sectionDataVisibility: 'Data visibility',
+    canSeeSalary: 'Can see salary records',
+    accessNone: 'No access',
+    accessViewer: 'View',
+    accessEditor: 'Edit',
+    isAdminYes: 'Yes — full access',
+    isAdminNo: 'No',
+    loadingAccess: 'Loading access…',
+    noFolders: 'No projects',
+    accessLoadError: 'Failed to load access',
+    saving: 'Saving…',
   },
   th: {
     appName: 'Sunti',
@@ -370,6 +402,7 @@ const i18n = {
     incomeRemaining: 'รายรับ (คงเหลือ)',
     navFolders: 'โครงการ',
     navInvoices: 'ใบส่งของ',
+    navFinance: 'การเงิน',
     navReports: 'รายงาน',
     navUsers: 'ผู้ใช้',
 
@@ -385,6 +418,21 @@ const i18n = {
     addSubfolder: 'เพิ่มโฟลเดอร์ย่อย',
     deleteFolder: 'ลบโฟลเดอร์',
     confirmDelete: 'ลบ?',
+
+    // โมดอลผู้ใช้
+    sectionMain: 'ทั่วไป',
+    sectionDocAccess: 'การเข้าถึงเอกสาร',
+    sectionDataVisibility: 'การมองเห็นข้อมูล',
+    canSeeSalary: 'เห็นข้อมูลเงินเดือน',
+    accessNone: 'ไม่มีสิทธิ์',
+    accessViewer: 'ดูได้',
+    accessEditor: 'แก้ไขได้',
+    isAdminYes: 'ใช่ — สิทธิ์เต็ม',
+    isAdminNo: 'ไม่',
+    loadingAccess: 'กำลังโหลดสิทธิ์…',
+    noFolders: 'ไม่มีโครงการ',
+    accessLoadError: 'โหลดสิทธิ์ไม่สำเร็จ',
+    saving: 'กำลังบันทึก…',
   }
 };
 

@@ -1,5 +1,4 @@
 const GOOGLE_CLIENT_ID = '6445860840-9bfshkstrc2vra49qi847ie9od38614t.apps.googleusercontent.com';
-const API_BASE = 'https://asia-southeast1-project-9718e7d4-4cd7-4f52-8d6.cloudfunctions.net';
 
 function renderHeader(activePage) {
   const header = document.getElementById('header');
@@ -9,6 +8,7 @@ function renderHeader(activePage) {
     <nav class="nav">
       <a href="folders.html"  class="nav-link ${activePage === 'folders'  ? 'active' : ''}" id="t-nav-folders"></a>
       <a href="invoices.html" class="nav-link ${activePage === 'invoices' ? 'active' : ''}" id="t-nav-invoices"></a>
+      <a href="finance.html"  class="nav-link ${activePage === 'finance'  ? 'active' : ''}" id="t-nav-finance"></a>
       <a href="reports.html"  class="nav-link ${activePage === 'reports'  ? 'active' : ''}" id="t-nav-reports"></a>
       <a href="users.html"    class="nav-link ${activePage === 'users'    ? 'active' : ''}" id="t-nav-users" style="display:none"></a>
     </nav>
@@ -74,12 +74,14 @@ function renderHeader(activePage) {
 function updateHeaderTexts() {
   const nf = document.getElementById('t-nav-folders');
   const ni = document.getElementById('t-nav-invoices');
+  const nfi = document.getElementById('t-nav-finance');
   const nr = document.getElementById('t-nav-reports');
   const nu = document.getElementById('t-nav-users');
   const lb = document.getElementById('logout-btn');
   const nt = document.getElementById('t-notifications-title');
   if (nf) nf.textContent = t('navFolders');
   if (ni) ni.textContent = t('navInvoices');
+  if (nfi) nfi.textContent = t('navFinance');
   if (nr) nr.textContent = t('navReports');
   if (nu) { nu.textContent = t('navUsers'); if (typeof isAdmin !== 'undefined' && isAdmin) nu.style.display = 'inline-flex'; else nu.style.display = 'none'; }
   if (lb) lb.textContent = t('logout');
