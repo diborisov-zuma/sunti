@@ -86,6 +86,10 @@
           <option value="archive" id="f-opt-archive"></option>
         </select>
       </div>
+      <div class="field-group">
+        <label id="t-label-company"></label>
+        <select id="f-company"></select>
+      </div>
       <div class="modal-actions">
         <button class="btn btn-outline" id="btn-add-cancel"></button>
         <button class="btn btn-primary" id="btn-add-save"></button>
@@ -112,6 +116,10 @@
           <option value="archive" id="e-opt-archive"></option>
         </select>
       </div>
+      <div class="field-group">
+        <label id="t-edit-label-company"></label>
+        <select id="e-company"></select>
+      </div>
       <div class="modal-actions">
         <button class="btn btn-outline" id="btn-edit-cancel"></button>
         <button class="btn btn-primary" id="btn-edit-save"></button>
@@ -123,6 +131,27 @@
 
   <script>
     let currentEditId = null;
+    let companiesCache = [];
+
+    async function loadCompanies() {
+      try { companiesCache = await apiFetch('/companies'); }
+      catch(e) { companiesCache = []; }
+      fillCompanySelect('f-company', '');
+      fillCompanySelect('e-company', '');
+    }
+
+    function fillCompanySelect(selectId, selectedId) {
+      const sel = document.getElementById(selectId);
+      if (!sel) return;
+      sel.innerHTML = `<option value="">— ${t('noCompany')} —</option>`;
+      companiesCache.forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c.id;
+        opt.textContent = c.registration_number ? `${c.name} (${c.registration_number})` : c.name;
+        if (c.id === selectedId) opt.selected = true;
+        sel.appendChild(opt);
+      });
+    }
 
     function showToast(msg, type) {
       const el = document.getElementById('toast');
@@ -147,6 +176,8 @@
       document.getElementById('t-label-name').textContent     = t('name');
       document.getElementById('t-label-order').textContent    = t('orderLabel');
       document.getElementById('t-label-status').textContent   = t('statusLabel');
+      document.getElementById('t-label-company').textContent  = t('companyLabel');
+      document.getElementById('t-edit-label-company').textContent = t('companyLabel');
       document.getElementById('f-opt-active').textContent     = t('active');
       document.getElementById('f-opt-archive').textContent    = t('archive');
       document.getElementById('btn-add-cancel').textContent   = t('cancel');
@@ -179,7 +210,7 @@
             <td><span class="status-badge ${r.status === 'active' ? 'status-active' : 'status-archive'}">${r.status === 'active' ? t('active') : t('archive')}</span></td>
             <td>
               <div class="row-actions">
-                <button class="btn btn-outline" data-action="edit" data-id="${r.id}" data-name="${r.name}" data-order="${r.order}" data-status="${r.status}">${t('edit')}</button>
+                <button class="btn btn-outline" data-action="edit" data-id="${r.id}" data-name="${r.name}" data-order="${r.order}" data-status="${r.status}" data-company="${r.company_id||''}">${t('edit')}</button>
                 <button class="btn btn-danger" data-action="delete" data-id="${r.id}">${t('delete')}</button>
               </div>
             </td>
@@ -195,6 +226,7 @@
       document.getElementById('f-name').value = '';
       document.getElementById('f-order').value = '';
       document.getElementById('f-status').value = 'active';
+      fillCompanySelect('f-company', '');
       openModal('modal-add');
       setTimeout(() => document.getElementById('f-name').focus(), 100);
     });
@@ -205,10 +237,11 @@
       const name   = document.getElementById('f-name').value.trim();
       const order  = document.getElementById('f-order').value;
       const status = document.getElementById('f-status').value;
+      const company_id = document.getElementById('f-company').value || null;
       if (!name || !order) { showToast(t('fillAllFields'), 'error'); return; }
       closeModal('modal-add');
       try {
-        await apiFetch('/folders', { method: 'POST', body: JSON.stringify({ name, order: parseInt(order), status }) });
+        await apiFetch('/folders', { method: 'POST', body: JSON.stringify({ name, order: parseInt(order), status, company_id }) });
         showToast(t('projectAdded'), 'success');
         await loadFolders();
       } catch(e) {
@@ -220,13 +253,14 @@
     document.getElementById('tbody').addEventListener('click', e => {
       const btn = e.target.closest('button[data-action]');
       if (!btn) return;
-      const { action, id, name, order, status } = btn.dataset;
+      const { action, id, name, order, status, company } = btn.dataset;
 
       if (action === 'edit') {
         currentEditId = id;
         document.getElementById('e-name').value   = name;
         document.getElementById('e-order').value  = order;
         document.getElementById('e-status').value = status;
+        fillCompanySelect('e-company', company || '');
         openModal('modal-edit');
         setTimeout(() => document.getElementById('e-name').focus(), 100);
       }
@@ -245,12 +279,13 @@
       const name   = document.getElementById('e-name').value.trim();
       const order  = document.getElementById('e-order').value;
       const status = document.getElementById('e-status').value;
+      const company_id = document.getElementById('e-company').value || null;
       if (!name || !order) { showToast(t('fillAllFields'), 'error'); return; }
       closeModal('modal-edit');
       try {
         await apiFetch(`/folders/${currentEditId}`, {
           method: 'PUT',
-          body: JSON.stringify({ name, order: parseInt(order), status })
+          body: JSON.stringify({ name, order: parseInt(order), status, company_id })
         });
         showToast(t('saved'), 'success');
         await loadFolders();
@@ -264,7 +299,7 @@
       if (e.key === 'Escape') { closeModal('modal-add'); closeModal('modal-edit'); }
     });
 
-    window.onLogin = async () => { updateTexts(); await loadFolders(); };
+    window.onLogin = async () => { updateTexts(); await loadCompanies(); await loadFolders(); };
     window.onLogout = () => {
       document.getElementById('tbody').innerHTML = '';
       updateTexts();

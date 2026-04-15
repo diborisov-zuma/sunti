@@ -47,13 +47,13 @@ exports.folders = async (req, res) => {
       if (user?.is_admin) {
         // Админ видит все папки
         const [rows] = await bigquery.query({
-          query: `SELECT id, name, \`order\`, status FROM ${table} ORDER BY \`order\` ASC`,
+          query: `SELECT id, name, \`order\`, status, company_id FROM ${table} ORDER BY \`order\` ASC`,
         });
         res.json(rows);
       } else {
         // Обычный пользователь — только папки из users_folders где docs_access != 'none'
         const [rows] = await bigquery.query({
-          query: `SELECT f.id, f.name, f.\`order\`, f.status, uf.docs_access
+          query: `SELECT f.id, f.name, f.\`order\`, f.status, f.company_id, uf.docs_access
                   FROM ${table} f
                   INNER JOIN \`${PROJECT}.${DATASET}.users_folders\` uf
                     ON uf.folder_id = f.id
@@ -72,16 +72,16 @@ exports.folders = async (req, res) => {
       const user = await getUserInfo(email);
       if (!user?.is_admin) { res.status(403).json({ error: 'Forbidden' }); return; }
 
-      const { name, order, status } = req.body;
+      const { name, order, status, company_id } = req.body;
       if (!name || order === undefined || !status) {
         res.status(400).json({ error: 'name, order and status are required' });
         return;
       }
       const id = uuidv4();
       await bigquery.query({
-        query: `INSERT INTO ${table} (id, name, \`order\`, status, created_at, created_by)
-                VALUES (@id, @name, @order, @status, CURRENT_TIMESTAMP(), @created_by)`,
-        params: { id, name, order: parseInt(order), status, created_by: email },
+        query: `INSERT INTO ${table} (id, name, \`order\`, status, company_id, created_at, created_by)
+                VALUES (@id, @name, @order, @status, NULLIF(@company_id, ''), CURRENT_TIMESTAMP(), @created_by)`,
+        params: { id, name, order: parseInt(order), status, company_id: company_id || '', created_by: email },
       });
       res.json({ success: true, id, name });
       return;
@@ -93,12 +93,15 @@ exports.folders = async (req, res) => {
       if (!user?.is_admin) { res.status(403).json({ error: 'Forbidden' }); return; }
 
       const id = req.url.split('/').filter(Boolean).pop().split('?')[0];
-      const { name, order, status } = req.body;
+      const { name, order, status, company_id } = req.body;
       const orderInt = parseInt(order || 1);
       if (!name || !id) { res.status(400).json({ error: 'name and id are required' }); return; }
       await bigquery.query({
-        query: `UPDATE ${table} SET name = @name, \`order\` = ${orderInt}, status = @status WHERE id = @id`,
-        params: { name, status: status || 'active', id },
+        query: `UPDATE ${table}
+                SET name = @name, \`order\` = ${orderInt}, status = @status,
+                    company_id = NULLIF(@company_id, '')
+                WHERE id = @id`,
+        params: { name, status: status || 'active', company_id: company_id || '', id },
       });
       res.json({ success: true });
       return;
