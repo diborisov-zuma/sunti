@@ -228,10 +228,12 @@
     let expandedTrx        = {};
     let currentPage        = 1;
     let pageSize           = 25;
-    let filterDateFrom     = '';
-    let filterDateTo       = '';
+    const today = new Date().toISOString().split('T')[0];
+    let filterDateFrom     = today;
+    let filterDateTo       = today;
     let filterDirection    = 'all';
     let filterCategory     = 'all';
+    let filterStatus       = 'active';
     let categoriesCache    = [];
     let usersCache         = [];
     let unreadMap          = {};
@@ -353,8 +355,9 @@
       selectedFolderId   = item.dataset.id;
       selectedFolderName = item.dataset.name;
       currentPage = 1;
-      filterDateFrom = ''; filterDateTo = '';
+      filterDateFrom = today; filterDateTo = today;
       filterDirection = 'all'; filterCategory = 'all';
+      filterStatus = 'active';
       expandedTrx = {};
       document.querySelectorAll('.folder-item').forEach(el => el.classList.remove('active'));
       item.classList.add('active');
@@ -369,6 +372,10 @@
           <div class="toolbar-right">
             <input type="date" class="filter-date" id="filter-date-from" title="${t('dateFrom')}">
             <input type="date" class="filter-date" id="filter-date-to"   title="${t('dateTo')}">
+            <select class="filter-select" id="filter-status">
+              <option value="active">${t('invActive')}</option>
+              <option value="deleted">${t('invDeleted')}</option>
+            </select>
             <select class="filter-select" id="filter-direction">
               <option value="all">${t('allDirections')}</option>
               <option value="income">${t('income')}</option>
@@ -430,11 +437,13 @@
 
       document.getElementById('filter-date-from').value = filterDateFrom;
       document.getElementById('filter-date-to').value   = filterDateTo;
+      document.getElementById('filter-status').value    = filterStatus;
       document.getElementById('filter-direction').value = filterDirection;
       document.getElementById('page-size-select').value = pageSize;
 
       document.getElementById('filter-date-from').addEventListener('change', e => { filterDateFrom = e.target.value; currentPage = 1; renderTransactions(); });
       document.getElementById('filter-date-to').addEventListener('change',   e => { filterDateTo   = e.target.value; currentPage = 1; renderTransactions(); });
+      document.getElementById('filter-status').addEventListener('change',    e => { filterStatus   = e.target.value; currentPage = 1; loadTransactions(); });
       document.getElementById('filter-direction').addEventListener('change', e => { filterDirection = e.target.value; currentPage = 1; renderTransactions(); });
       document.getElementById('filter-category').addEventListener('change',  e => { filterCategory  = e.target.value; currentPage = 1; renderTransactions(); });
       document.getElementById('page-size-select').addEventListener('change', e => { pageSize = parseInt(e.target.value); currentPage = 1; renderTransactions(); });
@@ -458,7 +467,7 @@
       if (!tbody) return;
       tbody.innerHTML = `<tr><td colspan="7" class="loading">${t('loading')}</td></tr>`;
       try {
-        allTransactions = await apiFetch(`/transactions?folder_id=${selectedFolderId}`);
+        allTransactions = await apiFetch(`/transactions?folder_id=${selectedFolderId}&status=${filterStatus}`);
         renderTransactions();
       } catch(e) {
         console.error(e);

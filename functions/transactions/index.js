@@ -37,15 +37,19 @@ exports.transactions = async (req, res) => {
     if (req.method === 'GET') {
       const invoiceId = req.query.invoice_id;
       const folderId  = req.query.folder_id;
+      const status    = req.query.status || 'active';
 
       let where = '';
       const params = {};
+      const statusClause = status === 'deleted'
+        ? 'IFNULL(t.status, \'active\') = \'deleted\''
+        : 'IFNULL(t.status, \'active\') != \'deleted\'';
 
       if (invoiceId) {
-        where = 'WHERE t.invoice_id = @invoice_id AND IFNULL(t.status, \'active\') != \'deleted\'';
+        where = `WHERE t.invoice_id = @invoice_id AND ${statusClause}`;
         params.invoice_id = invoiceId;
       } else if (folderId) {
-        where = 'WHERE t.folder_id = @folder_id AND IFNULL(t.status, \'active\') != \'deleted\'';
+        where = `WHERE t.folder_id = @folder_id AND ${statusClause}`;
         params.folder_id = folderId;
       } else {
         res.status(400).json({ error: 'invoice_id or folder_id is required' });
