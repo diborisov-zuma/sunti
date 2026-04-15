@@ -37,7 +37,7 @@ exports.users = async (req, res) => {
     if (req.method === 'GET' && req.url.includes('/me')) {
       const [rows] = await bigquery.query({
         query: `SELECT id, email, name, telegram_chat_id, telegram_username,
-                       is_admin, docs_access, can_see_salary, is_active
+                       is_admin, can_see_salary, is_active
                 FROM ${table} WHERE email = @email`,
         params: { email },
       });
@@ -49,7 +49,7 @@ exports.users = async (req, res) => {
     if (req.method === 'GET') {
       const [rows] = await bigquery.query({
         query: `SELECT id, email, name, telegram_chat_id, telegram_username,
-                       is_admin, docs_access, can_see_salary, first_login, last_login, is_active
+                       is_admin, can_see_salary, first_login, last_login, is_active
                 FROM ${table}
                 ORDER BY name ASC`,
       });
@@ -68,8 +68,8 @@ exports.users = async (req, res) => {
                 WHEN MATCHED THEN
                   UPDATE SET last_login = CURRENT_TIMESTAMP(), name = S.name
                 WHEN NOT MATCHED THEN
-                  INSERT (id, email, name, telegram_chat_id, first_login, last_login, is_active, is_admin, docs_access, can_see_salary)
-                  VALUES (GENERATE_UUID(), S.email, S.name, '', CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP(), true, false, 'editor', false)`,
+                  INSERT (id, email, name, telegram_chat_id, first_login, last_login, is_active, is_admin, can_see_salary)
+                  VALUES (GENERATE_UUID(), S.email, S.name, '', CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP(), true, false, false)`,
         params: { email, name: name || email },
       });
 
@@ -79,7 +79,7 @@ exports.users = async (req, res) => {
 
     // PUT — обновить поля пользователя (только для админа)
     if (req.method === 'PUT') {
-      const { telegram_chat_id, telegram_username, name, is_active, is_admin, docs_access, can_see_salary } = req.body;
+      const { telegram_chat_id, telegram_username, name, is_active, is_admin, can_see_salary } = req.body;
       const targetEmail = decodeURIComponent(req.url.split('/').filter(Boolean).pop().split('?')[0]);
 
       await bigquery.query({
@@ -89,7 +89,6 @@ exports.users = async (req, res) => {
                     name              = @name,
                     is_active         = @is_active,
                     is_admin          = @is_admin,
-                    docs_access       = @docs_access,
                     can_see_salary    = @can_see_salary
                 WHERE email = @email`,
         params: {
@@ -98,7 +97,6 @@ exports.users = async (req, res) => {
           name:              name || targetEmail,
           is_active:         is_active  !== false,
           is_admin:          is_admin   === true || is_admin   === 'true',
-          docs_access:       docs_access    || 'editor',
           can_see_salary:    can_see_salary === true || can_see_salary === 'true',
           email:             targetEmail,
         },
