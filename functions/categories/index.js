@@ -40,6 +40,37 @@ exports.categories = async (req, res) => {
   const path  = (req.url || '').split('?')[0];
 
   try {
+    // PUT /categories/bulk — admin, body { items: [{id, name, name_en, name_th, type}, ...] }
+    if (req.method === 'PUT' && path === '/bulk') {
+      if (!(await isAdmin(email))) { res.status(403).json({ error: 'Forbidden' }); return; }
+      const items = (req.body && req.body.items) || [];
+      if (!Array.isArray(items) || !items.length) { res.status(400).json({ error: 'items required' }); return; }
+      const params = { all_ids: items.map(x => x.id) };
+      const cases = { name: '', name_en: '', name_th: '', type: '' };
+      items.forEach((it, i) => {
+        params['id' + i] = it.id;
+        params['n' + i]  = it.name || '';
+        params['en' + i] = it.name_en || '';
+        params['th' + i] = it.name_th || '';
+        params['t' + i]  = it.type || '';
+        cases.name    += ` WHEN @id${i} THEN @n${i}`;
+        cases.name_en += ` WHEN @id${i} THEN @en${i}`;
+        cases.name_th += ` WHEN @id${i} THEN @th${i}`;
+        cases.type    += ` WHEN @id${i} THEN NULLIF(@t${i}, '')`;
+      });
+      await bigquery.query({
+        query: `UPDATE ${table}
+                SET name    = CASE id${cases.name}    ELSE name    END,
+                    name_en = CASE id${cases.name_en} ELSE name_en END,
+                    name_th = CASE id${cases.name_th} ELSE name_th END,
+                    type    = CASE id${cases.type}    ELSE type    END
+                WHERE id IN UNNEST(@all_ids)`,
+        params,
+      });
+      res.json({ success: true, count: items.length });
+      return;
+    }
+
     // PUT /categories/reorder — admin, body { ids: [id, id, ...] } → sort_order = index * 1000
     if (req.method === 'PUT' && path === '/reorder') {
       if (!(await isAdmin(email))) { res.status(403).json({ error: 'Forbidden' }); return; }

@@ -66,6 +66,7 @@
 
       <div class="page-header">
         <h1 id="t-page-title"></h1>
+        <button class="btn btn-primary" id="btn-save-all"></button>
       </div>
       <div class="hint" id="t-hint"></div>
       <div class="cat-wrap">
@@ -111,6 +112,7 @@
       document.getElementById('btn-add-type').textContent = t('addType');
       setText('t-hint',         t('dragToReorder'));
       setText('t-col-type',     t('categoryType'));
+      document.getElementById('btn-save-all').textContent = t('saveAll');
       updateHeaderTexts();
     }
 
@@ -243,6 +245,39 @@
           render(); // refresh cat's type dropdown options
         } catch (err) { showToast(err.message, 'error'); }
       }
+    });
+
+    document.getElementById('btn-save-all').addEventListener('click', async () => {
+      if (!dirty.size) { showToast(t('saved'), 'success'); return; }
+      const rows = document.querySelectorAll('#cat-list .cat-row.dirty');
+      const items = [];
+      rows.forEach(row => {
+        const id = row.dataset.id;
+        if (!dirty.has(id)) return;
+        items.push({
+          id,
+          name:    row.querySelector('input[data-field="name"]').value.trim(),
+          name_en: row.querySelector('input[data-field="name_en"]').value.trim(),
+          name_th: row.querySelector('input[data-field="name_th"]').value.trim(),
+          type:    row.querySelector('select[data-field="type"]').value,
+        });
+      });
+      if (!items.length) return;
+      const btn = document.getElementById('btn-save-all');
+      btn.disabled = true;
+      const oldText = btn.textContent;
+      btn.textContent = t('saving');
+      try {
+        await apiFetch('/categories/bulk', { method: 'PUT', body: JSON.stringify({ items }) });
+        items.forEach(it => {
+          const c = categories.find(x => x.id === it.id);
+          if (c) Object.assign(c, it);
+          dirty.delete(it.id);
+        });
+        render();
+        showToast(t('saved') + ' · ' + items.length, 'success');
+      } catch (err) { showToast(err.message, 'error'); }
+      finally { btn.disabled = false; btn.textContent = oldText; }
     });
 
     document.getElementById('btn-add-type').addEventListener('click', async () => {
