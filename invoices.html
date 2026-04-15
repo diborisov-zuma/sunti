@@ -22,8 +22,10 @@
     .main-toolbar h2 { font-size:1.1rem;color:#222;flex:1; }
     .toolbar-right { display:flex;align-items:center;gap:8px;flex-wrap:wrap; }
 
-    select.filter-select { border:1px solid #ddd;border-radius:6px;padding:6px 10px;font-size:0.85rem;color:#333;outline:none;background:#fff;cursor:pointer; }
-    select.filter-select:focus { border-color:#1a73e8; }
+    select.filter-select, input.filter-select, input.filter-date {
+      border:1px solid #ddd;border-radius:6px;padding:6px 10px;font-size:0.85rem;color:#333;outline:none;background:#fff;cursor:pointer;
+    }
+    select.filter-select:focus, input.filter-select:focus, input.filter-date:focus { border-color:#1a73e8; }
 
     .inv-wrap { background:#fff;border:1px solid #e8e8e8;border-radius:10px;overflow:hidden; }
     .inv-table { width:100%;border-collapse:collapse; }
@@ -710,8 +712,8 @@
           <h2>📁 ${selectedFolderName}</h2>
           <div class="toolbar-right">
             <input type="text" class="filter-select" id="filter-search" placeholder="${t('search')}" style="min-width:160px">
-            <input type="date" class="filter-select" id="filter-date-from" title="${t('dateFrom')}">
-            <input type="date" class="filter-select" id="filter-date-to"   title="${t('dateTo')}">
+            <input type="date" class="filter-date" id="filter-date-from" title="${t('dateFrom')}">
+            <input type="date" class="filter-date" id="filter-date-to"   title="${t('dateTo')}">
             <select class="filter-select" id="filter-status">
               <option value="all">${t('allStatuses')}</option>
               <option value="active">${t('filterStatusActive')}</option>
