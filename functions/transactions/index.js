@@ -56,14 +56,17 @@ exports.transactions = async (req, res) => {
         return;
       }
 
+      const accTable = `\`${PROJECT}.${DATASET}.company_accounts\``;
       const [rows] = await bigquery.query({
         query: `SELECT t.id, t.date, t.amount, t.direction, t.account_id,
                        t.counterparty_id, t.category_id, t.invoice_id, t.folder_id,
                        t.description, t.created_at,
                        IFNULL(t.status, 'active') AS status,
-                       c.name as category_name
+                       c.name as category_name,
+                       a.name as account_name
                 FROM ${table} t
                 LEFT JOIN ${catTable} c ON t.category_id = c.id
+                LEFT JOIN ${accTable} a ON t.account_id  = a.id
                 ${where}
                 ORDER BY t.date DESC`,
         params,

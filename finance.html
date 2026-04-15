@@ -42,8 +42,14 @@
     .expand-btn.open { color:#1a73e8; }
 
     .amount-col { text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap; }
+    .amount-col.income  { color:#1e8e3e;font-weight:500; }
+    .amount-col.expense { color:#c5221f;font-weight:500; }
     .direction-income { color:#1e8e3e;font-weight:500; }
     .direction-expense { color:#c5221f;font-weight:500; }
+    .toolbar-rows { display:flex;flex-direction:column;gap:8px;margin-bottom:16px; }
+    .toolbar-row { display:flex;align-items:center;gap:10px;flex-wrap:wrap; }
+    .toolbar-row h2 { font-size:1.1rem;color:#222;flex:1; }
+    .toolbar-row.bottom { justify-content:flex-end; }
 
     .trx-detail-row td { padding:0;background:#f8faff;border-bottom:1px solid #e0e8ff; }
     .trx-detail-inner { padding:12px 12px 12px 40px; }
@@ -244,6 +250,8 @@
     let filterCategory     = 'all';
     let filterStatus       = 'active';
     let filterSearch       = '';
+    let filterAccount      = 'all';
+    let accountsCache      = [];
     let searchDebounce     = null;
     let categoriesCache    = [];
     let usersCache         = [];
@@ -373,6 +381,7 @@
       currentPage = 1;
       filterDateFrom = today; filterDateTo = today;
       filterDirection = 'all'; filterCategory = 'all';
+      filterAccount = 'all';
       filterStatus = 'active';
       expandedTrx = {};
       document.querySelectorAll('.folder-item').forEach(el => el.classList.remove('active'));
@@ -383,12 +392,14 @@
     function renderMainArea() {
       const area = document.getElementById('main-area');
       area.innerHTML = `
-        <div class="main-toolbar">
-          <h2>📁 ${selectedFolderName}</h2>
-          <div class="toolbar-right">
-            <input type="text" class="filter-select" id="filter-search" placeholder="${t('search')}" style="min-width:160px">
+        <div class="toolbar-rows">
+          <div class="toolbar-row">
+            <h2>📁 ${selectedFolderName}</h2>
             <input type="date" class="filter-date" id="filter-date-from" title="${t('dateFrom')}">
             <input type="date" class="filter-date" id="filter-date-to"   title="${t('dateTo')}">
+          </div>
+          <div class="toolbar-row bottom">
+            <input type="text" class="filter-select" id="filter-search" placeholder="${t('search')}" style="min-width:160px">
             <select class="filter-select" id="filter-status">
               <option value="active">${t('filterStatusActive')}</option>
               <option value="deleted">${t('filterStatusDeleted')}</option>
@@ -400,6 +411,10 @@
             </select>
             <select class="filter-select" id="filter-category">
               <option value="all">${t('allCategories')}</option>
+            </select>
+            <select class="filter-select" id="filter-account">
+              <option value="all">${t('allAccounts')}</option>
+              ${accountsCache.map(a => `<option value="${a.id}">${a.name}</option>`).join('')}
             </select>
             <select class="filter-select" id="page-size-select">
               <option value="25">25</option>
@@ -415,7 +430,7 @@
               <tr>
                 <th style="width:32px"></th>
                 <th>${t('date')}</th>
-                <th>${t('direction')}</th>
+                <th>${t('companyAccounts')}</th>
                 <th class="amount-col">${t('amount')}</th>
                 <th>${t('category')}</th>
                 <th>${t('description')}</th>
@@ -468,6 +483,8 @@
       document.getElementById('filter-date-to').addEventListener('change',   e => { filterDateTo   = e.target.value; currentPage = 1; renderTransactions(); });
       document.getElementById('filter-status').addEventListener('change',    e => { filterStatus   = e.target.value; currentPage = 1; loadTransactions(); });
       document.getElementById('filter-direction').addEventListener('change', e => { filterDirection = e.target.value; currentPage = 1; renderTransactions(); });
+      document.getElementById('filter-account').value = filterAccount;
+      document.getElementById('filter-account').addEventListener('change', e => { filterAccount = e.target.value; currentPage = 1; renderTransactions(); });
       document.getElementById('filter-category').addEventListener('change',  e => { filterCategory  = e.target.value; currentPage = 1; renderTransactions(); });
       document.getElementById('page-size-select').addEventListener('change', e => { pageSize = parseInt(e.target.value); currentPage = 1; renderTransactions(); });
 
@@ -505,6 +522,7 @@
         if (filterDateTo   && d > filterDateTo)   return false;
         if (filterDirection !== 'all' && r.direction !== filterDirection) return false;
         if (filterCategory  !== 'all' && r.category_id !== filterCategory) return false;
+        if (filterAccount   !== 'all' && r.account_id  !== filterAccount)  return false;
         if (filterSearch && !(r.description||'').toLowerCase().includes(filterSearch.toLowerCase())) return false;
         return true;
       });
@@ -551,8 +569,8 @@
         tr.innerHTML = `
           <td><button class="expand-btn${isExp?' open':''}" data-trx-id="${tx.id}">${isExp?'▼':'▶'}</button></td>
           <td>${formatDate(tx.date)}</td>
-          <td><span class="direction-${tx.direction}">${tx.direction==='income'?t('income'):t('expense')}</span></td>
-          <td class="amount-col">${fmt(tx.amount)}</td>
+          <td style="color:#666">${tx.account_name || '—'}</td>
+          <td class="amount-col ${tx.direction==='expense'?'expense':'income'}">${tx.direction==='expense'?'-':''}${fmt(tx.amount)}</td>
           <td>${tx.category_name ? `<span class="cat-badge">${tx.category_name}</span>` : '<span style="color:#ccc">—</span>'}</td>
           <td style="color:#666">${tx.description||'—'}</td>
           <td>
@@ -919,7 +937,12 @@
       if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChatMessage(); }
     });
 
-    window.onLogin  = async () => { updateTexts(); await loadCategories(); await loadFolders(); };
+    async function loadAccounts() {
+      try { accountsCache = await apiFetch('/company_accounts'); }
+      catch(e) { accountsCache = []; }
+    }
+
+    window.onLogin  = async () => { updateTexts(); await Promise.all([loadCategories(), loadAccounts()]); await loadFolders(); };
     window.onLogout = () => {
       selectedFolderId = null;
       document.getElementById('folder-list').innerHTML = '';
