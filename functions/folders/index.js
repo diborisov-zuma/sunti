@@ -44,19 +44,22 @@ exports.folders = async (req, res) => {
     if (req.method === 'GET') {
       const user = await getUserInfo(email);
 
+      const coTable = `\`${PROJECT}.${DATASET}.companies\``;
       if (user?.is_admin) {
-        // Админ видит все папки
         const [rows] = await bigquery.query({
-          query: `SELECT id, name, \`order\`, status, company_id FROM ${table} ORDER BY \`order\` ASC`,
+          query: `SELECT f.id, f.name, f.\`order\`, f.status, f.company_id, co.name AS company_name
+                  FROM ${table} f
+                  LEFT JOIN ${coTable} co ON co.id = f.company_id
+                  ORDER BY f.\`order\` ASC`,
         });
         res.json(rows);
       } else {
-        // Обычный пользователь — только папки из users_folders где docs_access != 'none'
         const [rows] = await bigquery.query({
-          query: `SELECT f.id, f.name, f.\`order\`, f.status, f.company_id, uf.docs_access
+          query: `SELECT f.id, f.name, f.\`order\`, f.status, f.company_id, co.name AS company_name, uf.docs_access
                   FROM ${table} f
                   INNER JOIN \`${PROJECT}.${DATASET}.users_folders\` uf
                     ON uf.folder_id = f.id
+                  LEFT JOIN ${coTable} co ON co.id = f.company_id
                   WHERE uf.user_email = @email
                     AND uf.docs_access != 'none'
                   ORDER BY f.\`order\` ASC`,

@@ -243,6 +243,8 @@
     let filterDirection    = 'all';
     let filterCategory     = 'all';
     let filterStatus       = 'active';
+    let filterSearch       = '';
+    let searchDebounce     = null;
     let categoriesCache    = [];
     let usersCache         = [];
     let unreadMap          = {};
@@ -384,6 +386,7 @@
         <div class="main-toolbar">
           <h2>📁 ${selectedFolderName}</h2>
           <div class="toolbar-right">
+            <input type="text" class="filter-select" id="filter-search" placeholder="${t('search')}" style="min-width:160px">
             <input type="date" class="filter-date" id="filter-date-from" title="${t('dateFrom')}">
             <input type="date" class="filter-date" id="filter-date-to"   title="${t('dateTo')}">
             <select class="filter-select" id="filter-status">
@@ -449,6 +452,12 @@
       });
       catSel.value = filterCategory;
 
+      document.getElementById('filter-search').value   = filterSearch;
+      document.getElementById('filter-search').addEventListener('input', e => {
+        filterSearch = e.target.value.trim();
+        clearTimeout(searchDebounce);
+        searchDebounce = setTimeout(() => { currentPage = 1; renderTransactions(); }, 250);
+      });
       document.getElementById('filter-date-from').value = filterDateFrom;
       document.getElementById('filter-date-to').value   = filterDateTo;
       document.getElementById('filter-status').value    = filterStatus;
@@ -496,6 +505,7 @@
         if (filterDateTo   && d > filterDateTo)   return false;
         if (filterDirection !== 'all' && r.direction !== filterDirection) return false;
         if (filterCategory  !== 'all' && r.category_id !== filterCategory) return false;
+        if (filterSearch && !(r.description||'').toLowerCase().includes(filterSearch.toLowerCase())) return false;
         return true;
       });
     }

@@ -37,6 +37,9 @@ exports.invoices = async (req, res) => {
       const folderId   = req.query.folder_id;
       const status     = req.query.status;
       const categoryId = req.query.category_id;
+      const search     = (req.query.search || '').trim();
+      const dateFrom   = req.query.date_from;
+      const dateTo     = req.query.date_to;
       const limit      = parseInt(req.query.limit  || 25);
       const offset     = parseInt(req.query.offset || 0);
 
@@ -60,9 +63,17 @@ exports.invoices = async (req, res) => {
         params.category_id = categoryId;
       }
 
+      if (search) {
+        where += ` AND LOWER(i.name) LIKE LOWER(@search)`;
+        params.search = `%${search}%`;
+      }
+
+      if (dateFrom) { where += ` AND i.date >= @date_from`; params.date_from = dateFrom; }
+      if (dateTo)   { where += ` AND i.date <= @date_to`;   params.date_to   = dateTo; }
+
       const [rows] = await bigquery.query({
         query: `SELECT i.id, i.folder_id, i.name, i.status, i.direction, i.total_amount, i.paid_amount,
-                       i.category_id, i.uploaded_by, i.uploaded_at,
+                       i.category_id, i.uploaded_by, i.uploaded_at, i.date,
                        c.name as category_name
                 FROM ${table} i
                 LEFT JOIN ${catTable} c ON i.category_id = c.id
@@ -95,12 +106,12 @@ exports.invoices = async (req, res) => {
 
     // POST — создать накладную
     if (req.method === 'POST') {
-      const { folder_id, name, status, direction, total_amount, paid_amount, category_id } = req.body;
+      const { folder_id, name, status, direction, total_amount, paid_amount, category_id, date } = req.body;
       if (!folder_id || !name) { res.status(400).json({ error: 'folder_id and name are required' }); return; }
       const id = uuidv4();
       await bigquery.query({
-        query: `INSERT INTO ${table} (id, folder_id, name, status, direction, total_amount, paid_amount, category_id, uploaded_by, uploaded_at)
-                VALUES (@id, @folder_id, @name, @status, @direction, @total_amount, @paid_amount, NULLIF(@category_id, ''), @uploaded_by, CURRENT_TIMESTAMP())`,
+        query: `INSERT INTO ${table} (id, folder_id, name, status, direction, total_amount, paid_amount, category_id, date, uploaded_by, uploaded_at)
+                VALUES (@id, @folder_id, @name, @status, @direction, @total_amount, @paid_amount, NULLIF(@category_id, ''), NULLIF(@date,''), @uploaded_by, CURRENT_TIMESTAMP())`,
         params: {
           id, folder_id, name,
           status:       status     || 'active',
@@ -108,6 +119,7 @@ exports.invoices = async (req, res) => {
           total_amount: parseFloat(total_amount || 0),
           paid_amount:  parseFloat(paid_amount  || 0),
           category_id:  category_id || '',
+          date:         date || '',
           uploaded_by:  email,
         },
       });
@@ -118,7 +130,7 @@ exports.invoices = async (req, res) => {
     // PUT — редактировать
     if (req.method === 'PUT') {
       const id = req.url.split('/').filter(Boolean).pop().split('?')[0];
-      const { name, status, direction, total_amount, paid_amount, category_id } = req.body;
+      const { name, status, direction, total_amount, paid_amount, category_id, date } = req.body;
       if (!name || !id) { res.status(400).json({ error: 'name and id are required' }); return; }
 
       const [rows] = await bigquery.query({
@@ -130,8 +142,8 @@ exports.invoices = async (req, res) => {
 
       await bigquery.query({ query: `DELETE FROM ${table} WHERE id = @id`, params: { id } });
       await bigquery.query({
-        query: `INSERT INTO ${table} (id, folder_id, name, status, direction, total_amount, paid_amount, category_id, uploaded_by, uploaded_at)
-                VALUES (@id, @folder_id, @name, @status, @direction, @total_amount, @paid_amount, NULLIF(@category_id, ''), @uploaded_by, TIMESTAMP(@uploaded_at))`,
+        query: `INSERT INTO ${table} (id, folder_id, name, status, direction, total_amount, paid_amount, category_id, date, uploaded_by, uploaded_at)
+                VALUES (@id, @folder_id, @name, @status, @direction, @total_amount, @paid_amount, NULLIF(@category_id, ''), NULLIF(@date,''), @uploaded_by, TIMESTAMP(@uploaded_at))`,
         params: {
           id, folder_id: cur.folder_id, name,
           status:       status     || 'active',
@@ -139,6 +151,7 @@ exports.invoices = async (req, res) => {
           total_amount: parseFloat(total_amount || 0),
           paid_amount:  parseFloat(paid_amount  || 0),
           category_id:  category_id || '',
+          date:         date || '',
           uploaded_by:  cur.uploaded_by,
           uploaded_at:  cur.uploaded_at,
         },
@@ -161,7 +174,7 @@ exports.invoices = async (req, res) => {
       } else {
         // Мягкое удаление
         const [rows] = await bigquery.query({
-          query: `SELECT folder_id, name, direction, total_amount, paid_amount, category_id, uploaded_by,
+          query: `SELECT folder_id, name, direction, total_amount, paid_amount, category_id, uploaded_by, date,
                          FORMAT_TIMESTAMP('%Y-%m-%dT%H:%M:%S', uploaded_at) as uploaded_at
                   FROM ${table} WHERE id = @id`,
           params: { id },
@@ -171,8 +184,8 @@ exports.invoices = async (req, res) => {
 
         await bigquery.query({ query: `DELETE FROM ${table} WHERE id = @id`, params: { id } });
         await bigquery.query({
-          query: `INSERT INTO ${table} (id, folder_id, name, status, direction, total_amount, paid_amount, category_id, uploaded_by, uploaded_at)
-                  VALUES (@id, @folder_id, @name, 'deleted', @direction, @total_amount, @paid_amount, NULLIF(@category_id,''), @uploaded_by, TIMESTAMP(@uploaded_at))`,
+          query: `INSERT INTO ${table} (id, folder_id, name, status, direction, total_amount, paid_amount, category_id, date, uploaded_by, uploaded_at)
+                  VALUES (@id, @folder_id, @name, 'deleted', @direction, @total_amount, @paid_amount, NULLIF(@category_id,''), NULLIF(@date,''), @uploaded_by, TIMESTAMP(@uploaded_at))`,
           params: {
             id,
             folder_id:    cur.folder_id,
@@ -181,6 +194,7 @@ exports.invoices = async (req, res) => {
             total_amount: cur.total_amount || 0,
             paid_amount:  cur.paid_amount  || 0,
             category_id:  cur.category_id || '',
+            date:         cur.date ? (cur.date.value || cur.date) : '',
             uploaded_by:  cur.uploaded_by,
             uploaded_at:  cur.uploaded_at,
           },

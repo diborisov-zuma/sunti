@@ -57,6 +57,7 @@
             <tr>
               <th>#</th>
               <th id="t-col-name"></th>
+              <th id="t-col-company"></th>
               <th id="t-col-status"></th>
               <th></th>
             </tr>
@@ -172,6 +173,7 @@
       document.getElementById('btn-add').textContent          = t('add');
       document.getElementById('t-col-name').textContent       = t('name');
       document.getElementById('t-col-status').textContent     = t('statusLabel');
+      document.getElementById('t-col-company').textContent    = t('companyLabel');
       document.getElementById('t-modal-add-title').textContent  = t('newProject');
       document.getElementById('t-label-name').textContent     = t('name');
       document.getElementById('t-label-order').textContent    = t('orderLabel');
@@ -196,17 +198,18 @@
 
     async function loadFolders() {
       const tbody = document.getElementById('tbody');
-      tbody.innerHTML = `<tr><td colspan="4" class="loading">${t('loading')}</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="5" class="loading">${t('loading')}</td></tr>`;
       try {
         const rows = await apiFetch('/folders');
         if (!rows.length) {
-          tbody.innerHTML = `<tr><td colspan="4" class="empty-state">${t('noProjects')}</td></tr>`;
+          tbody.innerHTML = `<tr><td colspan="5" class="empty-state">${t('noProjects')}</td></tr>`;
           return;
         }
         tbody.innerHTML = rows.map(r => `
           <tr>
             <td style="color:#bbb">${r.order}</td>
             <td><strong>${r.name}</strong></td>
+            <td style="color:#666">${r.company_name || '—'}</td>
             <td><span class="status-badge ${r.status === 'active' ? 'status-active' : 'status-archive'}">${r.status === 'active' ? t('active') : t('archive')}</span></td>
             <td>
               <div class="row-actions">
@@ -218,7 +221,7 @@
         `).join('');
       } catch(e) {
         console.error(e);
-        tbody.innerHTML = `<tr><td colspan="4" class="empty-state">${e.message}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="5" class="empty-state">${e.message}</td></tr>`;
       }
     }
 

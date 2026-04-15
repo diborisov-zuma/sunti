@@ -248,6 +248,10 @@
         <label id="t-inv-name-label"></label>
         <input type="text" id="inv-name">
       </div>
+      <div class="field-group">
+        <label id="t-inv-date-label"></label>
+        <input type="date" id="inv-date">
+      </div>
       <div class="fields-row">
         <div class="field-group">
           <label id="t-inv-status-label"></label>
@@ -399,10 +403,15 @@
     let pageSize           = 25;
     let filterStatus       = 'all';
     let filterCategory     = 'all';
+    let filterSearch       = '';
+    let filterDateFrom     = '';
+    let filterDateTo       = '';
+    let searchDebounce     = null;
     let totalCount         = 0;
     let categoriesCache    = [];
     let usersCache         = [];
     let unreadMap          = {}; // { document_id: count }
+    let invoicesById       = {};
 
     // Chat state
     let chatDocId    = null;
@@ -609,6 +618,7 @@
       document.getElementById('t-sidebar-title').textContent    = t('navFolders');
       document.getElementById('t-select-project').textContent   = t('selectProject');
       document.getElementById('t-inv-name-label').textContent   = t('name');
+      document.getElementById('t-inv-date-label').textContent   = t('date');
       document.getElementById('t-inv-status-label').textContent = t('statusLabel');
       document.getElementById('t-inv-direction-label').textContent = t('direction');
       document.getElementById('inv-opt-expense').textContent        = t('expense');
@@ -699,6 +709,9 @@
         <div class="main-toolbar">
           <h2>📁 ${selectedFolderName}</h2>
           <div class="toolbar-right">
+            <input type="text" class="filter-select" id="filter-search" placeholder="${t('search')}" style="min-width:160px">
+            <input type="date" class="filter-select" id="filter-date-from" title="${t('dateFrom')}">
+            <input type="date" class="filter-select" id="filter-date-to"   title="${t('dateTo')}">
             <select class="filter-select" id="filter-status">
               <option value="all">${t('allStatuses')}</option>
               <option value="active">${t('filterStatusActive')}</option>
@@ -785,11 +798,22 @@
       document.getElementById('filter-status').addEventListener('change', e => { filterStatus = e.target.value; currentPage = 1; expandedInv = {}; loadInvoices(); });
       document.getElementById('filter-category').addEventListener('change', e => { filterCategory = e.target.value; currentPage = 1; expandedInv = {}; loadInvoices(); });
       document.getElementById('page-size-select').addEventListener('change', e => { pageSize = parseInt(e.target.value); currentPage = 1; expandedInv = {}; loadInvoices(); });
+      document.getElementById('filter-search').value    = filterSearch;
+      document.getElementById('filter-date-from').value = filterDateFrom;
+      document.getElementById('filter-date-to').value   = filterDateTo;
+      document.getElementById('filter-search').addEventListener('input', e => {
+        filterSearch = e.target.value.trim();
+        clearTimeout(searchDebounce);
+        searchDebounce = setTimeout(() => { currentPage = 1; expandedInv = {}; loadInvoices(); }, 300);
+      });
+      document.getElementById('filter-date-from').addEventListener('change', e => { filterDateFrom = e.target.value; currentPage = 1; expandedInv = {}; loadInvoices(); });
+      document.getElementById('filter-date-to').addEventListener('change',   e => { filterDateTo   = e.target.value; currentPage = 1; expandedInv = {}; loadInvoices(); });
 
       document.getElementById('btn-create-inv').addEventListener('click', () => {
         currentInvMode = 'create'; currentInvId = null;
         document.getElementById('t-modal-inv-title').textContent = t('createInvoice');
         document.getElementById('inv-name').value      = '';
+        document.getElementById('inv-date').value      = new Date().toISOString().split('T')[0];
         document.getElementById('inv-status').value    = 'active';
         document.getElementById('inv-direction').value = 'expense';
         document.getElementById('inv-total').value     = '';
@@ -812,6 +836,9 @@
       let url = `/invoices?folder_id=${selectedFolderId}&limit=${pageSize}&offset=${offset}`;
       if (filterStatus !== 'all')   url += `&status=${filterStatus}`;
       if (filterCategory !== 'all') url += `&category_id=${filterCategory}`;
+      if (filterSearch)   url += `&search=${encodeURIComponent(filterSearch)}`;
+      if (filterDateFrom) url += `&date_from=${filterDateFrom}`;
+      if (filterDateTo)   url += `&date_to=${filterDateTo}`;
 
       try {
         const data = await apiFetch(url);
@@ -834,6 +861,7 @@
 
         tbody.innerHTML = '';
         data.rows.forEach(r => {
+          invoicesById[r.id] = r;
           const remaining  = parseFloat(r.total_amount||0) - parseFloat(r.paid_amount||0);
           const isExpanded = expandedInv[r.id] || false;
 
@@ -844,7 +872,7 @@
             <td><button class="expand-btn${isExpanded?' open':''}" data-inv-id="${r.id}">${isExpanded?'▼':'▶'}</button></td>
             <td>
               <div style="font-weight:500">${r.name}</div>
-              <div style="font-size:0.75rem;color:#999;margin-top:2px">${formatDate(r.uploaded_at)} · ${r.uploaded_by}</div>
+              <div style="font-size:0.75rem;color:#999;margin-top:2px">${r.date ? formatDate(r.date) : '—'}</div>
             </td>
             <td>${r.category_name ? `<span class="cat-badge">${r.category_name}</span>` : '<span style="color:#ccc">—</span>'}</td>
             <td><span class="status-badge status-${r.status}">${statusLabel(r.status)}</span></td>
@@ -857,6 +885,7 @@
                   data-id="${r.id}" data-name="${r.name}" data-status="${r.status}"
                   data-direction="${r.direction||'expense'}"
                   data-total="${r.total_amount}" data-paid="${r.paid_amount}"
+                  data-date="${r.date ? (r.date.value || r.date) : ''}"
                   data-category="${r.category_id||''}">${t('edit')}</button>
                 ${r.status === 'deleted'
                   ? `<span class="deleted-label">DELETED</span>`
@@ -907,6 +936,14 @@
     function renderInvoiceDetail(invId, transactions, invFiles) {
       const inner = document.getElementById(`detail-${invId}`);
       if (!inner) return;
+
+      const inv = invoicesById[invId] || {};
+      let metaHtml = `
+        <div style="font-size:0.78rem;color:#888;margin-bottom:14px">
+          ${t('uploadedAt')}: <strong style="color:#555">${inv.uploaded_at ? formatDate(inv.uploaded_at) : '—'}</strong>
+          · ${t('uploadedBy')}: <strong style="color:#555">${inv.uploaded_by || '—'}</strong>
+        </div>
+      `;
 
       // Транзакции
       let trxHtml = `
@@ -997,7 +1034,7 @@
       }
       filesHtml += `</div>`;
 
-      inner.innerHTML = trxHtml + filesHtml;
+      inner.innerHTML = metaHtml + trxHtml + filesHtml;
     }
 
     // ФАЙЛЫ ТРАНЗАКЦИИ
@@ -1115,6 +1152,7 @@
         currentInvMode = 'edit'; currentInvId = btn.dataset.id;
         document.getElementById('t-modal-inv-title').textContent  = t('editInvoice');
         document.getElementById('inv-name').value      = btn.dataset.name;
+        document.getElementById('inv-date').value      = btn.dataset.date ? btn.dataset.date.split('T')[0] : '';
         document.getElementById('inv-status').value    = btn.dataset.status;
         document.getElementById('inv-direction').value = btn.dataset.direction || 'expense';
         document.getElementById('inv-total').value     = btn.dataset.total;
@@ -1219,6 +1257,7 @@
     document.getElementById('btn-inv-cancel').addEventListener('click', () => closeModal('modal-inv'));
     document.getElementById('btn-inv-save').addEventListener('click', async () => {
       const name        = document.getElementById('inv-name').value.trim();
+      const date        = document.getElementById('inv-date').value;
       const status      = document.getElementById('inv-status').value;
       const direction   = document.getElementById('inv-direction').value;
       const total       = document.getElementById('inv-total').value;
@@ -1228,10 +1267,10 @@
       closeModal('modal-inv');
       try {
         if (currentInvMode === 'create') {
-          await apiFetch('/invoices', { method: 'POST', body: JSON.stringify({ folder_id: selectedFolderId, name, status, direction, total_amount: total, paid_amount: paid, category_id }) });
+          await apiFetch('/invoices', { method: 'POST', body: JSON.stringify({ folder_id: selectedFolderId, name, date, status, direction, total_amount: total, paid_amount: paid, category_id }) });
           showToast(t('invoiceCreated'), 'success');
         } else {
-          await apiFetch(`/invoices/${currentInvId}`, { method: 'PUT', body: JSON.stringify({ name, status, direction, total_amount: total, paid_amount: paid, category_id }) });
+          await apiFetch(`/invoices/${currentInvId}`, { method: 'PUT', body: JSON.stringify({ name, date, status, direction, total_amount: total, paid_amount: paid, category_id }) });
           showToast(t('saved'), 'success');
         }
         loadInvoices();
