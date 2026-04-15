@@ -22,6 +22,14 @@ async function verifyToken(req) {
   return info.email || null;
 }
 
+async function getUserInfo(email) {
+  const [rows] = await bigquery.query({
+    query: `SELECT is_admin FROM \`${PROJECT}.${DATASET}.users\` WHERE email = @email`,
+    params: { email },
+  });
+  return rows[0] || null;
+}
+
 exports.folders = async (req, res) => {
   setCors(res);
   if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
@@ -32,17 +40,38 @@ exports.folders = async (req, res) => {
   const table = `\`${PROJECT}.${DATASET}.${TABLE}\``;
 
   try {
-    // GET — все папки
+    // GET — папки доступные пользователю
     if (req.method === 'GET') {
-      const [rows] = await bigquery.query({
-        query: `SELECT id, name, \`order\`, status FROM ${table} ORDER BY \`order\` ASC`,
-      });
-      res.json(rows);
+      const user = await getUserInfo(email);
+
+      if (user?.is_admin) {
+        // Админ видит все папки
+        const [rows] = await bigquery.query({
+          query: `SELECT id, name, \`order\`, status FROM ${table} ORDER BY \`order\` ASC`,
+        });
+        res.json(rows);
+      } else {
+        // Обычный пользователь — только папки из users_folders где docs_access != 'none'
+        const [rows] = await bigquery.query({
+          query: `SELECT f.id, f.name, f.\`order\`, f.status, uf.docs_access
+                  FROM ${table} f
+                  INNER JOIN \`${PROJECT}.${DATASET}.users_folders\` uf
+                    ON uf.folder_id = f.id
+                  WHERE uf.user_email = @email
+                    AND uf.docs_access != 'none'
+                  ORDER BY f.\`order\` ASC`,
+          params: { email },
+        });
+        res.json(rows);
+      }
       return;
     }
 
-    // POST — создать
+    // POST — создать (только админ)
     if (req.method === 'POST') {
+      const user = await getUserInfo(email);
+      if (!user?.is_admin) { res.status(403).json({ error: 'Forbidden' }); return; }
+
       const { name, order, status } = req.body;
       if (!name || order === undefined || !status) {
         res.status(400).json({ error: 'name, order and status are required' });
@@ -58,31 +87,41 @@ exports.folders = async (req, res) => {
       return;
     }
 
-    // PUT — редактировать по id
+    // PUT — редактировать по id (только админ)
     if (req.method === 'PUT') {
+      const user = await getUserInfo(email);
+      if (!user?.is_admin) { res.status(403).json({ error: 'Forbidden' }); return; }
+
       const id = req.url.split('/').filter(Boolean).pop().split('?')[0];
       const { name, order, status } = req.body;
       const orderInt = parseInt(order || 1);
-      console.log('PUT id:', id, 'body:', JSON.stringify(req.body));
       if (!name || !id) { res.status(400).json({ error: 'name and id are required' }); return; }
-      const query = `UPDATE ${table} SET name = @name, \`order\` = ${orderInt}, status = @status WHERE id = @id`;
       await bigquery.query({
-        query,
+        query: `UPDATE ${table} SET name = @name, \`order\` = ${orderInt}, status = @status WHERE id = @id`,
         params: { name, status: status || 'active', id },
       });
       res.json({ success: true });
       return;
     }
 
-    // DELETE — удалить по id
+    // DELETE — удалить по id (только админ)
     if (req.method === 'DELETE') {
+      const user = await getUserInfo(email);
+      if (!user?.is_admin) { res.status(403).json({ error: 'Forbidden' }); return; }
+
       const id = req.url.split('/').filter(Boolean).pop().split('?')[0];
-      console.log('DELETE id:', id);
       if (!id) { res.status(400).json({ error: 'id is required' }); return; }
+
+      // Удаляем папку и все связанные записи в users_folders
       await bigquery.query({
         query: `DELETE FROM ${table} WHERE id = @id`,
         params: { id },
       });
+      await bigquery.query({
+        query: `DELETE FROM \`${PROJECT}.${DATASET}.users_folders\` WHERE folder_id = @id`,
+        params: { id },
+      });
+
       res.json({ success: true });
       return;
     }
