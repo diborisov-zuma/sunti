@@ -1,0 +1,10 @@
+{
+  "name": "category_types",
+  "version": "1.0.0",
+  "main": "index.js",
+  "type": "commonjs",
+  "dependencies": {
+    "@google-cloud/bigquery": "^8.1.1",
+    "@google-cloud/functions-framework": "^5.0.2"
+  }
+}

@@ -49,6 +49,22 @@
   <div id="app-view">
     <div class="page-content">
       <div class="page-header">
+        <h1 id="t-types-title" style="font-size:1.05rem;color:#222"></h1>
+        <button class="btn btn-primary" id="btn-add-type"></button>
+      </div>
+      <div class="cat-wrap" style="margin-bottom:28px">
+        <div class="cat-hdr" style="grid-template-columns:28px 90px 1fr 1fr 1fr 80px">
+          <span></span>
+          <span>ID</span>
+          <span>RU</span>
+          <span>EN</span>
+          <span>TH</span>
+          <span></span>
+        </div>
+        <ul class="cat-list" id="type-list"></ul>
+      </div>
+
+      <div class="page-header">
         <h1 id="t-page-title"></h1>
       </div>
       <div class="hint" id="t-hint"></div>
@@ -70,8 +86,11 @@
 
   <script>
     let categories = [];
+    let types      = [];
     let dragId     = null;
+    let dragKind   = null; // 'cat' | 'type'
     const dirty    = new Set();
+    const typeDirty= new Set();
 
     function showToast(msg, type) {
       const el = document.getElementById('toast');
@@ -88,115 +107,152 @@
       setText('t-guest-sub',    t('guestSub'));
       setText('t-login',        t('login'));
       setText('t-page-title',   t('navCategories'));
+      setText('t-types-title',  t('categoryTypes'));
+      document.getElementById('btn-add-type').textContent = t('addType');
       setText('t-hint',         t('dragToReorder'));
       setText('t-col-type',     t('categoryType'));
       updateHeaderTexts();
     }
 
-    async function loadCategories() {
-      try { categories = await apiFetch('/categories'); }
-      catch(e) { showToast(e.message, 'error'); categories = []; }
+    async function loadAll() {
+      try {
+        const [cats, tps] = await Promise.all([apiFetch('/categories'), apiFetch('/category_types')]);
+        categories = cats; types = tps;
+      } catch(e) { showToast(e.message, 'error'); }
+      renderTypes();
       render();
+    }
+
+    function renderTypes() {
+      const ul = document.getElementById('type-list');
+      if (!types.length) { ul.innerHTML = `<li class="empty-state">—</li>`; return; }
+      ul.innerHTML = types.map(ty => `
+        <li class="cat-row${typeDirty.has(ty.id)?' dirty':''}" draggable="true" data-kind="type" data-id="${ty.id}" style="grid-template-columns:28px 90px 1fr 1fr 1fr 80px">
+          <span class="handle">⋮⋮</span>
+          <span style="font-size:0.78rem;color:#888;font-family:monospace">${ty.id}</span>
+          <input data-field="name"    value="${(ty.name||'').replace(/"/g,'&quot;')}">
+          <input data-field="name_en" value="${(ty.name_en||'').replace(/"/g,'&quot;')}">
+          <input data-field="name_th" value="${(ty.name_th||'').replace(/"/g,'&quot;')}">
+          <button class="btn btn-primary" data-action="save-type" data-id="${ty.id}" ${typeDirty.has(ty.id)?'':'disabled style="opacity:0.4"'}>${t('save')}</button>
+        </li>
+      `).join('');
     }
 
     function render() {
       const ul = document.getElementById('cat-list');
       if (!categories.length) { ul.innerHTML = `<li class="empty-state">—</li>`; return; }
+      const typeOpts = `<option value="">—</option>` + types.map(ty => `<option value="${ty.id}">${ty.id}</option>`).join('');
       ul.innerHTML = categories.map(c => `
-        <li class="cat-row${dirty.has(c.id)?' dirty':''}" draggable="true" data-id="${c.id}">
+        <li class="cat-row${dirty.has(c.id)?' dirty':''}" draggable="true" data-kind="cat" data-id="${c.id}">
           <span class="handle">⋮⋮</span>
           <input data-field="name"    value="${(c.name||'').replace(/"/g,'&quot;')}">
           <input data-field="name_en" value="${(c.name_en||'').replace(/"/g,'&quot;')}">
           <input data-field="name_th" value="${(c.name_th||'').replace(/"/g,'&quot;')}">
-          <select data-field="type">
-            <option value=""         ${!c.type?'selected':''}>—</option>
-            <option value="expense"  ${c.type==='expense'?'selected':''}>expense</option>
-            <option value="income"   ${c.type==='income'?'selected':''}>income</option>
-            <option value="transfer" ${c.type==='transfer'?'selected':''}>transfer</option>
-          </select>
+          <select data-field="type">${typeOpts.replace(`value="${c.type||''}"`, `value="${c.type||''}" selected`)}</select>
           <button class="btn btn-primary" data-action="save" data-id="${c.id}" ${dirty.has(c.id)?'':'disabled style="opacity:0.4"'}>${t('save')}</button>
         </li>
       `).join('');
     }
 
-    const list = document.getElementById('cat-list');
+    function listeners(rootId, kind) {
+      const root = document.getElementById(rootId);
+      root.addEventListener('dragstart', e => {
+        const row = e.target.closest('.cat-row'); if (!row) return;
+        dragId = row.dataset.id; dragKind = kind;
+        row.classList.add('dragging');
+        e.dataTransfer.effectAllowed = 'move';
+      });
+      root.addEventListener('dragend', () => {
+        root.querySelectorAll('.cat-row').forEach(r => { r.classList.remove('dragging'); r.classList.remove('over'); });
+      });
+      root.addEventListener('dragover', e => {
+        if (dragKind !== kind) return;
+        e.preventDefault();
+        const row = e.target.closest('.cat-row');
+        if (!row || row.dataset.id === dragId) return;
+        root.querySelectorAll('.cat-row.over').forEach(r => r.classList.remove('over'));
+        row.classList.add('over');
+      });
+      root.addEventListener('drop', async e => {
+        if (dragKind !== kind) return;
+        e.preventDefault();
+        const row = e.target.closest('.cat-row'); if (!row || !dragId) return;
+        const targetId = row.dataset.id; if (targetId === dragId) return;
+        const arr = kind === 'cat' ? categories : types;
+        const from = arr.findIndex(c => c.id === dragId);
+        const to   = arr.findIndex(c => c.id === targetId);
+        if (from < 0 || to < 0) return;
+        const [moved] = arr.splice(from, 1);
+        arr.splice(to, 0, moved);
+        if (kind === 'cat') render(); else renderTypes();
+        try {
+          const ep = kind === 'cat' ? '/categories/reorder' : '/category_types/reorder';
+          await apiFetch(ep, { method: 'PUT', body: JSON.stringify({ ids: arr.map(x => x.id) }) });
+          showToast(t('saved'), 'success');
+        } catch (err) { showToast(err.message, 'error'); await loadAll(); }
+      });
+      root.addEventListener('input', e => {
+        const row = e.target.closest('.cat-row'); if (!row) return;
+        const id = row.dataset.id;
+        const set = kind === 'cat' ? dirty : typeDirty;
+        set.add(id); row.classList.add('dirty');
+        const btn = row.querySelector(`button[data-action="${kind === 'cat' ? 'save' : 'save-type'}"]`);
+        if (btn) { btn.disabled = false; btn.style.opacity = ''; }
+      });
+    }
+    listeners('cat-list', 'cat');
+    listeners('type-list', 'type');
 
-    list.addEventListener('dragstart', e => {
-      const row = e.target.closest('.cat-row');
-      if (!row) return;
-      dragId = row.dataset.id;
-      row.classList.add('dragging');
-      e.dataTransfer.effectAllowed = 'move';
-    });
-    list.addEventListener('dragend', e => {
-      document.querySelectorAll('.cat-row').forEach(r => { r.classList.remove('dragging'); r.classList.remove('over'); });
-    });
-    list.addEventListener('dragover', e => {
-      e.preventDefault();
-      const row = e.target.closest('.cat-row');
-      if (!row || row.dataset.id === dragId) return;
-      document.querySelectorAll('.cat-row.over').forEach(r => r.classList.remove('over'));
-      row.classList.add('over');
-    });
-    list.addEventListener('drop', async e => {
-      e.preventDefault();
-      const row = e.target.closest('.cat-row');
-      if (!row || !dragId) return;
-      const targetId = row.dataset.id;
-      if (targetId === dragId) return;
-
-      const from = categories.findIndex(c => c.id === dragId);
-      const to   = categories.findIndex(c => c.id === targetId);
-      if (from < 0 || to < 0) return;
-      const [moved] = categories.splice(from, 1);
-      categories.splice(to, 0, moved);
-      render();
-      try {
-        await apiFetch('/categories/reorder', {
-          method: 'PUT',
-          body: JSON.stringify({ ids: categories.map(c => c.id) }),
-        });
-        showToast(t('saved'), 'success');
-      } catch (err) {
-        showToast(err.message, 'error');
-        await loadCategories();
-      }
-    });
-
-    list.addEventListener('input', e => {
-      const row = e.target.closest('.cat-row');
-      if (!row) return;
-      const id = row.dataset.id;
-      dirty.add(id);
-      row.classList.add('dirty');
-      const btn = row.querySelector('button[data-action="save"]');
-      if (btn) { btn.disabled = false; btn.style.opacity = ''; }
-    });
-
-    list.addEventListener('click', async e => {
-      const btn = e.target.closest('button[data-action="save"]');
+    document.addEventListener('click', async e => {
+      const btn = e.target.closest('button[data-action]');
       if (!btn) return;
-      const id = btn.dataset.id;
-      const row = btn.closest('.cat-row');
-      const name    = row.querySelector('input[data-field="name"]').value.trim();
-      const name_en = row.querySelector('input[data-field="name_en"]').value.trim();
-      const name_th = row.querySelector('input[data-field="name_th"]').value.trim();
-      const type    = row.querySelector('select[data-field="type"]').value;
-      if (!name) { showToast(t('fillAllFields'), 'error'); return; }
-      try {
-        await apiFetch(`/categories/${id}`, {
-          method: 'PUT',
-          body: JSON.stringify({ name, name_en, name_th, type }),
-        });
-        const c = categories.find(x => x.id === id);
-        if (c) { c.name = name; c.name_en = name_en; c.name_th = name_th; c.type = type; }
-        dirty.delete(id);
-        row.classList.remove('dirty');
-        btn.disabled = true; btn.style.opacity = '0.4';
-        showToast(t('saved'), 'success');
-      } catch (err) {
-        showToast(err.message, 'error');
+      const action = btn.dataset.action;
+
+      if (action === 'save') {
+        const id = btn.dataset.id;
+        const row = btn.closest('.cat-row');
+        const name    = row.querySelector('input[data-field="name"]').value.trim();
+        const name_en = row.querySelector('input[data-field="name_en"]').value.trim();
+        const name_th = row.querySelector('input[data-field="name_th"]').value.trim();
+        const type    = row.querySelector('select[data-field="type"]').value;
+        if (!name) { showToast(t('fillAllFields'), 'error'); return; }
+        try {
+          await apiFetch(`/categories/${id}`, { method: 'PUT', body: JSON.stringify({ name, name_en, name_th, type }) });
+          const c = categories.find(x => x.id === id);
+          if (c) { c.name = name; c.name_en = name_en; c.name_th = name_th; c.type = type; }
+          dirty.delete(id); row.classList.remove('dirty');
+          btn.disabled = true; btn.style.opacity = '0.4';
+          showToast(t('saved'), 'success');
+        } catch (err) { showToast(err.message, 'error'); }
       }
+
+      if (action === 'save-type') {
+        const id = btn.dataset.id;
+        const row = btn.closest('.cat-row');
+        const name    = row.querySelector('input[data-field="name"]').value.trim();
+        const name_en = row.querySelector('input[data-field="name_en"]').value.trim();
+        const name_th = row.querySelector('input[data-field="name_th"]').value.trim();
+        if (!name) { showToast(t('fillAllFields'), 'error'); return; }
+        try {
+          await apiFetch(`/category_types/${id}`, { method: 'PUT', body: JSON.stringify({ name, name_en, name_th }) });
+          const ty = types.find(x => x.id === id);
+          if (ty) { ty.name = name; ty.name_en = name_en; ty.name_th = name_th; }
+          typeDirty.delete(id); row.classList.remove('dirty');
+          btn.disabled = true; btn.style.opacity = '0.4';
+          showToast(t('saved'), 'success');
+          render(); // refresh cat's type dropdown options
+        } catch (err) { showToast(err.message, 'error'); }
+      }
+    });
+
+    document.getElementById('btn-add-type').addEventListener('click', async () => {
+      const id = prompt('ID (латиницей, без пробелов):');
+      if (!id) return;
+      const name = prompt('Название (RU):') || id;
+      try {
+        await apiFetch('/category_types', { method: 'POST', body: JSON.stringify({ id: id.trim(), name, name_en: '', name_th: '' }) });
+        await loadAll();
+      } catch (err) { showToast(err.message, 'error'); }
     });
 
     window.onLogin = async () => {
@@ -205,13 +261,14 @@
         document.getElementById('app-view').innerHTML = `<div class="empty-state" style="margin-top:60px">403 — admins only</div>`;
         return;
       }
-      await loadCategories();
+      await loadAll();
     };
     window.onLogout = () => {
       document.getElementById('cat-list').innerHTML = '';
+      document.getElementById('type-list').innerHTML = '';
       updateTexts();
     };
-    window.onLangChange = () => { updateTexts(); render(); };
+    window.onLangChange = () => { updateTexts(); renderTypes(); render(); };
 
     renderHeader('categories');
     updateTexts();

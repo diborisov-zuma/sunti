@@ -215,7 +215,7 @@
     .chat-empty { text-align: center; padding: 32px 16px; color: #bbb; font-size: 0.85rem; }
 
     .combo { position:relative; display:inline-block; }
-    .combo input { min-width:180px; }
+    .combo input { min-width:360px; }
     .combo ul { position:absolute;top:100%;left:0;right:0;max-height:220px;overflow-y:auto;background:#fff;border:1px solid #ddd;border-radius:6px;margin-top:2px;box-shadow:0 4px 12px rgba(0,0,0,0.08);list-style:none;padding:4px 0;z-index:50;display:none; }
     .combo.open ul { display:block; }
     .combo li { padding:6px 10px;font-size:0.85rem;color:#333;cursor:pointer; }
@@ -393,20 +393,26 @@
       if (currentLang === 'th') return c.name_th || c.name;
       return c.name;
     }
-    function typeLabelForGroup(type) {
-      if (type === 'income')   return t('income');
-      if (type === 'expense')  return t('expense');
-      if (type === 'transfer') return t('navFinance');
-      return '—';
+    let typesCache = [];
+    function typeLabelForGroup(typeId) {
+      const t2 = typesCache.find(x => x.id === typeId);
+      if (!t2) return '—';
+      if (currentLang === 'en') return t2.name_en || t2.name;
+      if (currentLang === 'th') return t2.name_th || t2.name;
+      return t2.name;
     }
     function catItemsGrouped() {
-      const ORDER = { expense: 1, income: 2, transfer: 3 };
+      const orderMap = {};
+      typesCache.forEach((t2, i) => { orderMap[t2.id] = t2.sort_order || (i * 1000); });
       const copy = categoriesCache.slice().sort((a, b) => {
-        const da = (ORDER[a.type] || 9), db = (ORDER[b.type] || 9);
+        const da = (orderMap[a.type] ?? 9e9), db = (orderMap[b.type] ?? 9e9);
         if (da !== db) return da - db;
         return (a.sort_order || 0) - (b.sort_order || 0);
       });
       return copy.map(c => ({ id: c.id, label: catLabel(c), group: typeLabelForGroup(c.type) }));
+    }
+    async function loadTypes() {
+      try { typesCache = await apiFetch('/category_types'); } catch(e) { typesCache = []; }
     }
 
     function bindCombo(inputId, listId, items, { placeholder, selectedId, onSelect, allowAll = false, allLabel = '' } = {}) {
@@ -1493,7 +1499,7 @@
 
     window.onLogin  = async () => {
       updateTexts();
-      await Promise.all([loadCategories(), loadFolders(), loadAccounts(), loadCompanies()]);
+      await Promise.all([loadCategories(), loadFolders(), loadAccounts(), loadCompanies(), loadTypes()]);
       renderMainArea();
     };
     window.onLogout = () => {
