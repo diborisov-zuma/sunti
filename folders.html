@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sunti — Проекты</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <script src="_i18n.js"></script>
+  <script src="_config.js"></script>
+  <script src="_auth.js"></script>
+  <script src="_header.js"></script>
+  <style>
+    .page-content { max-width: 700px; margin: 32px auto; padding: 0 24px; }
+    .page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
+    .page-header h1 { font-size: 1.2rem; color: #222; }
+    .table-wrap { background: #fff; border: 1px solid #e8e8e8; border-radius: 10px; overflow: hidden; }
+    table { width: 100%; border-collapse: collapse; }
+    thead { background: #f8f8f8; border-bottom: 1px solid #e8e8e8; }
+    th { padding: 10px 16px; font-size: 0.78rem; font-weight: 600; color: #888; text-align: left; text-transform: uppercase; letter-spacing: 0.04em; }
+    td { padding: 12px 16px; font-size: 0.9rem; color: #333; border-bottom: 1px solid #f0f0f0; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: #fafafa; }
+    .status-badge { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: 500; }
+    .status-active  { background: #e6f4ea; color: #1e8e3e; }
+    .status-archive { background: #f1f3f4; color: #888; }
+    .row-actions { display: flex; gap: 6px; }
+    .empty-state { text-align: center; padding: 48px 24px; color: #bbb; }
+    .loading { text-align: center; padding: 48px; color: #bbb; }
+    .field-group { margin-bottom: 14px; }
+    .field-group label { display: block; font-size: 0.82rem; color: #666; margin-bottom: 4px; }
+    .field-group input, .field-group select { width: 100%; border: 1px solid #ddd; border-radius: 6px; padding: 9px 12px; font-size: 0.9rem; outline: none; box-sizing: border-box; }
+    .field-group input:focus, .field-group select:focus { border-color: #1a73e8; }
+  </style>
+</head>
+<body>
+
+  <header id="header"></header>
+
+  <div id="guest-view">
+    <h2 id="t-guest-title"></h2>
+    <p id="t-guest-sub"></p>
+    <div style="display:flex;justify-content:center;margin-top:24px">
+      <a href="index.html" class="btn btn-primary" id="t-login"></a>
+    </div>
+  </div>
+
+  <div id="app-view">
+    <div class="page-content">
+      <div class="page-header">
+        <h1 id="t-page-title"></h1>
+        <button class="btn btn-primary" id="btn-add"></button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th id="t-col-name"></th>
+              <th id="t-col-status"></th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Модалка добавления -->
+  <div class="modal-overlay" id="modal-add">
+    <div class="modal">
+      <h3 id="t-modal-add-title"></h3>
+      <div class="field-group">
+        <label id="t-label-name"></label>
+        <input type="text" id="f-name" placeholder="Villa 3">
+      </div>
+      <div class="field-group">
+        <label id="t-label-order"></label>
+        <input type="number" id="f-order" placeholder="1" min="1">
+      </div>
+      <div class="field-group">
+        <label id="t-label-status"></label>
+        <select id="f-status">
+          <option value="active" id="f-opt-active"></option>
+          <option value="archive" id="f-opt-archive"></option>
+        </select>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-outline" id="btn-add-cancel"></button>
+        <button class="btn btn-primary" id="btn-add-save"></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Модалка редактирования -->
+  <div class="modal-overlay" id="modal-edit">
+    <div class="modal">
+      <h3 id="t-modal-edit-title"></h3>
+      <div class="field-group">
+        <label id="t-edit-label-name"></label>
+        <input type="text" id="e-name">
+      </div>
+      <div class="field-group">
+        <label id="t-edit-label-order"></label>
+        <input type="number" id="e-order" min="1">
+      </div>
+      <div class="field-group">
+        <label id="t-edit-label-status"></label>
+        <select id="e-status">
+          <option value="active" id="e-opt-active"></option>
+          <option value="archive" id="e-opt-archive"></option>
+        </select>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-outline" id="btn-edit-cancel"></button>
+        <button class="btn btn-primary" id="btn-edit-save"></button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    let currentEditId = null;
+
+    function showToast(msg, type) {
+      const el = document.getElementById('toast');
+      el.textContent = msg;
+      el.className = 'toast show' + (type ? ' ' + type : '');
+      clearTimeout(el._t);
+      el._t = setTimeout(() => el.className = 'toast', 3000);
+    }
+
+    function openModal(id)  { document.getElementById(id).classList.add('open'); }
+    function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+    function updateTexts() {
+      document.getElementById('t-guest-title').textContent    = t('guestTitle');
+      document.getElementById('t-guest-sub').textContent      = t('guestSub');
+      document.getElementById('t-login').textContent          = t('login');
+      document.getElementById('t-page-title').textContent     = t('navFolders');
+      document.getElementById('btn-add').textContent          = t('add');
+      document.getElementById('t-col-name').textContent       = t('name');
+      document.getElementById('t-col-status').textContent     = t('statusLabel');
+      document.getElementById('t-modal-add-title').textContent  = t('newProject');
+      document.getElementById('t-label-name').textContent     = t('name');
+      document.getElementById('t-label-order').textContent    = t('orderLabel');
+      document.getElementById('t-label-status').textContent   = t('statusLabel');
+      document.getElementById('f-opt-active').textContent     = t('active');
+      document.getElementById('f-opt-archive').textContent    = t('archive');
+      document.getElementById('btn-add-cancel').textContent   = t('cancel');
+      document.getElementById('btn-add-save').textContent     = t('save');
+      document.getElementById('t-modal-edit-title').textContent = t('editProject');
+      document.getElementById('t-edit-label-name').textContent  = t('name');
+      document.getElementById('t-edit-label-order').textContent = t('orderLabel');
+      document.getElementById('t-edit-label-status').textContent = t('statusLabel');
+      document.getElementById('e-opt-active').textContent     = t('active');
+      document.getElementById('e-opt-archive').textContent    = t('archive');
+      document.getElementById('btn-edit-cancel').textContent  = t('cancel');
+      document.getElementById('btn-edit-save').textContent    = t('save');
+      updateHeaderTexts();
+      if (document.getElementById('tbody').children.length > 0) loadFolders();
+    }
+
+    async function loadFolders() {
+      const tbody = document.getElementById('tbody');
+      tbody.innerHTML = `<tr><td colspan="4" class="loading">${t('loading')}</td></tr>`;
+      try {
+        const rows = await apiFetch('/folders');
+        if (!rows.length) {
+          tbody.innerHTML = `<tr><td colspan="4" class="empty-state">${t('noProjects')}</td></tr>`;
+          return;
+        }
+        tbody.innerHTML = rows.map(r => `
+          <tr>
+            <td style="color:#bbb">${r.order}</td>
+            <td><strong>${r.name}</strong></td>
+            <td><span class="status-badge ${r.status === 'active' ? 'status-active' : 'status-archive'}">${r.status === 'active' ? t('active') : t('archive')}</span></td>
+            <td>
+              <div class="row-actions">
+                <button class="btn btn-outline" data-action="edit" data-id="${r.id}" data-name="${r.name}" data-order="${r.order}" data-status="${r.status}">${t('edit')}</button>
+                <button class="btn btn-danger" data-action="delete" data-id="${r.id}">${t('delete')}</button>
+              </div>
+            </td>
+          </tr>
+        `).join('');
+      } catch(e) {
+        console.error(e);
+        tbody.innerHTML = `<tr><td colspan="4" class="empty-state">${e.message}</td></tr>`;
+      }
+    }
+
+    document.getElementById('btn-add').addEventListener('click', () => {
+      document.getElementById('f-name').value = '';
+      document.getElementById('f-order').value = '';
+      document.getElementById('f-status').value = 'active';
+      openModal('modal-add');
+      setTimeout(() => document.getElementById('f-name').focus(), 100);
+    });
+
+    document.getElementById('btn-add-cancel').addEventListener('click', () => closeModal('modal-add'));
+
+    document.getElementById('btn-add-save').addEventListener('click', async () => {
+      const name   = document.getElementById('f-name').value.trim();
+      const order  = document.getElementById('f-order').value;
+      const status = document.getElementById('f-status').value;
+      if (!name || !order) { showToast(t('fillAllFields'), 'error'); return; }
+      closeModal('modal-add');
+      try {
+        await apiFetch('/folders', { method: 'POST', body: JSON.stringify({ name, order: parseInt(order), status }) });
+        showToast(t('projectAdded'), 'success');
+        await loadFolders();
+      } catch(e) {
+        console.error(e);
+        showToast(e.message, 'error');
+      }
+    });
+
+    document.getElementById('tbody').addEventListener('click', e => {
+      const btn = e.target.closest('button[data-action]');
+      if (!btn) return;
+      const { action, id, name, order, status } = btn.dataset;
+
+      if (action === 'edit') {
+        currentEditId = id;
+        document.getElementById('e-name').value   = name;
+        document.getElementById('e-order').value  = order;
+        document.getElementById('e-status').value = status;
+        openModal('modal-edit');
+        setTimeout(() => document.getElementById('e-name').focus(), 100);
+      }
+
+      if (action === 'delete') {
+        if (!confirm(t('confirmDeleteProject'))) return;
+        apiFetch(`/folders/${id}`, { method: 'DELETE' })
+          .then(() => { showToast(t('deleted'), 'success'); loadFolders(); })
+          .catch(e => { console.error(e); showToast(e.message, 'error'); });
+      }
+    });
+
+    document.getElementById('btn-edit-cancel').addEventListener('click', () => closeModal('modal-edit'));
+
+    document.getElementById('btn-edit-save').addEventListener('click', async () => {
+      const name   = document.getElementById('e-name').value.trim();
+      const order  = document.getElementById('e-order').value;
+      const status = document.getElementById('e-status').value;
+      if (!name || !order) { showToast(t('fillAllFields'), 'error'); return; }
+      closeModal('modal-edit');
+      try {
+        await apiFetch(`/folders/${currentEditId}`, {
+          method: 'PUT',
+          body: JSON.stringify({ name, order: parseInt(order), status })
+        });
+        showToast(t('saved'), 'success');
+        await loadFolders();
+      } catch(e) {
+        console.error(e);
+        showToast(e.message, 'error');
+      }
+    });
+
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape') { closeModal('modal-add'); closeModal('modal-edit'); }
+    });
+
+    window.onLogin = async () => { updateTexts(); await loadFolders(); };
+    window.onLogout = () => {
+      document.getElementById('tbody').innerHTML = '';
+      updateTexts();
+    };
+    window.onLangChange = () => updateTexts();
+
+    renderHeader('folders');
+    updateTexts();
+  </script>
+
+</body>
+</html>

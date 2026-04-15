@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sunti</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <script src="_i18n.js"></script>
+  <script src="_auth.js"></script>
+  <script src="_header.js"></script>
+  <style>
+    .home-content {
+      max-width: 600px;
+      margin: 80px auto;
+      padding: 0 24px;
+      text-align: center;
+    }
+
+    .home-content h2 { font-size: 1.6rem; color: #222; margin-bottom: 12px; }
+    .home-content p  { color: #888; font-size: 1rem; margin-bottom: 32px; line-height: 1.6; }
+
+    .home-links {
+      display: flex;
+      gap: 16px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .home-card {
+      background: #fff;
+      border: 1px solid #e8e8e8;
+      border-radius: 12px;
+      padding: 24px 32px;
+      text-decoration: none;
+      color: #333;
+      transition: all 0.2s;
+      min-width: 160px;
+    }
+
+    .home-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.1); transform: translateY(-2px); }
+    .home-card .card-icon { font-size: 2rem; margin-bottom: 8px; }
+    .home-card .card-title { font-size: 0.95rem; font-weight: 500; }
+  </style>
+</head>
+<body>
+
+  <header id="header"></header>
+
+  <div id="guest-view">
+    <h2 id="t-guest-title"></h2>
+    <p id="t-guest-sub"></p>
+    <div id="guest-signin">
+      <div class="g_id_signin"
+        data-type="standard" data-size="large" data-theme="filled_blue"
+        data-text="signin_with" data-shape="rectangular" data-logo_alignment="left">
+      </div>
+    </div>
+  </div>
+
+  <div id="app-view">
+    <div class="home-content">
+      <h2 id="t-welcome"></h2>
+      <p id="t-home-sub"></p>
+      <div class="home-links">
+        <a href="invoices.html" class="home-card">
+          <div class="card-icon">📁</div>
+          <div class="card-title" id="t-card-invoices"></div>
+        </a>
+        <a href="reports.html" class="home-card">
+          <div class="card-icon">📊</div>
+          <div class="card-title" id="t-card-reports"></div>
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    const homeI18n = {
+      ru: { welcome: 'Добро пожаловать в Sunti', homeSub: 'Выберите раздел для работы', cardInvoices: 'Накладные', cardReports: 'Отчёты' },
+      en: { welcome: 'Welcome to Sunti', homeSub: 'Select a section to get started', cardInvoices: 'Invoices', cardReports: 'Reports' },
+      th: { welcome: 'ยินดีต้อนรับสู่ Sunti', homeSub: 'เลือกส่วนที่ต้องการ', cardInvoices: 'ใบส่งของ', cardReports: 'รายงาน' },
+    };
+
+    function onLangChange() {
+      document.getElementById('t-guest-title').textContent = t('guestTitle');
+      document.getElementById('t-guest-sub').textContent   = t('guestSub');
+      const h = homeI18n[currentLang];
+      if (document.getElementById('t-welcome'))       document.getElementById('t-welcome').textContent       = h.welcome;
+      if (document.getElementById('t-home-sub'))      document.getElementById('t-home-sub').textContent      = h.homeSub;
+      if (document.getElementById('t-card-invoices')) document.getElementById('t-card-invoices').textContent = h.cardInvoices;
+      if (document.getElementById('t-card-reports'))  document.getElementById('t-card-reports').textContent  = h.cardReports;
+      updateHeaderTexts();
+    }
+
+    function onLogin(user) {
+      onLangChange();
+    }
+
+    function onLogout() {
+      onLangChange();
+    }
+
+    function showToast(msg, type = '') {
+      const el = document.getElementById('toast');
+      el.textContent = msg;
+      el.className = 'toast show' + (type ? ' ' + type : '');
+      clearTimeout(el._t);
+      el._t = setTimeout(() => el.className = 'toast', 3000);
+    }
+
+    renderHeader('home');
+    onLangChange();
+  </script>
+
+</body>
+</html>

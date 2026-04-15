@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sunti — Отчёты</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <script src="_i18n.js"></script>
+  <script src="_auth.js"></script>
+  <script src="_header.js"></script>
+  <style>
+    .coming-soon {
+      text-align: center;
+      padding: 100px 24px;
+      color: #bbb;
+    }
+    .coming-soon .icon { font-size: 3rem; margin-bottom: 16px; }
+    .coming-soon h2 { font-size: 1.2rem; color: #999; }
+  </style>
+</head>
+<body>
+
+  <header id="header"></header>
+
+  <div id="guest-view">
+    <h2 id="t-guest-title"></h2>
+    <p id="t-guest-sub"></p>
+    <div id="guest-signin">
+      <div class="g_id_signin"
+        data-type="standard" data-size="large" data-theme="filled_blue"
+        data-text="signin_with" data-shape="rectangular" data-logo_alignment="left">
+      </div>
+    </div>
+  </div>
+
+  <div id="app-view">
+    <div class="coming-soon">
+      <div class="icon">📊</div>
+      <h2 id="t-coming"></h2>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    const reportsI18n = {
+      ru: 'Отчёты — в разработке',
+      en: 'Reports — coming soon',
+      th: 'รายงาน — เร็วๆ นี้',
+    };
+
+    function onLogin() { onLangChange(); }
+    function onLogout() { onLangChange(); }
+
+    function onLangChange() {
+      document.getElementById('t-guest-title').textContent = t('guestTitle');
+      document.getElementById('t-guest-sub').textContent   = t('guestSub');
+      document.getElementById('t-coming').textContent      = reportsI18n[currentLang];
+      updateHeaderTexts();
+    }
+
+    function showToast(msg, type = '') {
+      const el = document.getElementById('toast');
+      el.textContent = msg;
+      el.className = 'toast show' + (type ? ' ' + type : '');
+      clearTimeout(el._t);
+      el._t = setTimeout(() => el.className = 'toast', 3000);
+    }
+
+    renderHeader('reports');
+    onLangChange();
+  </script>
+
+</body>
+</html>

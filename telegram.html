@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sunti — Привязка Telegram</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <script src="_i18n.js"></script>
+  <script src="_config.js"></script>
+  <script src="_auth.js"></script>
+  <script src="_header.js"></script>
+  <style>
+    .tg-page {
+      max-width: 480px;
+      margin: 60px auto;
+      padding: 0 24px;
+      text-align: center;
+    }
+
+    .tg-icon { font-size: 4rem; margin-bottom: 16px; }
+
+    .tg-title {
+      font-size: 1.4rem;
+      font-weight: 600;
+      color: #222;
+      margin-bottom: 8px;
+    }
+
+    .tg-subtitle {
+      font-size: 0.95rem;
+      color: #666;
+      margin-bottom: 32px;
+      line-height: 1.6;
+    }
+
+    .tg-card {
+      background: #fff;
+      border: 1px solid #e8e8e8;
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 20px;
+      text-align: left;
+    }
+
+    .tg-step {
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+      margin-bottom: 20px;
+    }
+
+    .tg-step:last-child { margin-bottom: 0; }
+
+    .tg-step-num {
+      width: 28px; height: 28px;
+      background: #1a73e8;
+      color: #fff;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.85rem; font-weight: 600;
+      flex-shrink: 0;
+    }
+
+    .tg-step-text { font-size: 0.9rem; color: #333; line-height: 1.5; padding-top: 4px; }
+    .tg-step-text b { color: #222; }
+
+    .tg-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: #0088cc;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 12px 24px;
+      font-size: 1rem;
+      font-weight: 500;
+      cursor: pointer;
+      text-decoration: none;
+      transition: background 0.15s;
+      margin-top: 8px;
+    }
+    .tg-btn:hover { background: #0077b5; }
+
+    .tg-linked {
+      background: #e6f4ea;
+      border: 1px solid #b7dfbe;
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+    .tg-linked-icon { font-size: 2.5rem; margin-bottom: 8px; }
+    .tg-linked-title { font-size: 1.1rem; font-weight: 600; color: #1e8e3e; margin-bottom: 4px; }
+    .tg-linked-sub { font-size: 0.88rem; color: #555; }
+
+    .tg-check-btn {
+      background: none;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      padding: 8px 16px;
+      font-size: 0.85rem;
+      color: #555;
+      cursor: pointer;
+      margin-top: 16px;
+      transition: all 0.15s;
+    }
+    .tg-check-btn:hover { background: #f4f4f4; }
+  </style>
+</head>
+<body>
+
+  <header id="header"></header>
+
+  <div id="guest-view">
+    <h2 id="t-guest-title"></h2>
+    <p id="t-guest-sub"></p>
+    <div style="display:flex;justify-content:center;margin-top:24px">
+      <a href="index.html" class="btn btn-primary" id="t-login"></a>
+    </div>
+  </div>
+
+  <div id="app-view">
+    <div class="tg-page" id="tg-page">
+      <div style="text-align:center;padding:48px;color:#bbb">Загрузка...</div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    let userEmail = null;
+
+    function showToast(msg, type) {
+      const el = document.getElementById('toast');
+      el.textContent = msg;
+      el.className = 'toast show' + (type ? ' ' + type : '');
+      clearTimeout(el._t);
+      el._t = setTimeout(() => el.className = 'toast', 3000);
+    }
+
+    function updateTexts() {
+      document.getElementById('t-guest-title').textContent = t('guestTitle');
+      document.getElementById('t-guest-sub').textContent   = t('guestSub');
+      document.getElementById('t-login').textContent       = t('login');
+      updateHeaderTexts();
+    }
+
+    async function checkTelegramStatus() {
+      try {
+        const users = await apiFetch('/users');
+        const me = users.find(u => u.email === userEmail);
+        return me && me.telegram_chat_id && me.telegram_chat_id !== '';
+      } catch(e) { return false; }
+    }
+
+    async function renderPage() {
+      const page    = document.getElementById('tg-page');
+      const linked  = await checkTelegramStatus();
+      const encodedEmail = userEmail
+        .replace(/\./g, '_dot_')
+        .replace(/@/g, '_at_')
+        .replace(/\+/g, '_plus_');
+      const deepLink = `https://t.me/sunti_notify_bot?start=${encodedEmail}`;
+
+      if (linked) {
+        page.innerHTML = `
+          <div class="tg-icon">✅</div>
+          <div class="tg-title">${t('tgLinkedTitle')}</div>
+          <div class="tg-subtitle">${t('tgLinkedSubtitle')}</div>
+          <div class="tg-linked">
+            <div class="tg-linked-icon">🔔</div>
+            <div class="tg-linked-title">${t('tgLinkedActive')}</div>
+            <div class="tg-linked-sub">${t('tgLinkedSub')} ${userEmail}</div>
+          </div>
+          <div style="margin-top:16px">
+            <a href="invoices.html" class="btn btn-primary">${t('tgGoToInvoices')}</a>
+          </div>
+        `;
+        if (typeof updateTelegramStatus === 'function') updateTelegramStatus(true);
+      } else {
+        page.innerHTML = `
+          <div class="tg-icon">📱</div>
+          <div class="tg-title">${t('tgPageTitle')}</div>
+          <div class="tg-subtitle">${t('tgPageSubtitle')}</div>
+
+          <div class="tg-card">
+            <div class="tg-step">
+              <div class="tg-step-num">1</div>
+              <div class="tg-step-text">${t('tgStep1')}</div>
+            </div>
+            <div class="tg-step">
+              <div class="tg-step-num">2</div>
+              <div class="tg-step-text">${t('tgStep2')}</div>
+            </div>
+            <div class="tg-step">
+              <div class="tg-step-num">3</div>
+              <div class="tg-step-text">${t('tgStep3')} <b>${userEmail}</b></div>
+            </div>
+          </div>
+
+          <a href="${deepLink}" target="_blank" class="tg-btn">
+            ${t('tgOpenBtn')}
+          </a>
+
+          <div>
+            <button class="tg-check-btn" onclick="recheckStatus()">${t('tgCheckBtn')}</button>
+          </div>
+        `;
+        if (typeof updateTelegramStatus === 'function') updateTelegramStatus(false);
+      }
+    }
+
+    async function recheckStatus() {
+      const linked = await checkTelegramStatus();
+      if (linked) {
+        showToast(t('tgSuccess'), 'success');
+        if (typeof updateTelegramStatus === 'function') updateTelegramStatus(true);
+        setTimeout(renderPage, 800);
+      } else {
+        showToast(t('tgNotLinked'), 'error');
+      }
+    }
+
+    window.onLogin = async (user) => {
+      userEmail = user.email;
+      updateTexts();
+      await renderPage();
+    };
+
+    window.onLogout = () => {
+      userEmail = null;
+      document.getElementById('tg-page').innerHTML = '';
+      updateTexts();
+    };
+
+    window.onLangChange = () => { updateTexts(); if (userEmail) renderPage(); };
+
+    renderHeader('telegram');
+    updateTexts();
+  </script>
+
+</body>
+</html>

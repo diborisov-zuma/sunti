@@ -1,0 +1,10 @@
+введи в powershell:
+python -m http.server 8080
+
+cd "D:\SITE"
+npx serve .
+
+
+Доступы:
+Открой console.cloud.google.com
+APIs & Services → OAuth consent screen -> Audience

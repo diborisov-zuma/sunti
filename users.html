@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sunti — Пользователи</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <script src="_i18n.js"></script>
+  <script src="_config.js"></script>
+  <script src="_auth.js"></script>
+  <script src="_header.js"></script>
+  <style>
+    .page-content { max-width: 800px; margin: 32px auto; padding: 0 24px; }
+    .page-header { display:flex;align-items:center;justify-content:space-between;margin-bottom:24px; }
+    .page-header h1 { font-size:1.2rem;color:#222; }
+
+    .table-wrap { background:#fff;border:1px solid #e8e8e8;border-radius:10px;overflow:hidden; }
+    table { width:100%;border-collapse:collapse; }
+    thead { background:#f8f8f8;border-bottom:1px solid #e8e8e8; }
+    th { padding:10px 16px;font-size:0.78rem;font-weight:600;color:#888;text-align:left;text-transform:uppercase;letter-spacing:0.04em; }
+    td { padding:12px 16px;font-size:0.88rem;color:#333;border-bottom:1px solid #f0f0f0; }
+    tr:last-child td { border-bottom:none; }
+    tr:hover td { background:#fafafa; }
+
+    .user-avatar { width:32px;height:32px;border-radius:50%;background:#e8f0fe;display:flex;align-items:center;justify-content:center;font-size:0.85rem;color:#1a73e8;font-weight:600;flex-shrink:0; }
+    .user-cell { display:flex;align-items:center;gap:10px; }
+    .user-name { font-weight:500;color:#222; }
+    .user-email { font-size:0.75rem;color:#999;margin-top:1px; }
+
+    .tg-badge { display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:20px;font-size:0.75rem; }
+    .tg-set { background:#e3f2fd;color:#0277bd; }
+    .tg-missing { background:#f1f3f4;color:#999; }
+
+    .status-badge { display:inline-block;padding:3px 10px;border-radius:20px;font-size:0.75rem;font-weight:500; }
+    .status-active  { background:#e6f4ea;color:#1e8e3e; }
+    .status-blocked { background:#fce8e6;color:#c5221f; }
+
+    .empty-state { text-align:center;padding:48px 24px;color:#bbb; }
+    .loading { text-align:center;padding:48px;color:#bbb; }
+
+    .field-group { margin-bottom:14px; }
+    .field-group label { display:block;font-size:0.82rem;color:#666;margin-bottom:4px; }
+    .field-group input, .field-group select { width:100%;border:1px solid #ddd;border-radius:6px;padding:9px 12px;font-size:0.9rem;outline:none;box-sizing:border-box; }
+    .field-group input:focus, .field-group select:focus { border-color:#1a73e8; }
+
+    .tg-hint { font-size:0.78rem;color:#999;margin-top:4px;line-height:1.4; }
+
+    .access-denied { text-align:center;padding:100px 24px;color:#bbb; }
+    .access-denied h2 { font-size:1.2rem;color:#c5221f;margin-bottom:8px; }
+  </style>
+</head>
+<body>
+
+  <header id="header"></header>
+
+  <div id="guest-view">
+    <h2 id="t-guest-title"></h2>
+    <p id="t-guest-sub"></p>
+    <div style="display:flex;justify-content:center;margin-top:24px">
+      <a href="index.html" class="btn btn-primary" id="t-login"></a>
+    </div>
+  </div>
+
+  <div id="app-view">
+    <div class="page-content" id="page-content">
+      <!-- Заполняется после проверки прав -->
+    </div>
+  </div>
+
+  <!-- Модалка редактирования пользователя -->
+  <div class="modal-overlay" id="modal-edit">
+    <div class="modal">
+      <h3 id="t-modal-title"></h3>
+
+      <div class="field-group">
+        <label id="t-label-name"></label>
+        <input type="text" id="edit-name">
+      </div>
+
+      <div class="field-group">
+        <label id="t-label-telegram"></label>
+        <input type="text" id="edit-telegram" placeholder="@username">
+        <div class="tg-hint" id="t-tg-hint"></div>
+      </div>
+
+      <div class="field-group">
+        <label id="t-label-status"></label>
+        <select id="edit-active">
+          <option value="true"  id="edit-opt-active"></option>
+          <option value="false" id="edit-opt-blocked"></option>
+        </select>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn btn-outline" id="btn-cancel"></button>
+        <button class="btn btn-primary" id="btn-save"></button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    let editingEmail = null;
+
+    function showToast(msg, type) {
+      const el = document.getElementById('toast');
+      el.textContent = msg;
+      el.className = 'toast show' + (type ? ' ' + type : '');
+      clearTimeout(el._t);
+      el._t = setTimeout(() => el.className = 'toast', 3000);
+    }
+
+    function openModal(id)  { document.getElementById(id).classList.add('open'); }
+    function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+    function formatDate(val) {
+      if (!val) return '—';
+      const d = new Date(val.value || val);
+      if (isNaN(d)) return '—';
+      return `${String(d.getUTCDate()).padStart(2,'0')}.${String(d.getUTCMonth()+1).padStart(2,'0')}.${d.getUTCFullYear()}`;
+    }
+
+    function updateTexts() {
+      document.getElementById('t-guest-title').textContent  = t('guestTitle');
+      document.getElementById('t-guest-sub').textContent    = t('guestSub');
+      document.getElementById('t-login').textContent        = t('login');
+      document.getElementById('t-modal-title').textContent  = t('editUser');
+      document.getElementById('t-label-name').textContent   = t('name');
+      document.getElementById('t-label-telegram').textContent = t('telegramChatId');
+      document.getElementById('t-tg-hint').textContent      = t('tgHint');
+      document.getElementById('t-label-status').textContent = t('statusLabel');
+      document.getElementById('edit-opt-active').textContent  = t('userActive');
+      document.getElementById('edit-opt-blocked').textContent = t('userBlocked');
+      document.getElementById('btn-cancel').textContent     = t('cancel');
+      document.getElementById('btn-save').textContent       = t('save');
+      updateHeaderTexts();
+    }
+
+    function renderAdminPage() {
+      document.getElementById('page-content').innerHTML = `
+        <div class="page-header">
+          <h1 id="t-page-title">${t('usersPage')}</h1>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>${t('user')}</th>
+                <th>Telegram</th>
+                <th>${t('statusLabel')}</th>
+                <th>${t('lastLogin')}</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="users-tbody">
+              <tr><td colspan="5" class="loading">${t('loading')}</td></tr>
+            </tbody>
+          </table>
+        </div>
+      `;
+      loadUsers();
+    }
+
+    function renderAccessDenied() {
+      document.getElementById('page-content').innerHTML = `
+        <div class="access-denied">
+          <h2>${t('accessDenied')}</h2>
+          <p>${t('adminOnly')}</p>
+        </div>
+      `;
+    }
+
+    async function loadUsers() {
+      const tbody = document.getElementById('users-tbody');
+      if (!tbody) return;
+      try {
+        const users = await apiFetch('/users');
+        if (!users.length) {
+          tbody.innerHTML = `<tr><td colspan="5" class="empty-state">${t('noUsers')}</td></tr>`;
+          return;
+        }
+        tbody.innerHTML = users.map(u => {
+          const initials = (u.name || u.email).split(' ').map(w => w[0]).join('').substring(0,2).toUpperCase();
+          const hasTg    = u.telegram_username && u.telegram_username !== '';
+          return `
+            <tr>
+              <td>
+                <div class="user-cell">
+                  <div class="user-avatar">${initials}</div>
+                  <div>
+                    <div class="user-name">${u.name || '—'}</div>
+                    <div class="user-email">${u.email}</div>
+                  </div>
+                </div>
+              </td>
+              <td>
+                ${hasTg
+                  ? `<a href="https://t.me/${u.telegram_username.replace('@','')}" target="_blank" class="tg-badge tg-set">✓ ${u.telegram_username}</a>`
+                  : `<span class="tg-badge tg-missing">${t('notSet')}</span>`
+                }
+              </td>
+              <td>
+                <span class="status-badge ${u.is_active ? 'status-active' : 'status-blocked'}">
+                  ${u.is_active ? t('userActive') : t('userBlocked')}
+                </span>
+              </td>
+              <td style="color:#999;font-size:0.83rem">${formatDate(u.last_login)}</td>
+              <td>
+                <button class="btn btn-outline" data-action="edit"
+                  data-email="${u.email}"
+                  data-name="${u.name||''}"
+                  data-telegram="${u.telegram_username||''}"
+                  data-active="${u.is_active}">${t('edit')}</button>
+              </td>
+            </tr>
+          `;
+        }).join('');
+
+        // Обработчики кнопок
+        document.getElementById('users-tbody').addEventListener('click', e => {
+          const btn = e.target.closest('button[data-action]');
+          if (!btn) return;
+          editingEmail = btn.dataset.email;
+          document.getElementById('edit-name').value     = btn.dataset.name;
+          document.getElementById('edit-telegram').value = btn.dataset.telegram;
+          document.getElementById('edit-active').value   = btn.dataset.active;
+          openModal('modal-edit');
+          setTimeout(() => document.getElementById('edit-name').focus(), 100);
+        });
+
+      } catch(e) {
+        console.error(e);
+        if (tbody) tbody.innerHTML = `<tr><td colspan="5" class="empty-state">${e.message}</td></tr>`;
+      }
+    }
+
+    // Сохранить пользователя
+    document.getElementById('btn-cancel').addEventListener('click', () => closeModal('modal-edit'));
+    document.getElementById('btn-save').addEventListener('click', async () => {
+      const name             = document.getElementById('edit-name').value.trim();
+      const telegram_username = document.getElementById('edit-telegram').value.trim();
+      const is_active        = document.getElementById('edit-active').value === 'true';
+      closeModal('modal-edit');
+      try {
+        await apiFetch(`/users/${encodeURIComponent(editingEmail)}`, {
+          method: 'PUT',
+          body: JSON.stringify({ name, telegram_username, is_active }),
+        });
+        showToast(t('saved'), 'success');
+        loadUsers();
+      } catch(e) {
+        console.error(e);
+        showToast(e.message, 'error');
+      }
+    });
+
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape') closeModal('modal-edit');
+    });
+
+    window.onLogin = (user, admin) => {
+      updateTexts();
+      if (admin) renderAdminPage();
+      else renderAccessDenied();
+    };
+
+    window.onLogout = () => {
+      document.getElementById('page-content').innerHTML = '';
+      updateTexts();
+    };
+
+    window.onLangChange = () => updateTexts();
+
+    renderHeader('users');
+    updateTexts();
+  </script>
+
+</body>
+</html>

@@ -1,0 +1,14 @@
+{
+  "folders": [
+    {
+      "id": "villa1",
+      "name": "Villa 1",
+      "children": []
+    },
+    {
+      "id": "villa2",
+      "name": "Villa 2",
+      "children": []
+    }
+  ]
+}
