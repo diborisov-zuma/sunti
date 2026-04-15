@@ -128,6 +128,11 @@
         <div class="folders-loading">Загрузка проектов…</div>
       </div>
 
+      <div class="section-divider" id="t-section-statement-access"></div>
+      <div id="statement-access-container">
+        <div class="folders-loading">Загрузка…</div>
+      </div>
+
       <div class="section-divider" id="t-section-data-vis"></div>
 
       <div class="checkbox-row">
@@ -148,6 +153,8 @@
     let editingEmail = null;
     let allFolders = [];
     let currentUserFolderAccess = {};
+    let allCompanies = [];
+    let currentUserStatementAccess = {};
 
     function showToast(msg, type) {
       const el = document.getElementById('toast');
@@ -181,9 +188,11 @@
       document.getElementById('btn-save').textContent       = t('save');
       const secMain   = document.getElementById('t-section-main');
       const secDoc    = document.getElementById('t-section-doc-access');
+      const secStmt   = document.getElementById('t-section-statement-access');
       const secData   = document.getElementById('t-section-data-vis');
       if (secMain) secMain.textContent  = t('sectionMain');
       if (secDoc)  secDoc.textContent   = t('sectionDocAccess');
+      if (secStmt) secStmt.textContent  = t('sectionStatementAccess');
       if (secData) secData.textContent  = t('sectionDataVisibility');
       const optNo  = document.getElementById('edit-opt-no-admin');
       const optYes = document.getElementById('edit-opt-yes-admin');
@@ -306,7 +315,10 @@
 
           openModal('modal-edit');
           setTimeout(() => document.getElementById('edit-name').focus(), 100);
-          await loadUserFolderAccess(editingEmail);
+          await Promise.all([
+            loadUserFolderAccess(editingEmail),
+            loadUserStatementAccess(editingEmail),
+          ]);
         });
 
       } catch(e) {
@@ -355,6 +367,74 @@
       }
     }
 
+    async function loadUserStatementAccess(userEmail) {
+      const container = document.getElementById('statement-access-container');
+      container.innerHTML = '<div class="folders-loading">' + t('loadingAccess') + '</div>';
+      try {
+        const records = await apiFetch(`/users_statements?user_email=${encodeURIComponent(userEmail)}`);
+        currentUserStatementAccess = {};
+        for (const r of records) {
+          currentUserStatementAccess[r.company_id] = { id: r.id, statement_access: r.statement_access };
+        }
+
+        if (!allCompanies.length) {
+          try { allCompanies = await apiFetch('/companies'); } catch(e) {}
+        }
+
+        if (!allCompanies.length) {
+          container.innerHTML = '<div class="folders-loading">—</div>';
+          return;
+        }
+
+        const rows = allCompanies.map(c => {
+          const current = currentUserStatementAccess[c.id]?.statement_access || 'none';
+          return `
+            <div class="folder-access-row" data-company-id="${c.id}">
+              <span class="folder-name" title="${c.name}">${c.name}</span>
+              <select class="statement-access-select">
+                <option value="none"   ${current === 'none'   ? 'selected' : ''}>${t('accessNone')}</option>
+                <option value="viewer" ${current === 'viewer' ? 'selected' : ''}>${t('accessViewer')}</option>
+                <option value="editor" ${current === 'editor' ? 'selected' : ''}>${t('accessEditor')}</option>
+              </select>
+            </div>
+          `;
+        }).join('');
+
+        container.innerHTML = `<div class="folder-access-list">${rows}</div>`;
+      } catch(e) {
+        container.innerHTML = '<div class="folders-loading" style="color:#c5221f">' + t('accessLoadError') + '</div>';
+        console.error(e);
+      }
+    }
+
+    async function saveStatementAccess(userEmail) {
+      const rows = document.querySelectorAll('.folder-access-row[data-company-id]');
+      const promises = [];
+      for (const row of rows) {
+        const companyId = row.dataset.companyId;
+        const newAccess = row.querySelector('.statement-access-select').value;
+        const existing  = currentUserStatementAccess[companyId];
+        if (existing) {
+          if (existing.statement_access !== newAccess) {
+            if (newAccess === 'none') {
+              promises.push(apiFetch(`/users_statements/${existing.id}`, { method: 'DELETE' }));
+            } else {
+              promises.push(apiFetch(`/users_statements/${existing.id}`, {
+                method: 'PUT',
+                body: JSON.stringify({ statement_access: newAccess }),
+              }));
+            }
+          }
+        } else if (newAccess !== 'none') {
+          promises.push(apiFetch('/users_statements', {
+            method: 'POST',
+            body: JSON.stringify({ user_email: userEmail, company_id: companyId, statement_access: newAccess }),
+          }));
+        }
+      }
+      await Promise.all(promises);
+    }
+
     async function saveFolderAccess(userEmail) {
       const rows = document.querySelectorAll('.folder-access-row[data-folder-id]');
       const promises = [];
@@ -401,6 +481,7 @@
           body: JSON.stringify({ name, telegram_username, telegram_chat_id, is_active, is_admin, can_see_salary }),
         });
         await saveFolderAccess(editingEmail);
+        await saveStatementAccess(editingEmail);
         closeModal('modal-edit');
         showToast(t('saved'), 'success');
         loadUsers();

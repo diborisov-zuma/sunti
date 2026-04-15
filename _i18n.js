@@ -159,6 +159,7 @@ const i18n = {
     // Модалка пользователя
     sectionMain: 'Основное',
     sectionDocAccess: 'Доступ к документам',
+    sectionStatementAccess: 'Доступ к банковским выпискам',
     sectionDataVisibility: 'Видимость данных',
     canSeeSalary: 'Видит зарплатные записи',
     accessNone: 'Нет доступа',
@@ -328,6 +329,7 @@ const i18n = {
     // User modal
     sectionMain: 'General',
     sectionDocAccess: 'Document access',
+    sectionStatementAccess: 'Bank statement access',
     sectionDataVisibility: 'Data visibility',
     canSeeSalary: 'Can see salary records',
     accessNone: 'No access',
@@ -497,6 +499,7 @@ const i18n = {
     // โมดอลผู้ใช้
     sectionMain: 'ทั่วไป',
     sectionDocAccess: 'การเข้าถึงเอกสาร',
+    sectionStatementAccess: 'การเข้าถึงใบแจ้งยอดธนาคาร',
     sectionDataVisibility: 'การมองเห็นข้อมูล',
     canSeeSalary: 'เห็นข้อมูลเงินเดือน',
     accessNone: 'ไม่มีสิทธิ์',
