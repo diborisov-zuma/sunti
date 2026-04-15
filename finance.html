@@ -184,6 +184,13 @@
           <ul id="trx-folder-list"></ul>
         </span>
       </div>
+      <div class="field-group" id="trx-invoice-group" style="display:none">
+        <label id="t-trx-invoice-label"></label>
+        <span class="combo" style="display:block">
+          <input type="text" id="trx-invoice-input" style="width:100%;border:1px solid #ddd;border-radius:6px;padding:9px 12px;font-size:0.9rem;outline:none;box-sizing:border-box">
+          <ul id="trx-invoice-list"></ul>
+        </span>
+      </div>
       <div class="field-group">
         <label id="t-trx-desc-label"></label>
         <input type="text" id="trx-desc">
@@ -394,6 +401,7 @@
       document.getElementById('t-trx-amount-label').textContent = t('amount');
       document.getElementById('t-trx-cat-label').textContent    = t('category');
       setText('t-trx-folder-label',                                 t('navFolders'));
+      setText('t-trx-invoice-label',                                t('navInvoices'));
       document.getElementById('t-trx-desc-label').textContent   = t('description');
       document.getElementById('trx-opt-income').textContent     = t('income');
       document.getElementById('trx-opt-expense').textContent    = t('expense');
@@ -416,19 +424,43 @@
 
     let modalCategoryCombo = null;
     let modalFolderCombo   = null;
+    let modalInvoiceCombo  = null;
+    let modalInvoicesCache = [];
 
-    function mountModalCombos(selectedCatId, selectedFolderId, showFolder, folderList) {
+    async function loadInvoicesForFolder(folderId) {
+      if (!folderId) return [];
+      try {
+        const data = await apiFetch(`/invoices?folder_id=${folderId}&limit=500`);
+        return data.rows || [];
+      } catch(e) { return []; }
+    }
+
+    async function mountInvoiceCombo(folderId, selectedInvoiceId) {
+      modalInvoicesCache = await loadInvoicesForFolder(folderId);
+      const items = modalInvoicesCache.map(i => ({ id: i.id, label: i.name + (i.date ? ' · ' + formatDate(i.date) : '') }));
+      modalInvoiceCombo = bindCombo('trx-invoice-input', 'trx-invoice-list', items, {
+        placeholder: t('navInvoices'),
+        allowAll: true, allLabel: '— —',
+        selectedId: selectedInvoiceId || '',
+      });
+    }
+
+    async function mountModalCombos(selectedCatId, selectedFolderId, showFolder, folderList, selectedInvoiceId) {
       modalCategoryCombo = bindCombo('trx-category-input', 'trx-category-list',
         categoriesCache.map(c => ({ id: c.id, label: catLabel(c) })),
         { placeholder: t('noCategory'), allowAll: true, allLabel: '— ' + t('noCategory') + ' —', selectedId: selectedCatId || '' });
       document.getElementById('trx-folder-group').style.display = showFolder ? 'block' : 'none';
+      document.getElementById('trx-invoice-group').style.display = 'block';
       if (showFolder) {
         const items = (folderList || foldersCache).map(f => ({ id: f.id, label: f.name }));
-        modalFolderCombo = bindCombo('trx-folder-input', 'trx-folder-list', items,
-          { placeholder: t('navFolders'), allowAll: false, selectedId: selectedFolderId || '' });
+        modalFolderCombo = bindCombo('trx-folder-input', 'trx-folder-list', items, {
+          placeholder: t('navFolders'), allowAll: false, selectedId: selectedFolderId || '',
+          onSelect: async (fid) => { await mountInvoiceCombo(fid, null); },
+        });
       } else {
         modalFolderCombo = null;
       }
+      await mountInvoiceCombo(selectedFolderId, selectedInvoiceId);
     }
 
     function getWritableFolders() {
@@ -931,7 +963,7 @@
         document.getElementById('trx-amount').value    = btn.dataset.amount;
         document.getElementById('trx-desc').value      = btn.dataset.desc;
         const showFolderPicker = !currentTrxInvoiceId; // нет invoice → можно менять folder
-        mountModalCombos(btn.dataset.category || '', btn.dataset.folder || '', showFolderPicker, foldersCache);
+        mountModalCombos(btn.dataset.category || '', btn.dataset.folder || '', showFolderPicker, foldersCache, currentTrxInvoiceId);
         openModal('modal-trx');
         setTimeout(() => document.getElementById('trx-amount').focus(), 100);
       }
@@ -981,19 +1013,20 @@
       const description = document.getElementById('trx-desc').value;
       const category_id = (modalCategoryCombo && modalCategoryCombo.getSelected()) || null;
       const folder_id   = (modalFolderCombo && modalFolderCombo.getSelected()) || '';
+      const invoice_id  = (modalInvoiceCombo && modalInvoiceCombo.getSelected()) || null;
       if (!date || !amount) { showToast(t('fillAllFields'), 'error'); return; }
       closeModal('modal-trx');
       try {
         if (currentTrxMode === 'create') {
           await apiFetch('/transactions', {
             method: 'POST',
-            body: JSON.stringify({ date, amount, direction, category_id, description, folder_id }),
+            body: JSON.stringify({ date, amount, direction, category_id, description, folder_id, invoice_id }),
           });
           showToast(t('saved'), 'success');
         } else {
           await apiFetch(`/transactions/${currentTrxId}`, {
             method: 'PUT',
-            body: JSON.stringify({ date, amount, direction, category_id, description, folder_id }),
+            body: JSON.stringify({ date, amount, direction, category_id, description, folder_id, invoice_id }),
           });
           showToast(t('saved'), 'success');
         }

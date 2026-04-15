@@ -63,7 +63,7 @@ const i18n = {
     editStatement: 'Редактировать выписку',
     replaceFile: 'Заменить файл',
     allAccounts: 'Все счета',
-    allCompanies: 'Все юр. лица',
+    allCompanies: 'Все компании',
     allFolders: 'Все проекты',
     navReports: 'Отчёты',
     navUsers: 'Пользователи',

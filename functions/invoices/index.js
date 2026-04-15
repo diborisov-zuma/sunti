@@ -50,6 +50,7 @@ exports.invoices = async (req, res) => {
     // GET — накладные по folder_id с фильтром и пагинацией
     if (req.method === 'GET') {
       const folderId   = req.query.folder_id;
+      const folderIds  = (req.query.folder_ids || '').split(',').map(s => s.trim()).filter(Boolean);
       const status     = req.query.status;
       const categoryId = req.query.category_id;
       const search     = (req.query.search || '').trim();
@@ -58,12 +59,18 @@ exports.invoices = async (req, res) => {
       const limit      = parseInt(req.query.limit  || 25);
       const offset     = parseInt(req.query.offset || 0);
 
-      if (!folderId) { res.status(400).json({ error: 'folder_id is required' }); return; }
+      if (!folderId && !folderIds.length) { res.status(400).json({ error: 'folder_id or folder_ids is required' }); return; }
 
       const catTable = `\`${PROJECT}.${DATASET}.categories\``;
 
-      let where = `WHERE i.folder_id = @folder_id`;
-      const params = { folder_id: folderId };
+      let where, params;
+      if (folderId) {
+        where = `WHERE i.folder_id = @folder_id`;
+        params = { folder_id: folderId };
+      } else {
+        where = `WHERE i.folder_id IN UNNEST(@folder_ids)`;
+        params = { folder_ids: folderIds };
+      }
 
       if (status && status !== 'all') {
         where += ` AND i.status = @status`;

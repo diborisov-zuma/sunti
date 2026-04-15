@@ -110,7 +110,7 @@ exports.transactions = async (req, res) => {
     // PUT — редактировать транзакцию
     if (req.method === 'PUT') {
       const id = req.url.split('/').filter(Boolean).pop().split('?')[0];
-      const { date, amount, direction, account_id, counterparty_id, category_id, folder_id, description } = req.body;
+      const { date, amount, direction, account_id, counterparty_id, category_id, folder_id, invoice_id, description } = req.body;
       if (!id || !date || !amount) { res.status(400).json({ error: 'id, date and amount are required' }); return; }
 
       const [rows] = await bigquery.query({
@@ -132,7 +132,7 @@ exports.transactions = async (req, res) => {
           account_id:      account_id      || '',
           counterparty_id: counterparty_id || '',
           category_id:     category_id     || '',
-          invoice_id:      cur.invoice_id  || '',
+          invoice_id:      (invoice_id !== undefined ? (invoice_id || '') : (cur.invoice_id || '')),
           folder_id:       folder_id       || cur.folder_id || '',
           description:     description     || '',
           created_at:      cur.created_at,
