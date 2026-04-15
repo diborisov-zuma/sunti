@@ -618,12 +618,13 @@
       return map[s] || s;
     }
 
+    function setText(id, v) { const el = document.getElementById(id); if (el) el.textContent = v; }
+
     function updateTexts() {
-      document.getElementById('t-guest-title').textContent      = t('guestTitle');
-      document.getElementById('t-guest-sub').textContent        = t('guestSub');
-      document.getElementById('t-login').textContent            = t('login');
-      document.getElementById('t-sidebar-title').textContent    = t('navFolders');
-      document.getElementById('t-select-project').textContent   = t('selectProject');
+      setText('t-guest-title',    t('guestTitle'));
+      setText('t-guest-sub',      t('guestSub'));
+      setText('t-login',          t('login'));
+      setText('t-select-project', t('selectProject'));
       document.getElementById('t-inv-name-label').textContent   = t('name');
       document.getElementById('t-inv-date-label').textContent   = t('date');
       const tfl = document.getElementById('t-inv-folder-label'); if (tfl) tfl.textContent = t('navFolders');

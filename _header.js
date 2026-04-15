@@ -6,13 +6,19 @@ function renderHeader(activePage) {
     <a class="logo" href="index.html">Sunti</a>
 
     <nav class="nav">
-      <a href="folders.html"  class="nav-link ${activePage === 'folders'  ? 'active' : ''}" id="t-nav-folders"></a>
       <a href="invoices.html" class="nav-link ${activePage === 'invoices' ? 'active' : ''}" id="t-nav-invoices"></a>
       <a href="finance.html"  class="nav-link ${activePage === 'finance'  ? 'active' : ''}" id="t-nav-finance"></a>
       <a href="statements.html" class="nav-link ${activePage === 'statements' ? 'active' : ''}" id="t-nav-statements"></a>
       <a href="reports.html"  class="nav-link ${activePage === 'reports'  ? 'active' : ''}" id="t-nav-reports"></a>
-      <a href="companies.html" class="nav-link ${activePage === 'companies' ? 'active' : ''}" id="t-nav-companies" style="display:none"></a>
-      <a href="users.html"    class="nav-link ${activePage === 'users'    ? 'active' : ''}" id="t-nav-users" style="display:none"></a>
+      <div class="nav-dropdown" id="nav-settings" style="display:none">
+        <a class="nav-link ${['folders','companies','users','categories'].includes(activePage) ? 'active' : ''}" id="t-nav-settings">⚙</a>
+        <div class="nav-dropdown-menu">
+          <a href="folders.html"    class="${activePage === 'folders'    ? 'active' : ''}" id="t-nav-folders"></a>
+          <a href="companies.html"  class="${activePage === 'companies'  ? 'active' : ''}" id="t-nav-companies"></a>
+          <a href="users.html"      class="${activePage === 'users'      ? 'active' : ''}" id="t-nav-users"></a>
+          <a href="categories.html" class="${activePage === 'categories' ? 'active' : ''}" id="t-nav-categories"></a>
+        </div>
+      </div>
     </nav>
 
     <div class="header-right">
@@ -63,13 +69,23 @@ function renderHeader(activePage) {
 
   updateHeaderTexts();
 
-  // Закрываем панель при клике вне неё
+  // Dropdown Settings
+  const sdd = document.getElementById('nav-settings');
+  if (sdd) {
+    sdd.querySelector('.nav-link').addEventListener('click', e => {
+      e.preventDefault();
+      sdd.classList.toggle('open');
+    });
+  }
+
+  // Закрываем панели при клике вне них
   document.addEventListener('click', e => {
     const panel = document.getElementById('notifications-panel');
     const btn   = document.getElementById('notifications-btn');
     if (panel && !panel.contains(e.target) && btn && !btn.contains(e.target)) {
       panel.style.display = 'none';
     }
+    if (sdd && !sdd.contains(e.target)) sdd.classList.remove('open');
   });
 }
 
@@ -81,6 +97,9 @@ function updateHeaderTexts() {
   const nr = document.getElementById('t-nav-reports');
   const nc = document.getElementById('t-nav-companies');
   const nu = document.getElementById('t-nav-users');
+  const ncat = document.getElementById('t-nav-categories');
+  const nsett = document.getElementById('t-nav-settings');
+  const settWrap = document.getElementById('nav-settings');
   const lb = document.getElementById('logout-btn');
   const nt = document.getElementById('t-notifications-title');
   if (nf) nf.textContent = t('navFolders');
@@ -88,8 +107,11 @@ function updateHeaderTexts() {
   if (nfi) nfi.textContent = t('navFinance');
   if (ns)  ns.textContent  = t('navStatements');
   if (nr) nr.textContent = t('navReports');
-  if (nc) { nc.textContent = t('navCompanies'); if (typeof isAdmin !== 'undefined' && isAdmin) nc.style.display = 'inline-flex'; else nc.style.display = 'none'; }
-  if (nu) { nu.textContent = t('navUsers'); if (typeof isAdmin !== 'undefined' && isAdmin) nu.style.display = 'inline-flex'; else nu.style.display = 'none'; }
+  if (nc) nc.textContent = t('navCompanies');
+  if (nu) nu.textContent = t('navUsers');
+  if (ncat) ncat.textContent = t('navCategories');
+  if (nsett) nsett.textContent = '⚙ ' + t('navSettings');
+  if (settWrap) settWrap.style.display = (typeof isAdmin !== 'undefined' && isAdmin) ? 'inline-flex' : 'none';
   if (lb) lb.textContent = t('logout');
   if (nt) nt.textContent = t('notifications');
 }

@@ -7,7 +7,7 @@ const TABLE    = 'categories';
 
 function setCors(res) {
   res.set('Access-Control-Allow-Origin', '*');
-  res.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  res.set('Access-Control-Allow-Methods', 'GET, POST, PUT, OPTIONS');
   res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 }
 
@@ -21,6 +21,14 @@ async function verifyToken(req) {
   return info.email || null;
 }
 
+async function isAdmin(email) {
+  const [rows] = await bigquery.query({
+    query: `SELECT is_admin FROM \`${PROJECT}.${DATASET}.users\` WHERE email = @email`,
+    params: { email },
+  });
+  return rows[0]?.is_admin === true;
+}
+
 exports.categories = async (req, res) => {
   setCors(res);
   if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
@@ -29,14 +37,47 @@ exports.categories = async (req, res) => {
   if (!email) { res.status(401).json({ error: 'Unauthorized' }); return; }
 
   const table = `\`${PROJECT}.${DATASET}.${TABLE}\``;
+  const path  = (req.url || '').split('?')[0];
 
   try {
+    // PUT /categories/reorder — admin, body { ids: [id, id, ...] } → sort_order = index * 1000
+    if (req.method === 'PUT' && path === '/reorder') {
+      if (!(await isAdmin(email))) { res.status(403).json({ error: 'Forbidden' }); return; }
+      const ids = (req.body && req.body.ids) || [];
+      if (!Array.isArray(ids)) { res.status(400).json({ error: 'ids must be an array' }); return; }
+      for (let i = 0; i < ids.length; i++) {
+        await bigquery.query({
+          query: `UPDATE ${table} SET sort_order = @pos WHERE id = @id`,
+          params: { id: ids[i], pos: (i + 1) * 1000 },
+        });
+      }
+      res.json({ success: true });
+      return;
+    }
+
+    // PUT /categories/<id> — admin, редактирование имён
+    if (req.method === 'PUT') {
+      if (!(await isAdmin(email))) { res.status(403).json({ error: 'Forbidden' }); return; }
+      const id = path.split('/').filter(Boolean)[0];
+      const { name, name_en, name_th, type } = req.body || {};
+      if (!id || !name) { res.status(400).json({ error: 'id and name are required' }); return; }
+      await bigquery.query({
+        query: `UPDATE ${table}
+                SET name = @name, name_en = @name_en, name_th = @name_th,
+                    type = NULLIF(@type, '')
+                WHERE id = @id`,
+        params: { id, name, name_en: name_en || null, name_th: name_th || null, type: type || '' },
+      });
+      res.json({ success: true });
+      return;
+    }
+
     if (req.method === 'GET') {
       const type = req.query.type;
-      let query = `SELECT id, name, name_en, name_th, type FROM ${table} ORDER BY type, name`;
+      let query = `SELECT id, name, name_en, name_th, type, sort_order FROM ${table} ORDER BY sort_order NULLS LAST, type, name`;
       const params = {};
       if (type) {
-        query = `SELECT id, name, name_en, name_th, type FROM ${table} WHERE type = @type ORDER BY name`;
+        query = `SELECT id, name, name_en, name_th, type, sort_order FROM ${table} WHERE type = @type ORDER BY sort_order NULLS LAST, name`;
         params.type = type;
       }
       const [rows] = await bigquery.query({ query, params });

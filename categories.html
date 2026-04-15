@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sunti — Категории</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <script src="_i18n.js"></script>
+  <script src="_config.js"></script>
+  <script src="_auth.js"></script>
+  <script src="_header.js"></script>
+  <style>
+    .page-content { max-width: 900px; margin: 32px auto; padding: 0 24px; }
+    .page-header { display:flex;align-items:center;justify-content:space-between;margin-bottom:20px; }
+    .page-header h1 { font-size:1.2rem;color:#222; }
+    .hint { font-size:0.82rem;color:#999;margin-bottom:12px; }
+
+    .cat-wrap { background:#fff;border:1px solid #e8e8e8;border-radius:10px;overflow:hidden; }
+    .cat-list { list-style:none; padding:0; margin:0; }
+    .cat-row { display:grid;grid-template-columns:28px 1fr 1fr 1fr 110px 80px;gap:8px;align-items:center;
+               padding:10px 14px;border-bottom:1px solid #f0f0f0;cursor:grab;user-select:none; }
+    .cat-row:last-child { border-bottom:none; }
+    .cat-row.dragging { opacity:0.4; }
+    .cat-row.over { border-top:2px solid #1a73e8; }
+    .cat-row input, .cat-row select { border:1px solid #ddd;border-radius:6px;padding:6px 8px;font-size:0.85rem;outline:none;background:#fff;width:100%;box-sizing:border-box; }
+    .cat-row input:focus, .cat-row select:focus { border-color:#1a73e8; }
+    .cat-row .handle { color:#ccc;font-size:1.1rem;text-align:center;cursor:grab; }
+    .cat-row.dirty { background:#fffbea; }
+
+    .cat-hdr { display:grid;grid-template-columns:28px 1fr 1fr 1fr 110px 80px;gap:8px;
+               padding:10px 14px;background:#f8f8f8;font-size:0.75rem;font-weight:600;
+               color:#888;text-transform:uppercase;letter-spacing:0.04em;border-bottom:1px solid #e8e8e8; }
+
+    .empty-state { text-align:center;padding:48px 24px;color:#bbb; }
+  </style>
+</head>
+<body>
+  <header id="header"></header>
+
+  <div id="guest-view">
+    <h2 id="t-guest-title"></h2>
+    <p id="t-guest-sub"></p>
+    <div style="display:flex;justify-content:center;margin-top:24px">
+      <a href="index.html" class="btn btn-primary" id="t-login"></a>
+    </div>
+  </div>
+
+  <div id="app-view">
+    <div class="page-content">
+      <div class="page-header">
+        <h1 id="t-page-title"></h1>
+      </div>
+      <div class="hint" id="t-hint"></div>
+      <div class="cat-wrap">
+        <div class="cat-hdr">
+          <span></span>
+          <span id="t-col-name">RU</span>
+          <span id="t-col-name-en">EN</span>
+          <span id="t-col-name-th">TH</span>
+          <span id="t-col-type"></span>
+          <span></span>
+        </div>
+        <ul class="cat-list" id="cat-list"></ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    let categories = [];
+    let dragId     = null;
+    const dirty    = new Set();
+
+    function showToast(msg, type) {
+      const el = document.getElementById('toast');
+      el.textContent = msg;
+      el.className = 'toast show' + (type ? ' ' + type : '');
+      clearTimeout(el._t);
+      el._t = setTimeout(() => el.className = 'toast', 3000);
+    }
+
+    function setText(id, v) { const el = document.getElementById(id); if (el) el.textContent = v; }
+
+    function updateTexts() {
+      setText('t-guest-title',  t('guestTitle'));
+      setText('t-guest-sub',    t('guestSub'));
+      setText('t-login',        t('login'));
+      setText('t-page-title',   t('navCategories'));
+      setText('t-hint',         t('dragToReorder'));
+      setText('t-col-type',     t('categoryType'));
+      updateHeaderTexts();
+    }
+
+    async function loadCategories() {
+      try { categories = await apiFetch('/categories'); }
+      catch(e) { showToast(e.message, 'error'); categories = []; }
+      render();
+    }
+
+    function render() {
+      const ul = document.getElementById('cat-list');
+      if (!categories.length) { ul.innerHTML = `<li class="empty-state">—</li>`; return; }
+      ul.innerHTML = categories.map(c => `
+        <li class="cat-row${dirty.has(c.id)?' dirty':''}" draggable="true" data-id="${c.id}">
+          <span class="handle">⋮⋮</span>
+          <input data-field="name"    value="${(c.name||'').replace(/"/g,'&quot;')}">
+          <input data-field="name_en" value="${(c.name_en||'').replace(/"/g,'&quot;')}">
+          <input data-field="name_th" value="${(c.name_th||'').replace(/"/g,'&quot;')}">
+          <select data-field="type">
+            <option value=""         ${!c.type?'selected':''}>—</option>
+            <option value="expense"  ${c.type==='expense'?'selected':''}>expense</option>
+            <option value="income"   ${c.type==='income'?'selected':''}>income</option>
+            <option value="transfer" ${c.type==='transfer'?'selected':''}>transfer</option>
+          </select>
+          <button class="btn btn-primary" data-action="save" data-id="${c.id}" ${dirty.has(c.id)?'':'disabled style="opacity:0.4"'}>${t('save')}</button>
+        </li>
+      `).join('');
+    }
+
+    const list = document.getElementById('cat-list');
+
+    list.addEventListener('dragstart', e => {
+      const row = e.target.closest('.cat-row');
+      if (!row) return;
+      dragId = row.dataset.id;
+      row.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+    });
+    list.addEventListener('dragend', e => {
+      document.querySelectorAll('.cat-row').forEach(r => { r.classList.remove('dragging'); r.classList.remove('over'); });
+    });
+    list.addEventListener('dragover', e => {
+      e.preventDefault();
+      const row = e.target.closest('.cat-row');
+      if (!row || row.dataset.id === dragId) return;
+      document.querySelectorAll('.cat-row.over').forEach(r => r.classList.remove('over'));
+      row.classList.add('over');
+    });
+    list.addEventListener('drop', async e => {
+      e.preventDefault();
+      const row = e.target.closest('.cat-row');
+      if (!row || !dragId) return;
+      const targetId = row.dataset.id;
+      if (targetId === dragId) return;
+
+      const from = categories.findIndex(c => c.id === dragId);
+      const to   = categories.findIndex(c => c.id === targetId);
+      if (from < 0 || to < 0) return;
+      const [moved] = categories.splice(from, 1);
+      categories.splice(to, 0, moved);
+      render();
+      try {
+        await apiFetch('/categories/reorder', {
+          method: 'PUT',
+          body: JSON.stringify({ ids: categories.map(c => c.id) }),
+        });
+        showToast(t('saved'), 'success');
+      } catch (err) {
+        showToast(err.message, 'error');
+        await loadCategories();
+      }
+    });
+
+    list.addEventListener('input', e => {
+      const row = e.target.closest('.cat-row');
+      if (!row) return;
+      const id = row.dataset.id;
+      dirty.add(id);
+      row.classList.add('dirty');
+      const btn = row.querySelector('button[data-action="save"]');
+      if (btn) { btn.disabled = false; btn.style.opacity = ''; }
+    });
+
+    list.addEventListener('click', async e => {
+      const btn = e.target.closest('button[data-action="save"]');
+      if (!btn) return;
+      const id = btn.dataset.id;
+      const row = btn.closest('.cat-row');
+      const name    = row.querySelector('input[data-field="name"]').value.trim();
+      const name_en = row.querySelector('input[data-field="name_en"]').value.trim();
+      const name_th = row.querySelector('input[data-field="name_th"]').value.trim();
+      const type    = row.querySelector('select[data-field="type"]').value;
+      if (!name) { showToast(t('fillAllFields'), 'error'); return; }
+      try {
+        await apiFetch(`/categories/${id}`, {
+          method: 'PUT',
+          body: JSON.stringify({ name, name_en, name_th, type }),
+        });
+        const c = categories.find(x => x.id === id);
+        if (c) { c.name = name; c.name_en = name_en; c.name_th = name_th; c.type = type; }
+        dirty.delete(id);
+        row.classList.remove('dirty');
+        btn.disabled = true; btn.style.opacity = '0.4';
+        showToast(t('saved'), 'success');
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    });
+
+    window.onLogin = async () => {
+      updateTexts();
+      if (!isAdmin) {
+        document.getElementById('app-view').innerHTML = `<div class="empty-state" style="margin-top:60px">403 — admins only</div>`;
+        return;
+      }
+      await loadCategories();
+    };
+    window.onLogout = () => {
+      document.getElementById('cat-list').innerHTML = '';
+      updateTexts();
+    };
+    window.onLangChange = () => { updateTexts(); render(); };
+
+    renderHeader('categories');
+    updateTexts();
+  </script>
+</body>
+</html>
