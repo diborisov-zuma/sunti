@@ -1,0 +1,84 @@
+name: Deploy Cloud Functions
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'functions/**'
+      - '.github/workflows/functions-deploy.yml'
+  workflow_dispatch:
+    inputs:
+      all:
+        description: 'Deploy all functions'
+        type: boolean
+        default: true
+
+jobs:
+  detect:
+    runs-on: ubuntu-latest
+    outputs:
+      functions: ${{ steps.changed.outputs.functions }}
+      any: ${{ steps.changed.outputs.any }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - id: changed
+        shell: bash
+        run: |
+          before="${{ github.event.before }}"
+          event="${{ github.event_name }}"
+          if [ "$event" = "workflow_dispatch" ] || [ -z "$before" ] || [ "$before" = "0000000000000000000000000000000000000000" ]; then
+            dirs=$(ls -1 functions)
+          else
+            changed=$(git diff --name-only "$before" "${{ github.sha }}")
+            if echo "$changed" | grep -q '^\.github/workflows/functions-deploy\.yml$'; then
+              dirs=$(ls -1 functions)
+            else
+              dirs=$(echo "$changed" | grep '^functions/' | awk -F/ '{print $2}' | sort -u)
+            fi
+          fi
+          dirs=$(echo "$dirs" | grep -v '^$' | while read d; do
+            [ -f "functions/$d/index.js" ] && echo "$d"
+          done)
+          echo "Changed functions:"
+          echo "$dirs"
+          if [ -z "$dirs" ]; then
+            echo "any=false" >> "$GITHUB_OUTPUT"
+            echo "functions=[]" >> "$GITHUB_OUTPUT"
+          else
+            json=$(echo "$dirs" | jq -R . | jq -s -c .)
+            echo "any=true" >> "$GITHUB_OUTPUT"
+            echo "functions=$json" >> "$GITHUB_OUTPUT"
+          fi
+
+  deploy:
+    needs: detect
+    if: needs.detect.outputs.any == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        fn: ${{ fromJson(needs.detect.outputs.functions) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Deploy ${{ matrix.fn }}
+        run: |
+          gcloud functions deploy ${{ matrix.fn }} \
+            --gen2 \
+            --runtime=nodejs20 \
+            --region=asia-southeast1 \
+            --source=functions/${{ matrix.fn }} \
+            --entry-point=${{ matrix.fn }} \
+            --trigger-http \
+            --allow-unauthenticated \
+            --project=project-9718e7d4-4cd7-4f52-8d6
