@@ -29,7 +29,7 @@
 
     .combo { position:relative; display:inline-block; }
     .combo input { min-width:360px; }
-    .combo ul { position:absolute;top:100%;left:0;right:0;max-height:220px;overflow-y:auto;background:#fff;border:1px solid #ddd;border-radius:6px;margin-top:2px;box-shadow:0 4px 12px rgba(0,0,0,0.08);list-style:none;padding:4px 0;z-index:50;display:none; }
+    .combo ul { position:absolute;top:100%;left:0;right:0;max-height:440px;overflow-y:auto;background:#fff;border:1px solid #ddd;border-radius:6px;margin-top:2px;box-shadow:0 4px 12px rgba(0,0,0,0.08);list-style:none;padding:4px 0;z-index:50;display:none; }
     .combo.open ul { display:block; }
     .combo li { padding:6px 10px;font-size:0.85rem;color:#333;cursor:pointer; }
     .combo li:hover, .combo li.active { background:#e8f0fe;color:#1a73e8; }
@@ -151,7 +151,7 @@
 
   <!-- Модалка: транзакция -->
   <div class="modal-overlay" id="modal-trx">
-    <div class="modal" style="width:480px;max-width:95vw">
+    <div class="modal" style="width:720px;max-width:95vw">
       <h3 id="t-modal-trx-title"></h3>
       <div class="fields-row">
         <div class="field-group">
@@ -565,6 +565,7 @@
               <tr>
                 <th style="width:32px"></th>
                 <th>${t('date')}</th>
+                <th>${t('navFolders')}</th>
                 <th>${t('companyAccounts')}</th>
                 <th class="amount-col">${t('amount')}</th>
                 <th>${t('category')}</th>
@@ -657,7 +658,7 @@
     async function loadTransactions() {
       const tbody = document.getElementById('trx-tbody');
       if (!tbody) return;
-      tbody.innerHTML = `<tr><td colspan="7" class="loading">${t('loading')}</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="8" class="loading">${t('loading')}</td></tr>`;
       try {
         const ids = foldersCache.map(f => f.id).join(',');
         if (!ids) { allTransactions = []; renderTransactions(); return; }
@@ -665,7 +666,7 @@
         renderTransactions();
       } catch(e) {
         console.error(e);
-        tbody.innerHTML = `<tr><td colspan="7" class="empty-state">${e.message}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="8" class="empty-state">${e.message}</td></tr>`;
       }
     }
 
@@ -711,7 +712,7 @@
       renderPagination(totalCount);
 
       if (!pageRows.length) {
-        tbody.innerHTML = `<tr><td colspan="7" class="empty-state">${t('noTransactions')}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="8" class="empty-state">${t('noTransactions')}</td></tr>`;
         return;
       }
 
@@ -728,6 +729,7 @@
         tr.innerHTML = `
           <td><button class="expand-btn${isExp?' open':''}" data-trx-id="${tx.id}">${isExp?'▼':'▶'}</button></td>
           <td>${formatDate(tx.date)}</td>
+          <td style="color:#666">${(foldersCache.find(f => f.id === tx.folder_id) || {}).name || '—'}</td>
           <td style="color:#666">${tx.account_name || '—'}</td>
           <td class="amount-col ${tx.direction==='expense'?'expense':'income'}">${tx.direction==='expense'?'-':''}${fmt(tx.amount)}</td>
           <td>${tx.category_id ? `<span class="cat-badge">${catLabelById(tx.category_id) || tx.category_name || ''}</span>` : '<span style="color:#ccc">—</span>'}</td>
@@ -756,7 +758,7 @@
         trDetail.className = 'trx-detail-row';
         trDetail.dataset.detailFor = tx.id;
         trDetail.style.display = isExp ? '' : 'none';
-        trDetail.innerHTML = `<td colspan="7"><div class="trx-detail-inner" id="detail-${tx.id}"><div class="loading" style="padding:12px">${t('loading')}</div></div></td>`;
+        trDetail.innerHTML = `<td colspan="8"><div class="trx-detail-inner" id="detail-${tx.id}"><div class="loading" style="padding:12px">${t('loading')}</div></div></td>`;
         tbody.appendChild(trDetail);
 
         if (isExp) loadTrxFiles(tx.id);

@@ -216,7 +216,7 @@
 
     .combo { position:relative; display:inline-block; }
     .combo input { min-width:360px; }
-    .combo ul { position:absolute;top:100%;left:0;right:0;max-height:220px;overflow-y:auto;background:#fff;border:1px solid #ddd;border-radius:6px;margin-top:2px;box-shadow:0 4px 12px rgba(0,0,0,0.08);list-style:none;padding:4px 0;z-index:50;display:none; }
+    .combo ul { position:absolute;top:100%;left:0;right:0;max-height:440px;overflow-y:auto;background:#fff;border:1px solid #ddd;border-radius:6px;margin-top:2px;box-shadow:0 4px 12px rgba(0,0,0,0.08);list-style:none;padding:4px 0;z-index:50;display:none; }
     .combo.open ul { display:block; }
     .combo li { padding:6px 10px;font-size:0.85rem;color:#333;cursor:pointer; }
     .combo li:hover, .combo li.active { background:#e8f0fe;color:#1a73e8; }
@@ -283,7 +283,10 @@
       </div>
       <div class="field-group">
         <label id="t-inv-cat-label"></label>
-        <select id="inv-category"><option value="">—</option></select>
+        <span class="combo" style="display:block">
+          <input type="text" id="inv-category-input" style="width:100%;border:1px solid #ddd;border-radius:6px;padding:9px 12px;font-size:0.9rem;outline:none;box-sizing:border-box;min-width:0">
+          <ul id="inv-category-list"></ul>
+        </span>
       </div>
       <div class="fields-row">
         <div class="field-group">
@@ -753,6 +756,15 @@
       } catch(e) { categoriesCache = []; }
     }
 
+    let modalInvCatCombo = null;
+    function mountInvCategoryCombo(selectedCatId) {
+      modalInvCatCombo = bindCombo('inv-category-input', 'inv-category-list', catItemsGrouped(), {
+        placeholder: '— ' + t('noCategory') + ' —',
+        allowAll: true, allLabel: '— ' + t('noCategory') + ' —',
+        selectedId: selectedCatId || '',
+      });
+    }
+
     function fillFolderSelect(selectId, selectedId, list) {
       const sel = document.getElementById(selectId);
       if (!sel) return;
@@ -948,7 +960,7 @@
         document.getElementById('inv-direction').value = 'expense';
         document.getElementById('inv-total').value     = '';
         document.getElementById('inv-paid').value      = '';
-        fillCategorySelect('inv-category', null);
+        mountInvCategoryCombo(null);
         fillFolderSelect('inv-folder', filterFolder !== 'all' ? filterFolder : writable[0].id, writable);
         document.getElementById('inv-folder-group').style.display = 'block';
         openModal('modal-inv');
@@ -1304,7 +1316,7 @@
         document.getElementById('inv-direction').value = btn.dataset.direction || 'expense';
         document.getElementById('inv-total').value     = btn.dataset.total;
         document.getElementById('inv-paid').value      = btn.dataset.paid;
-        fillCategorySelect('inv-category', btn.dataset.category);
+        mountInvCategoryCombo(btn.dataset.category || '');
         document.getElementById('inv-folder-group').style.display = 'none';
         openModal('modal-inv');
         setTimeout(() => document.getElementById('inv-name').focus(), 100);
@@ -1409,7 +1421,7 @@
       const direction   = document.getElementById('inv-direction').value;
       const total       = document.getElementById('inv-total').value;
       const paid        = document.getElementById('inv-paid').value;
-      const category_id = document.getElementById('inv-category').value || null;
+      const category_id = (modalInvCatCombo && modalInvCatCombo.getSelected()) || null;
       if (!name) { showToast(t('fillAllFields'), 'error'); return; }
       closeModal('modal-inv');
       try {
