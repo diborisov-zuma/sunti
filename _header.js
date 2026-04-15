@@ -81,7 +81,7 @@ function updateHeaderTexts() {
   if (nf) nf.textContent = t('navFolders');
   if (ni) ni.textContent = t('navInvoices');
   if (nr) nr.textContent = t('navReports');
-  if (nu) { nu.textContent = t('navUsers'); if (typeof isAdmin !== 'undefined' && isAdmin) nu.style.display = ''; }
+  if (nu) { nu.textContent = t('navUsers'); if (typeof isAdmin !== 'undefined' && isAdmin) nu.style.display = 'inline-flex'; else nu.style.display = 'none'; }
   if (lb) lb.textContent = t('logout');
   if (nt) nt.textContent = t('notifications');
 }

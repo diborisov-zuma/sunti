@@ -11,15 +11,15 @@
   <script src="_auth.js"></script>
   <script src="_header.js"></script>
   <style>
-    .page-content { max-width: 800px; margin: 32px auto; padding: 0 24px; }
+    .page-content { max-width: 1000px; margin: 32px auto; padding: 0 24px; }
     .page-header { display:flex;align-items:center;justify-content:space-between;margin-bottom:24px; }
     .page-header h1 { font-size:1.2rem;color:#222; }
 
     .table-wrap { background:#fff;border:1px solid #e8e8e8;border-radius:10px;overflow:hidden; }
     table { width:100%;border-collapse:collapse; }
     thead { background:#f8f8f8;border-bottom:1px solid #e8e8e8; }
-    th { padding:10px 16px;font-size:0.78rem;font-weight:600;color:#888;text-align:left;text-transform:uppercase;letter-spacing:0.04em; }
-    td { padding:12px 16px;font-size:0.88rem;color:#333;border-bottom:1px solid #f0f0f0; }
+    th { padding:10px 14px;font-size:0.78rem;font-weight:600;color:#888;text-align:left;text-transform:uppercase;letter-spacing:0.04em; }
+    td { padding:11px 14px;font-size:0.88rem;color:#333;border-bottom:1px solid #f0f0f0; }
     tr:last-child td { border-bottom:none; }
     tr:hover td { background:#fafafa; }
 
@@ -36,6 +36,15 @@
     .status-active  { background:#e6f4ea;color:#1e8e3e; }
     .status-blocked { background:#fce8e6;color:#c5221f; }
 
+    .access-badge { display:inline-block;padding:3px 10px;border-radius:20px;font-size:0.75rem;font-weight:500; }
+    .access-admin  { background:#fce8e6;color:#c5221f; }
+    .access-editor { background:#e8f0fe;color:#1a73e8; }
+    .access-viewer { background:#e6f4ea;color:#1e8e3e; }
+    .access-none   { background:#f1f3f4;color:#999; }
+
+    .bool-yes { color:#1e8e3e;font-weight:500; }
+    .bool-no  { color:#bbb; }
+
     .empty-state { text-align:center;padding:48px 24px;color:#bbb; }
     .loading { text-align:center;padding:48px;color:#bbb; }
 
@@ -43,11 +52,16 @@
     .field-group label { display:block;font-size:0.82rem;color:#666;margin-bottom:4px; }
     .field-group input, .field-group select { width:100%;border:1px solid #ddd;border-radius:6px;padding:9px 12px;font-size:0.9rem;outline:none;box-sizing:border-box; }
     .field-group input:focus, .field-group select:focus { border-color:#1a73e8; }
+    .fields-row { display:grid;grid-template-columns:1fr 1fr;gap:12px; }
 
-    .tg-hint { font-size:0.78rem;color:#999;margin-top:4px;line-height:1.4; }
+    .section-divider { font-size:0.78rem;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:0.05em;margin:16px 0 8px;padding-bottom:6px;border-bottom:1px solid #f0f0f0; }
 
     .access-denied { text-align:center;padding:100px 24px;color:#bbb; }
     .access-denied h2 { font-size:1.2rem;color:#c5221f;margin-bottom:8px; }
+
+    .checkbox-row { display:flex;align-items:center;gap:10px;padding:10px 0; }
+    .checkbox-row input[type=checkbox] { width:18px;height:18px;cursor:pointer; }
+    .checkbox-row label { font-size:0.9rem;color:#333;cursor:pointer;flex:1; }
   </style>
 </head>
 <body>
@@ -63,33 +77,65 @@
   </div>
 
   <div id="app-view">
-    <div class="page-content" id="page-content">
-      <!-- Заполняется после проверки прав -->
-    </div>
+    <div class="page-content" id="page-content"></div>
   </div>
 
-  <!-- Модалка редактирования пользователя -->
+  <!-- Модалка редактирования -->
   <div class="modal-overlay" id="modal-edit">
-    <div class="modal">
+    <div class="modal" style="width:500px;max-width:95vw">
       <h3 id="t-modal-title"></h3>
+
+      <div class="section-divider">Основное</div>
 
       <div class="field-group">
         <label id="t-label-name"></label>
         <input type="text" id="edit-name">
       </div>
 
-      <div class="field-group">
-        <label id="t-label-telegram"></label>
-        <input type="text" id="edit-telegram" placeholder="@username">
-        <div class="tg-hint" id="t-tg-hint"></div>
+      <div class="fields-row">
+        <div class="field-group">
+          <label id="t-label-telegram"></label>
+          <input type="text" id="edit-telegram" placeholder="@username">
+        </div>
+        <div class="field-group">
+          <label>Telegram Chat ID <span style="color:#bbb;font-size:0.75rem">(внутр.)</span></label>
+          <input type="text" id="edit-chat-id" placeholder="66782755">
+        </div>
       </div>
 
+      <div class="fields-row">
+        <div class="field-group">
+          <label id="t-label-status"></label>
+          <select id="edit-active">
+            <option value="true"  id="edit-opt-active"></option>
+            <option value="false" id="edit-opt-blocked"></option>
+          </select>
+        </div>
+        <div class="field-group">
+          <label>is_admin</label>
+          <select id="edit-is-admin">
+            <option value="false">Нет</option>
+            <option value="true">Да — полный доступ</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="section-divider">Уровни доступа</div>
+
       <div class="field-group">
-        <label id="t-label-status"></label>
-        <select id="edit-active">
-          <option value="true"  id="edit-opt-active"></option>
-          <option value="false" id="edit-opt-blocked"></option>
+        <label>Документы и транзакции</label>
+        <select id="edit-docs-access">
+          <option value="none">Нет доступа</option>
+          <option value="viewer">Просмотр</option>
+          <option value="editor">Редактирование</option>
         </select>
+      </div>
+
+      <div class="section-divider">Видимость данных</div>
+
+      <div class="checkbox-row">
+        <input type="checkbox" id="edit-can-see-salary">
+        <label for="edit-can-see-salary">Видит зарплатные записи</label>
       </div>
 
       <div class="modal-actions">
@@ -122,6 +168,16 @@
       return `${String(d.getUTCDate()).padStart(2,'0')}.${String(d.getUTCMonth()+1).padStart(2,'0')}.${d.getUTCFullYear()}`;
     }
 
+    function docsAccessLabel(v) {
+      const map = { none: 'Нет доступа', viewer: 'Просмотр', editor: 'Редактирование' };
+      return map[v] || v || '—';
+    }
+
+    function docsAccessClass(v) {
+      const map = { none: 'access-none', viewer: 'access-viewer', editor: 'access-editor' };
+      return map[v] || 'access-none';
+    }
+
     function updateTexts() {
       document.getElementById('t-guest-title').textContent  = t('guestTitle');
       document.getElementById('t-guest-sub').textContent    = t('guestSub');
@@ -129,7 +185,6 @@
       document.getElementById('t-modal-title').textContent  = t('editUser');
       document.getElementById('t-label-name').textContent   = t('name');
       document.getElementById('t-label-telegram').textContent = t('telegramChatId');
-      document.getElementById('t-tg-hint').textContent      = t('tgHint');
       document.getElementById('t-label-status').textContent = t('statusLabel');
       document.getElementById('edit-opt-active').textContent  = t('userActive');
       document.getElementById('edit-opt-blocked').textContent = t('userBlocked');
@@ -141,7 +196,7 @@
     function renderAdminPage() {
       document.getElementById('page-content').innerHTML = `
         <div class="page-header">
-          <h1 id="t-page-title">${t('usersPage')}</h1>
+          <h1>${t('usersPage')}</h1>
         </div>
         <div class="table-wrap">
           <table>
@@ -149,13 +204,16 @@
               <tr>
                 <th>${t('user')}</th>
                 <th>Telegram</th>
+                <th>Документы</th>
+                <th>ЗП</th>
+                <th>Admin</th>
                 <th>${t('statusLabel')}</th>
                 <th>${t('lastLogin')}</th>
                 <th></th>
               </tr>
             </thead>
             <tbody id="users-tbody">
-              <tr><td colspan="5" class="loading">${t('loading')}</td></tr>
+              <tr><td colspan="8" class="loading">${t('loading')}</td></tr>
             </tbody>
           </table>
         </div>
@@ -178,12 +236,13 @@
       try {
         const users = await apiFetch('/users');
         if (!users.length) {
-          tbody.innerHTML = `<tr><td colspan="5" class="empty-state">${t('noUsers')}</td></tr>`;
+          tbody.innerHTML = `<tr><td colspan="8" class="empty-state">${t('noUsers')}</td></tr>`;
           return;
         }
         tbody.innerHTML = users.map(u => {
           const initials = (u.name || u.email).split(' ').map(w => w[0]).join('').substring(0,2).toUpperCase();
           const hasTg    = u.telegram_username && u.telegram_username !== '';
+          const isAdminUser = u.is_admin === true;
           return `
             <tr>
               <td>
@@ -201,6 +260,9 @@
                   : `<span class="tg-badge tg-missing">${t('notSet')}</span>`
                 }
               </td>
+              <td><span class="access-badge ${docsAccessClass(u.docs_access)}">${docsAccessLabel(u.docs_access)}</span></td>
+              <td><span class="${u.can_see_salary ? 'bool-yes' : 'bool-no'}">${u.can_see_salary ? '✓' : '—'}</span></td>
+              <td><span class="${isAdminUser ? 'access-badge access-admin' : 'bool-no'}">${isAdminUser ? '✓ Admin' : '—'}</span></td>
               <td>
                 <span class="status-badge ${u.is_active ? 'status-active' : 'status-blocked'}">
                   ${u.is_active ? t('userActive') : t('userBlocked')}
@@ -212,41 +274,52 @@
                   data-email="${u.email}"
                   data-name="${u.name||''}"
                   data-telegram="${u.telegram_username||''}"
-                  data-active="${u.is_active}">${t('edit')}</button>
+                  data-chatid="${u.telegram_chat_id||''}"
+                  data-active="${u.is_active}"
+                  data-is-admin="${isAdminUser}"
+                  data-docs-access="${u.docs_access||'editor'}"
+                  data-can-see-salary="${u.can_see_salary||false}"
+                  >${t('edit')}</button>
               </td>
             </tr>
           `;
         }).join('');
 
-        // Обработчики кнопок
         document.getElementById('users-tbody').addEventListener('click', e => {
           const btn = e.target.closest('button[data-action]');
           if (!btn) return;
           editingEmail = btn.dataset.email;
-          document.getElementById('edit-name').value     = btn.dataset.name;
-          document.getElementById('edit-telegram').value = btn.dataset.telegram;
-          document.getElementById('edit-active').value   = btn.dataset.active;
+          document.getElementById('edit-name').value          = btn.dataset.name;
+          document.getElementById('edit-telegram').value      = btn.dataset.telegram;
+          document.getElementById('edit-chat-id').value       = btn.dataset.chatid;
+          document.getElementById('edit-active').value        = btn.dataset.active;
+          document.getElementById('edit-is-admin').value      = btn.dataset.isAdmin;
+          document.getElementById('edit-docs-access').value   = btn.dataset.docsAccess;
+          document.getElementById('edit-can-see-salary').checked = btn.dataset.canSeeSalary === 'true';
           openModal('modal-edit');
           setTimeout(() => document.getElementById('edit-name').focus(), 100);
         });
 
       } catch(e) {
         console.error(e);
-        if (tbody) tbody.innerHTML = `<tr><td colspan="5" class="empty-state">${e.message}</td></tr>`;
+        if (tbody) tbody.innerHTML = `<tr><td colspan="8" class="empty-state">${e.message}</td></tr>`;
       }
     }
 
-    // Сохранить пользователя
     document.getElementById('btn-cancel').addEventListener('click', () => closeModal('modal-edit'));
     document.getElementById('btn-save').addEventListener('click', async () => {
-      const name             = document.getElementById('edit-name').value.trim();
+      const name              = document.getElementById('edit-name').value.trim();
       const telegram_username = document.getElementById('edit-telegram').value.trim();
-      const is_active        = document.getElementById('edit-active').value === 'true';
+      const telegram_chat_id  = document.getElementById('edit-chat-id').value.trim();
+      const is_active         = document.getElementById('edit-active').value === 'true';
+      const is_admin          = document.getElementById('edit-is-admin').value === 'true';
+      const docs_access       = document.getElementById('edit-docs-access').value;
+      const can_see_salary    = document.getElementById('edit-can-see-salary').checked;
       closeModal('modal-edit');
       try {
         await apiFetch(`/users/${encodeURIComponent(editingEmail)}`, {
           method: 'PUT',
-          body: JSON.stringify({ name, telegram_username, is_active }),
+          body: JSON.stringify({ name, telegram_username, telegram_chat_id, is_active, is_admin, docs_access, can_see_salary }),
         });
         showToast(t('saved'), 'success');
         loadUsers();

@@ -32,12 +32,25 @@ exports.users = async (req, res) => {
   const table = `\`${PROJECT}.${DATASET}.${TABLE}\``;
 
   try {
-    // GET — список всех активных пользователей
+
+    // GET /users/me — данные текущего пользователя
+    if (req.method === 'GET' && req.url.includes('/me')) {
+      const [rows] = await bigquery.query({
+        query: `SELECT id, email, name, telegram_chat_id, telegram_username,
+                       is_admin, docs_access, can_see_salary, is_active
+                FROM ${table} WHERE email = @email`,
+        params: { email },
+      });
+      res.json(rows[0] || null);
+      return;
+    }
+
+    // GET /users — список всех пользователей (только для админа)
     if (req.method === 'GET') {
       const [rows] = await bigquery.query({
-        query: `SELECT id, email, name, telegram_chat_id, telegram_username, first_login, last_login, is_active
+        query: `SELECT id, email, name, telegram_chat_id, telegram_username,
+                       is_admin, docs_access, can_see_salary, first_login, last_login, is_active
                 FROM ${table}
-                WHERE is_active = true
                 ORDER BY name ASC`,
       });
       res.json(rows);
@@ -55,8 +68,8 @@ exports.users = async (req, res) => {
                 WHEN MATCHED THEN
                   UPDATE SET last_login = CURRENT_TIMESTAMP(), name = S.name
                 WHEN NOT MATCHED THEN
-                  INSERT (id, email, name, telegram_chat_id, first_login, last_login, is_active)
-                  VALUES (GENERATE_UUID(), S.email, S.name, '', CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP(), true)`,
+                  INSERT (id, email, name, telegram_chat_id, first_login, last_login, is_active, is_admin, docs_access, can_see_salary)
+                  VALUES (GENERATE_UUID(), S.email, S.name, '', CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP(), true, false, 'editor', false)`,
         params: { email, name: name || email },
       });
 
@@ -64,24 +77,30 @@ exports.users = async (req, res) => {
       return;
     }
 
-    // PUT — обновить поля пользователя
+    // PUT — обновить поля пользователя (только для админа)
     if (req.method === 'PUT') {
-      const { telegram_chat_id, telegram_username, name, is_active } = req.body;
+      const { telegram_chat_id, telegram_username, name, is_active, is_admin, docs_access, can_see_salary } = req.body;
       const targetEmail = decodeURIComponent(req.url.split('/').filter(Boolean).pop().split('?')[0]);
 
       await bigquery.query({
         query: `UPDATE ${table}
-                SET telegram_chat_id = @telegram_chat_id,
+                SET telegram_chat_id  = @telegram_chat_id,
                     telegram_username = @telegram_username,
-                    name = @name,
-                    is_active = @is_active
+                    name              = @name,
+                    is_active         = @is_active,
+                    is_admin          = @is_admin,
+                    docs_access       = @docs_access,
+                    can_see_salary    = @can_see_salary
                 WHERE email = @email`,
         params: {
-          telegram_chat_id: telegram_chat_id || '',
+          telegram_chat_id:  telegram_chat_id  || '',
           telegram_username: telegram_username || '',
-          name:             name || targetEmail,
-          is_active:        is_active !== false,
-          email:            targetEmail,
+          name:              name || targetEmail,
+          is_active:         is_active  !== false,
+          is_admin:          is_admin   === true || is_admin   === 'true',
+          docs_access:       docs_access    || 'editor',
+          can_see_salary:    can_see_salary === true || can_see_salary === 'true',
+          email:             targetEmail,
         },
       });
 

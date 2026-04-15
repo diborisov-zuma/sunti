@@ -1,7 +1,9 @@
 const PRIVATE_BUCKET = 'https://storage.googleapis.com/sunti-private';
 const PUBLIC_BUCKET  = 'https://storage.googleapis.com/sunti-site';
+const API_BASE       = 'https://asia-southeast1-project-9718e7d4-4cd7-4f52-8d6.cloudfunctions.net';
 
 let currentUser  = null;
+let currentMe    = null; // данные из таблицы users
 let isAdmin      = false;
 let _accessToken = null;
 let _tokenClient = null;
@@ -19,47 +21,37 @@ function isTokenExpired(token) {
   } catch { return true; }
 }
 
-async function checkAdmin(email) {
-  try {
-    const r = await fetch(`${PRIVATE_BUCKET}/admins.json`, {
-      headers: { 'Authorization': `Bearer ${_accessToken}` }
-    });
-    if (!r.ok) return false;
-    const data = await r.json();
-    return data.admins.map(e => e.toLowerCase()).includes(email.toLowerCase());
-  } catch { return false; }
-}
-
 async function applyLogin(idToken, accessToken) {
   const user   = parseJwt(idToken);
   currentUser  = user;
   _accessToken = accessToken;
-  window._googleToken  = idToken;
-  window._accessToken  = accessToken;
+  window._googleToken = idToken;
+  window._accessToken = accessToken;
 
-  isAdmin = await checkAdmin(user.email);
-
-  // Авторегистрация пользователя в БД
+  // Авторегистрация + получение прав из БД
   try {
-    const API_BASE = 'https://asia-southeast1-project-9718e7d4-4cd7-4f52-8d6.cloudfunctions.net';
+    // Регистрируем/обновляем пользователя
     await fetch(`${API_BASE}/users`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
       body: JSON.stringify({ name: user.name }),
     });
 
-    // Проверяем есть ли chat_id у текущего пользователя
-    const usersRes = await fetch(`${API_BASE}/users`, {
+    // Получаем права текущего пользователя
+    const meRes = await fetch(`${API_BASE}/users/me`, {
       headers: { 'Authorization': `Bearer ${accessToken}` },
     });
-    if (usersRes.ok) {
-      const users = await usersRes.json();
-      const me = users.find(u => u.email === user.email);
-      if (typeof updateTelegramStatus === 'function') {
-        updateTelegramStatus(me && me.telegram_chat_id && me.telegram_chat_id !== '');
-      }
+    if (meRes.ok) {
+      currentMe = await meRes.json();
+      isAdmin   = currentMe && currentMe.is_admin === true;
+      window._currentMe = currentMe;
     }
-  } catch(e) { console.error('User register error:', e); }
+
+    // Обновляем кнопку Telegram
+    if (typeof updateTelegramStatus === 'function') {
+      updateTelegramStatus(currentMe && currentMe.telegram_chat_id && currentMe.telegram_chat_id !== '');
+    }
+  } catch(e) { console.error('Auth error:', e); }
 
   document.getElementById('avatar').src         = user.picture;
   document.getElementById('uname').textContent  = user.name;
@@ -80,7 +72,6 @@ function handleCredentialResponse(response) {
   const idToken = response.credential;
   localStorage.setItem('google_id_token', idToken);
 
-  // Шаг 2 — запрашиваем Access Token для Storage
   _tokenClient = google.accounts.oauth2.initTokenClient({
     client_id: GOOGLE_CLIENT_ID,
     scope: 'https://www.googleapis.com/auth/devstorage.read_write',
@@ -106,7 +97,6 @@ async function tryAutoLogin() {
     return;
   }
 
-  // Access token мог истечь (живёт 1 час) — запрашиваем новый тихо
   if (!accessToken) {
     localStorage.removeItem('google_id_token');
     return;
@@ -121,10 +111,12 @@ function logout() {
   localStorage.removeItem('google_id_token');
   localStorage.removeItem('google_access_token');
   currentUser  = null;
+  currentMe    = null;
   isAdmin      = false;
   _accessToken = null;
-  window._googleToken = null;
-  window._accessToken = null;
+  window._googleToken  = null;
+  window._accessToken  = null;
+  window._currentMe    = null;
 
   document.getElementById('signin-btn').style.display = 'block';
   document.getElementById('user-info').style.display  = 'none';
@@ -138,7 +130,6 @@ function logout() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-  // Скрываем guest-view пока проверяем токен
   const guestView = document.getElementById('guest-view');
   if (guestView && localStorage.getItem('google_id_token')) {
     guestView.style.visibility = 'hidden';
