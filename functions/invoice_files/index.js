@@ -1,10 +1,14 @@
 const { BigQuery } = require('@google-cloud/bigquery');
+const { Storage }  = require('@google-cloud/storage');
 const { v4: uuidv4 } = require('uuid');
 
 const bigquery = new BigQuery();
+const storage  = new Storage();
 const PROJECT  = 'project-9718e7d4-4cd7-4f52-8d6';
 const DATASET  = 'sunti';
 const TABLE    = 'invoice_files';
+const BUCKET   = 'sunti-site';
+const SIGN_TTL_MS = 10 * 60 * 1000;
 
 function setCors(res) {
   res.set('Access-Control-Allow-Origin', '*');
@@ -22,6 +26,16 @@ async function verifyToken(req) {
   return info.email || null;
 }
 
+function parseKey(url) {
+  const m = (url || '').match(/^https:\/\/storage\.googleapis\.com\/([^/]+)\/(.+)$/);
+  if (!m) return null;
+  return { bucket: m[1], key: decodeURIComponent(m[2]) };
+}
+
+function sanitize(name) {
+  return (name || 'file').replace(/[^\w.\-]+/g, '_');
+}
+
 exports.invoice_files = async (req, res) => {
   setCors(res);
   if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
@@ -30,28 +44,63 @@ exports.invoice_files = async (req, res) => {
   if (!email) { res.status(401).json({ error: 'Unauthorized' }); return; }
 
   const table = `\`${PROJECT}.${DATASET}.${TABLE}\``;
+  const path  = (req.url || '').split('?')[0];
 
   try {
-    // GET — файлы по invoice_id
-    // URL: /invoice_files?invoice_id=xxx
-    if (req.method === 'GET') {
-      const invoiceId = req.query.invoice_id;
-      if (!invoiceId) {
-        res.status(400).json({ error: 'invoice_id is required' });
+    // POST /invoice_files/signed-upload-url → { upload_url, file_url }
+    if (req.method === 'POST' && path === '/signed-upload-url') {
+      const { invoice_id, folder_id, file_name, content_type } = req.body || {};
+      if (!invoice_id || !folder_id || !file_name) {
+        res.status(400).json({ error: 'invoice_id, folder_id and file_name are required' });
         return;
       }
+      const key = `${folder_id}/inv/${invoice_id}/${Date.now()}_${sanitize(file_name)}`;
+      const [upload_url] = await storage.bucket(BUCKET).file(key).getSignedUrl({
+        version: 'v4',
+        action:  'write',
+        expires: Date.now() + SIGN_TTL_MS,
+        contentType: content_type || 'application/octet-stream',
+      });
+      res.json({ upload_url, file_url: `https://storage.googleapis.com/${BUCKET}/${key}` });
+      return;
+    }
+
+    // GET /invoice_files/<id>/signed-download-url → { url }
+    if (req.method === 'GET' && path.endsWith('/signed-download-url')) {
+      const parts = path.split('/').filter(Boolean);
+      const id = parts[0];
+      if (!id) { res.status(400).json({ error: 'id is required' }); return; }
+      const [rows] = await bigquery.query({
+        query: `SELECT file_url, file_name FROM ${table} WHERE id = @id`,
+        params: { id },
+      });
+      if (!rows.length) { res.status(404).json({ error: 'Not found' }); return; }
+      const parsed = parseKey(rows[0].file_url);
+      if (!parsed) { res.status(500).json({ error: 'Bad file_url' }); return; }
+      const [url] = await storage.bucket(parsed.bucket).file(parsed.key).getSignedUrl({
+        version: 'v4',
+        action:  'read',
+        expires: Date.now() + SIGN_TTL_MS,
+        responseDisposition: `attachment; filename="${encodeURIComponent(rows[0].file_name || 'file')}"`,
+      });
+      res.json({ url });
+      return;
+    }
+
+    // GET /invoice_files?invoice_id=xxx
+    if (req.method === 'GET') {
+      const invoiceId = req.query.invoice_id;
+      if (!invoiceId) { res.status(400).json({ error: 'invoice_id is required' }); return; }
       const [rows] = await bigquery.query({
         query: `SELECT id, invoice_id, name, file_name, file_url, file_size, uploaded_by, uploaded_at
-                FROM ${table}
-                WHERE invoice_id = @invoice_id
-                ORDER BY uploaded_at DESC`,
+                FROM ${table} WHERE invoice_id = @invoice_id ORDER BY uploaded_at DESC`,
         params: { invoice_id: invoiceId },
       });
       res.json(rows);
       return;
     }
 
-    // POST — добавить файл
+    // POST — добавить файл (после успешной заливки через signed URL)
     if (req.method === 'POST') {
       const { invoice_id, name, file_name, file_url, file_size } = req.body;
       if (!invoice_id || !file_url) {
@@ -76,20 +125,27 @@ exports.invoice_files = async (req, res) => {
       return;
     }
 
-    // DELETE — удалить файл по id
+    // DELETE — удалить запись + физический файл из GCS
     if (req.method === 'DELETE') {
-      const id = req.url.split('/').filter(Boolean).pop().split('?')[0];
+      const id = path.split('/').filter(Boolean).pop();
       if (!id) { res.status(400).json({ error: 'id is required' }); return; }
-      await bigquery.query({
-        query: `DELETE FROM ${table} WHERE id = @id`,
+      const [rows] = await bigquery.query({
+        query: `SELECT file_url FROM ${table} WHERE id = @id`,
         params: { id },
       });
+      if (rows.length) {
+        const parsed = parseKey(rows[0].file_url);
+        if (parsed) {
+          try { await storage.bucket(parsed.bucket).file(parsed.key).delete({ ignoreNotFound: true }); }
+          catch (e) { console.error('GCS delete failed', e.message); }
+        }
+      }
+      await bigquery.query({ query: `DELETE FROM ${table} WHERE id = @id`, params: { id } });
       res.json({ success: true });
       return;
     }
 
     res.status(405).json({ error: 'Method not allowed' });
-
   } catch(e) {
     console.error(e);
     res.status(500).json({ error: e.message });

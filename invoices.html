@@ -1027,8 +1027,8 @@
                 <div class="fmeta">${f.file_name} · ${size} · ${formatDate(f.uploaded_at)}</div>
               </div>
               <div class="file-actions-row">
-                <a href="${f.file_url}" target="_blank" class="btn btn-outline" style="font-size:0.78rem;padding:3px 8px">${t('download')}</a>
-                <button class="btn btn-danger" style="font-size:0.78rem;padding:3px 8px" data-action="delete-inv-file" data-file-id="${f.id}" data-inv-id="${invId}" data-file-url="${f.file_url}">${t('delete')}</button>
+                <button class="btn btn-outline" style="font-size:0.78rem;padding:3px 8px" data-action="download-file" data-kind="invoice" data-file-id="${f.id}">${t('download')}</button>
+                <button class="btn btn-danger" style="font-size:0.78rem;padding:3px 8px" data-action="delete-inv-file" data-file-id="${f.id}" data-inv-id="${invId}">${t('delete')}</button>
               </div>
             </div>
           `;
@@ -1071,8 +1071,8 @@
                 <div class="fmeta">${size}</div>
               </div>
               <div class="file-actions-row">
-                <a href="${f.file_url}" target="_blank" class="btn btn-outline" style="font-size:0.75rem;padding:2px 7px">${t('download')}</a>
-                <button class="btn btn-danger" style="font-size:0.75rem;padding:2px 7px" data-action="delete-trx-file" data-file-id="${f.id}" data-trx-id="${trxId}" data-file-url="${f.file_url}">${t('delete')}</button>
+                <button class="btn btn-outline" style="font-size:0.75rem;padding:2px 7px" data-action="download-file" data-kind="transaction" data-file-id="${f.id}">${t('download')}</button>
+                <button class="btn btn-danger" style="font-size:0.75rem;padding:2px 7px" data-action="delete-trx-file" data-file-id="${f.id}" data-trx-id="${trxId}">${t('delete')}</button>
               </div>
             </div>
           `;
@@ -1227,12 +1227,8 @@
         if (!confirm(t('confirmDelete'))) return;
         const invId = btn.dataset.invId;
         apiFetch(`/invoice_files/${btn.dataset.fileId}`, { method: 'DELETE' })
-          .then(async () => {
-            await fetch(btn.dataset.fileUrl, { method: 'DELETE', headers: { Authorization: `Bearer ${window._accessToken}` } }).catch(()=>{});
-            showToast(t('deleted'), 'success');
-            loadInvoiceDetail(invId);
-          })
-          .catch(e => { showToast(e.message, 'error'); });
+          .then(() => { showToast(t('deleted'), 'success'); loadInvoiceDetail(invId); })
+          .catch(e => showToast(e.message, 'error'));
       }
 
       if (action === 'add-trx-file') {
@@ -1246,12 +1242,15 @@
         if (!confirm(t('confirmDelete'))) return;
         const trxId = btn.dataset.trxId;
         apiFetch(`/transaction_files/${btn.dataset.fileId}`, { method: 'DELETE' })
-          .then(async () => {
-            await fetch(btn.dataset.fileUrl, { method: 'DELETE', headers: { Authorization: `Bearer ${window._accessToken}` } }).catch(()=>{});
-            showToast(t('deleted'), 'success');
-            loadTrxFiles(trxId);
-          })
-          .catch(e => { showToast(e.message, 'error'); });
+          .then(() => { showToast(t('deleted'), 'success'); loadTrxFiles(trxId); })
+          .catch(e => showToast(e.message, 'error'));
+      }
+
+      if (action === 'download-file') {
+        const kind = btn.dataset.kind === 'invoice' ? 'invoice_files' : 'transaction_files';
+        apiFetch(`/${kind}/${btn.dataset.fileId}/signed-download-url`)
+          .then(r => { if (r.url) window.open(r.url, '_blank'); else showToast('No URL', 'error'); })
+          .catch(e => showToast(e.message, 'error'));
       }
     });
 
@@ -1310,27 +1309,29 @@
       closeModal('modal-file');
       showToast(t('uploading'));
       try {
-        const prefix   = currentFileTarget.type === 'invoice' ? `inv/${currentFileTarget.id}` : `trx/${currentFileTarget.id}`;
-        const key      = `${selectedFolderId}/${prefix}/${Date.now()}_${file.name}`;
-        const file_url = `${STORAGE_BUCKET}/${key}`;
+        const contentType = file.type || 'application/octet-stream';
+        const endpoint    = currentFileTarget.type === 'invoice' ? '/invoice_files' : '/transaction_files';
+        const parentKey   = currentFileTarget.type === 'invoice' ? 'invoice_id'     : 'transaction_id';
+        const { upload_url, file_url } = await apiFetch(endpoint + '/signed-upload-url', {
+          method: 'POST',
+          body: JSON.stringify({ [parentKey]: currentFileTarget.id, folder_id: selectedFolderId, file_name: file.name, content_type: contentType }),
+        });
 
         await new Promise((resolve, reject) => {
           const xhr = new XMLHttpRequest();
-          xhr.open('PUT', file_url);
-          xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
-          xhr.setRequestHeader('Authorization', `Bearer ${window._accessToken}`);
+          xhr.open('PUT', upload_url);
+          xhr.setRequestHeader('Content-Type', contentType);
           xhr.onload  = () => xhr.status === 200 ? resolve() : reject(new Error('Upload failed: ' + xhr.status));
           xhr.onerror = () => reject(new Error('Upload error'));
           xhr.send(file);
         });
 
-        if (currentFileTarget.type === 'invoice') {
-          await apiFetch('/invoice_files', { method: 'POST', body: JSON.stringify({ invoice_id: currentFileTarget.id, name: displayName||file.name, file_name: file.name, file_url, file_size: file.size }) });
-          loadInvoiceDetail(currentFileTarget.id);
-        } else {
-          await apiFetch('/transaction_files', { method: 'POST', body: JSON.stringify({ transaction_id: currentFileTarget.id, name: displayName||file.name, file_name: file.name, file_url, file_size: file.size }) });
-          loadTrxFiles(currentFileTarget.id);
-        }
+        await apiFetch(endpoint, {
+          method: 'POST',
+          body: JSON.stringify({ [parentKey]: currentFileTarget.id, name: displayName||file.name, file_name: file.name, file_url, file_size: file.size }),
+        });
+        if (currentFileTarget.type === 'invoice') loadInvoiceDetail(currentFileTarget.id);
+        else                                      loadTrxFiles(currentFileTarget.id);
         showToast(t('uploaded'), 'success');
       } catch(e) { console.error(e); showToast(e.message, 'error'); }
     });
