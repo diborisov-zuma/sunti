@@ -81,8 +81,27 @@ Shared conventions (see `functions/users/index.js` as the canonical example):
 
 **Invoice ↔ transaction linking (two-way)**
 - Invoice can spawn transactions (from the document's expanded view, button "Add transaction" or "Find transaction").
-- Transaction can spawn or attach to an invoice (from the payment's expanded view in finance.html: "Create document" / "Link to document" / "Unlink").
-- **Invariant: both must share the same `folder_id`.** When linking, the picker for invoices is filtered by the transaction's `folder_id` (and vice versa); when creating an invoice from a transaction, `folder_id` is inherited. `paid_amount` on the invoice is recomputed after every link/unlink/create/delete/edit.
+- From finance.html a transaction can only **link** to or **unlink** from an existing invoice — **no creation of invoices outside invoices.html**. Rule: documents are created and edited only on the documents page (`invoices.html`).
+- **Invariant: both must share the same `folder_id`.** When linking, the picker for invoices is filtered by the transaction's `folder_id` (and vice versa). `paid_amount` on the invoice is recomputed after every link/unlink/create/delete/edit.
+
+**Transaction modal contract (create and edit)**
+
+Applies to both `finance.html` and `invoices.html` modal-trx. The modal always has these fields: Name (description), Date (required), Type (direction), Amount, Category (required), Account (required), Folder, Document link.
+
+Required-field validation runs on save: missing Date / Category / Account / Folder → block save + highlight the inputs. Server receives `account_id` / `category_id` / `folder_id` / `date` and rejects with 400 otherwise.
+
+The Folder and Document fields behave by context:
+
+| Context | Folder | Document |
+|---|---|---|
+| Create on finance.html (no invoice) | Editable picker (required) | Optional "Link to document" button (chip shown when picked) |
+| Create on finance.html, already linked | Locked, inherited from invoice | Chip with current invoice, "Unlink" button |
+| Create on invoices.html (from a document) | Locked, inherited from the document | Chip with this document, no unlink |
+| Edit on finance.html, tx has no invoice | Editable (required) | "Link to document" button |
+| Edit on finance.html, tx has invoice | Locked | Chip + "Unlink" |
+| Edit on invoices.html | Locked (from invoice) | Chip, no unlink |
+
+On save, if there's a `invoice_id`, enforce `transaction.folder_id == invoice.folder_id` (server-side check as well — reject mismatch).
 
 **Invariants / cascades**
 - Hard-delete of an invoice cascades: invoice_files → transactions → transaction_files → GCS blobs.

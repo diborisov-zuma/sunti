@@ -337,6 +337,14 @@
         <select id="trx-account"></select>
       </div>
       <div class="field-group">
+        <label id="t-trx-folder-label" class="required"></label>
+        <input type="text" id="trx-folder-locked" disabled style="width:100%;background:#f5f5f5;color:#888;border:1px solid #ddd;border-radius:6px;padding:9px 12px;font-size:0.9rem;box-sizing:border-box">
+      </div>
+      <div class="field-group">
+        <label id="t-trx-invoice-label"></label>
+        <input type="text" id="trx-invoice-locked" disabled style="width:100%;background:#f5f5f5;color:#888;border:1px solid #ddd;border-radius:6px;padding:9px 12px;font-size:0.9rem;box-sizing:border-box">
+      </div>
+      <div class="field-group">
         <label id="t-trx-desc-label"></label>
         <input type="text" id="trx-desc">
       </div>
@@ -780,8 +788,10 @@
       document.getElementById('t-trx-direction-label').textContent = t('direction');
       document.getElementById('t-trx-amount-label').textContent = t('amount');
       document.getElementById('t-trx-cat-label').textContent    = t('category');
-      document.getElementById('t-trx-desc-label').textContent   = t('description');
+      document.getElementById('t-trx-desc-label').textContent   = t('name');
       const tal = document.getElementById('t-trx-account-label'); if (tal) tal.textContent = t('companyAccounts');
+      const tfll = document.getElementById('t-trx-folder-label'); if (tfll) tfll.textContent = t('navFolders');
+      const til  = document.getElementById('t-trx-invoice-label'); if (til)  til.textContent  = t('navInvoices');
       document.getElementById('trx-opt-income').textContent     = t('income');
       document.getElementById('trx-opt-expense').textContent    = t('expense');
       document.getElementById('btn-trx-cancel').textContent     = t('cancel');
@@ -1470,6 +1480,13 @@
         } catch (e) { showToast(e.message, 'error'); }
       }
 
+      function fillLockedContext(invId) {
+        const inv = invoicesById[invId];
+        const folderName = inv ? (foldersCache.find(f => f.id === inv.folder_id) || {}).name || '' : '';
+        document.getElementById('trx-folder-locked').value = folderName;
+        document.getElementById('trx-invoice-locked').value = inv ? (inv.name + (inv.date ? ' · ' + formatDate(inv.date) : '')) : '';
+      }
+
       if (action === 'add-trx') {
         currentTrxMode = 'create'; currentTrxId = null; currentTrxInvId = btn.dataset.invId;
         document.getElementById('trx-date').value      = new Date().toISOString().split('T')[0];
@@ -1478,6 +1495,7 @@
         document.getElementById('trx-desc').value      = '';
         fillCategorySelect('trx-category', null);
         fillTrxAccountSelect('');
+        fillLockedContext(currentTrxInvId);
         openModal('modal-trx');
         setTimeout(() => document.getElementById('trx-amount').focus(), 100);
       }
@@ -1490,6 +1508,7 @@
         document.getElementById('trx-desc').value      = btn.dataset.desc;
         fillCategorySelect('trx-category', btn.dataset.category);
         fillTrxAccountSelect(btn.dataset.account || '');
+        fillLockedContext(currentTrxInvId);
         openModal('modal-trx');
         setTimeout(() => document.getElementById('trx-amount').focus(), 100);
       }

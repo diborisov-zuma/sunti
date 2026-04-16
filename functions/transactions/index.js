@@ -112,6 +112,17 @@ exports.transactions = async (req, res) => {
         res.status(400).json({ error: 'date, amount and direction are required' });
         return;
       }
+      if (invoice_id) {
+        const [invRows] = await bigquery.query({
+          query: `SELECT folder_id FROM \`${PROJECT}.${DATASET}.invoices\` WHERE id = @id`,
+          params: { id: invoice_id },
+        });
+        if (!invRows.length) { res.status(400).json({ error: 'invoice not found' }); return; }
+        if (folder_id && invRows[0].folder_id !== folder_id) {
+          res.status(400).json({ error: 'transaction.folder_id must match invoice.folder_id' });
+          return;
+        }
+      }
       const id = uuidv4();
       await bigquery.query({
         query: `INSERT INTO ${table} (id, date, amount, direction, account_id, counterparty_id, category_id, invoice_id, folder_id, description, created_at)
@@ -139,6 +150,18 @@ exports.transactions = async (req, res) => {
       const id = req.url.split('/').filter(Boolean).pop().split('?')[0];
       const { date, amount, direction, account_id, counterparty_id, category_id, folder_id, invoice_id, description } = req.body;
       if (!id || !date || !amount) { res.status(400).json({ error: 'id, date and amount are required' }); return; }
+      if (invoice_id) {
+        const [invRows] = await bigquery.query({
+          query: `SELECT folder_id FROM \`${PROJECT}.${DATASET}.invoices\` WHERE id = @id`,
+          params: { id: invoice_id },
+        });
+        if (!invRows.length) { res.status(400).json({ error: 'invoice not found' }); return; }
+        const targetFolder = folder_id || invRows[0].folder_id;
+        if (targetFolder !== invRows[0].folder_id) {
+          res.status(400).json({ error: 'transaction.folder_id must match invoice.folder_id' });
+          return;
+        }
+      }
 
       const [rows] = await bigquery.query({
         query: `SELECT invoice_id, folder_id, FORMAT_TIMESTAMP('%Y-%m-%dT%H:%M:%S', created_at) as created_at FROM ${table} WHERE id = @id`,
