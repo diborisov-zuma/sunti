@@ -204,6 +204,67 @@
     </div>
   </div>
 
+  <!-- Модалка: создать документ из транзакции -->
+  <div class="modal-overlay" id="modal-create-doc">
+    <div class="modal" style="width:560px;max-width:95vw">
+      <h3 id="t-modal-create-doc-title"></h3>
+      <div class="field-group">
+        <label id="t-cd-name-label"></label>
+        <input type="text" id="cd-name">
+      </div>
+      <div class="fields-row">
+        <div class="field-group">
+          <label id="t-cd-date-label"></label>
+          <input type="date" id="cd-date">
+        </div>
+        <div class="field-group">
+          <label id="t-cd-status-label"></label>
+          <select id="cd-status">
+            <option value="active">active</option>
+            <option value="to_pay">to_pay</option>
+            <option value="partial">partial</option>
+            <option value="paid">paid</option>
+          </select>
+        </div>
+      </div>
+      <div class="fields-row">
+        <div class="field-group">
+          <label id="t-cd-direction-label"></label>
+          <select id="cd-direction">
+            <option value="expense">expense</option>
+            <option value="income">income</option>
+          </select>
+        </div>
+        <div class="field-group">
+          <label id="t-cd-total-label"></label>
+          <input type="number" id="cd-total" min="0" step="0.01" placeholder="0.00">
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-outline" id="btn-cd-cancel"></button>
+        <button class="btn btn-primary" id="btn-cd-save"></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Модалка: привязать к существующему документу -->
+  <div class="modal-overlay" id="modal-link-doc">
+    <div class="modal" style="width:780px;max-width:95vw;max-height:90vh;overflow-y:auto">
+      <h3 id="t-modal-link-doc-title"></h3>
+      <div class="fields-row" style="grid-template-columns:1fr 1fr 1fr 1fr;gap:10px">
+        <div class="field-group"><label>${''}</label><input type="date" id="ld-date-from"></div>
+        <div class="field-group"><label>${''}</label><input type="date" id="ld-date-to"></div>
+        <div class="field-group"><label>${''}</label><input type="number" id="ld-amount-min" placeholder="min"></div>
+        <div class="field-group"><label>${''}</label><input type="number" id="ld-amount-max" placeholder="max"></div>
+      </div>
+      <div id="ld-hint" style="font-size:0.8rem;color:#999;margin-bottom:8px"></div>
+      <div id="ld-results" style="max-height:420px;overflow-y:auto;border:1px solid #e8e8e8;border-radius:8px"></div>
+      <div class="modal-actions">
+        <button class="btn btn-outline" id="btn-ld-cancel"></button>
+      </div>
+    </div>
+  </div>
+
   <!-- Модалка: файл -->
   <div class="modal-overlay" id="modal-file">
     <div class="modal">
@@ -277,6 +338,8 @@
     let filterCompany      = 'all';
     let filterFolder       = 'all';
     let currentTrxInvoiceId = null;
+    let currentCreateDocTrx = null;
+    let currentLinkDocTrx   = null;
     let searchDebounce     = null;
     let categoriesCache    = [];
     let usersCache         = [];
@@ -442,6 +505,16 @@
       document.getElementById('t-trx-cat-label').textContent    = t('category');
       setText('t-trx-folder-label',                                 t('navFolders'));
       setText('t-trx-invoice-label',                                t('navInvoices'));
+      setText('t-modal-create-doc-title', t('createDoc'));
+      setText('t-cd-name-label',      t('name'));
+      setText('t-cd-date-label',      t('date'));
+      setText('t-cd-status-label',    t('statusLabel'));
+      setText('t-cd-direction-label', t('direction'));
+      setText('t-cd-total-label',     t('totalAmount'));
+      setText('btn-cd-cancel',        t('cancel'));
+      setText('btn-cd-save',          t('save'));
+      setText('t-modal-link-doc-title', t('linkDoc'));
+      setText('btn-ld-cancel',          t('cancel'));
       document.getElementById('t-trx-desc-label').textContent   = t('description');
       document.getElementById('trx-opt-income').textContent     = t('income');
       document.getElementById('trx-opt-expense').textContent    = t('expense');
@@ -761,6 +834,7 @@
                 data-desc="${(tx.description||'').replace(/"/g,'&quot;')}">${t('edit')}</button>
               ${deletedOrMark}
               ${isAdmin ? `<button class="icon-btn" data-action="hard-delete-trx" data-id="${tx.id}" title="${t('hardDelete')}">${ICON_TRASH}</button>` : ''}
+              ${tx.invoice_id ? `<span title="${t('linkedToDoc')}" style="color:#1a73e8;font-size:0.95rem">📄</span>` : ''}
               <button class="chat-btn" data-doc-id="${tx.id}" data-doc-type="transaction" data-doc-name="${(tx.description||formatDate(tx.date)).replace(/"/g,'&quot;')}"
                 title="${t('chat')}">💬<span class="chat-badge" style="display:none"></span></button>
             </div>
@@ -784,18 +858,62 @@
     async function loadTrxFiles(trxId) {
       const inner = document.getElementById(`detail-${trxId}`);
       if (!inner) return;
+      const tx = allTransactions.find(x => x.id === trxId);
       try {
-        const files = await apiFetch(`/transaction_files?transaction_id=${trxId}`);
-        renderTrxFiles(trxId, files);
+        const [files, invBlockHtml] = await Promise.all([
+          apiFetch(`/transaction_files?transaction_id=${trxId}`),
+          renderInvoiceBlock(tx),
+        ]);
+        renderTrxFiles(trxId, files, invBlockHtml);
       } catch(e) {
         if (inner) inner.innerHTML = `<div style="color:#c33;font-size:0.83rem">${e.message}</div>`;
       }
     }
 
-    function renderTrxFiles(trxId, files) {
+    async function renderInvoiceBlock(tx) {
+      if (!tx) return '';
+      if (tx.invoice_id) {
+        let inv = null;
+        try {
+          const data = await apiFetch(`/invoices?folder_id=${tx.folder_id}&limit=500`);
+          inv = (data.rows || []).find(r => r.id === tx.invoice_id);
+        } catch(e) {}
+        if (!inv) {
+          return `<div style="margin-bottom:12px;padding:10px;background:#fff;border:1px solid #e8e8e8;border-radius:8px;color:#c33;font-size:0.85rem">—</div>`;
+        }
+        const remaining = parseFloat(inv.total_amount||0) - parseFloat(inv.paid_amount||0);
+        return `
+          <div style="margin-bottom:12px;padding:12px;background:#fff;border:1px solid #d0e0ff;border-radius:8px">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+              <span style="font-size:0.78rem;color:#888;text-transform:uppercase;letter-spacing:0.04em">📄 ${t('navInvoices')}</span>
+              <button class="btn btn-outline" style="padding:3px 10px;font-size:0.78rem;color:#c5221f;border-color:#c5221f" data-action="unlink-doc" data-trx-id="${tx.id}" data-inv-id="${inv.id}">${t('unlinkDoc')}</button>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px;font-size:0.85rem">
+              <div><div style="color:#888;font-size:0.72rem">${t('name')}</div><strong>${inv.name}</strong></div>
+              <div><div style="color:#888;font-size:0.72rem">${t('statusLabel')}</div><span class="status-badge status-${inv.status}">${inv.status}</span></div>
+              <div><div style="color:#888;font-size:0.72rem">${t('category')}</div>${catLabelById(inv.category_id) || '—'}</div>
+              <div><div style="color:#888;font-size:0.72rem">${t('date')}</div>${formatDate(inv.date)}</div>
+              <div><div style="color:#888;font-size:0.72rem">${t('totalAmount')}</div>${fmt(inv.total_amount)}</div>
+              <div><div style="color:#888;font-size:0.72rem">${t('paidAmount')}</div>${fmt(inv.paid_amount)}</div>
+              <div><div style="color:#888;font-size:0.72rem">${t('remainingAmount')}</div><span style="color:${remaining>0?'#c5221f':'#1e8e3e'}">${fmt(remaining)}</span></div>
+            </div>
+          </div>
+        `;
+      }
+      return `
+        <div style="margin-bottom:12px;padding:12px;background:#fff;border:1px solid #e8e8e8;border-radius:8px;display:flex;gap:8px;align-items:center">
+          <span style="font-size:0.85rem;color:#666;flex:1">${t('noDocLinked')}</span>
+          <button class="btn btn-outline" style="padding:4px 10px;font-size:0.82rem" data-action="create-doc" data-trx-id="${tx.id}">${t('createDoc')}</button>
+          <button class="btn btn-outline" style="padding:4px 10px;font-size:0.82rem" data-action="link-doc" data-trx-id="${tx.id}">${t('linkDoc')}</button>
+        </div>
+      `;
+    }
+
+    function renderTrxFiles(trxId, files, invBlockHtml) {
       const inner = document.getElementById(`detail-${trxId}`);
       if (!inner) return;
-      let html = `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+      let html = invBlockHtml || '';
+      html += `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
         <span style="font-size:0.78rem;color:#888;text-transform:uppercase;letter-spacing:0.04em">${t('files')}</span>
         <button class="btn btn-outline" style="padding:3px 8px;font-size:0.78rem" data-action="add-trx-file" data-trx-id="${trxId}">${t('addFile')}</button>
       </div>`;
@@ -1039,6 +1157,73 @@
           .catch(e => showToast(e.message, 'error'));
       }
 
+      if (action === 'unlink-doc') {
+        if (!confirm(t('confirmUnlinkDoc'))) return;
+        try {
+          const tx = allTransactions.find(x => x.id === btn.dataset.trxId);
+          await apiFetch(`/transactions/${btn.dataset.trxId}`, {
+            method: 'PUT',
+            body: JSON.stringify({
+              date: (tx.date && (tx.date.value || tx.date)) || '',
+              amount: tx.amount, direction: tx.direction,
+              category_id: tx.category_id, description: tx.description,
+              invoice_id: '',
+            }),
+          });
+          showToast(t('saved'), 'success');
+          await loadTransactions();
+          // перерисовываем раскрытый детейл
+          if (expandedTrx[btn.dataset.trxId]) loadTrxFiles(btn.dataset.trxId);
+        } catch (err) { showToast(err.message, 'error'); }
+      }
+
+      if (action === 'create-doc') {
+        const tx = allTransactions.find(x => x.id === btn.dataset.trxId);
+        if (!tx) return;
+        currentCreateDocTrx = tx;
+        document.getElementById('cd-name').value = '';
+        document.getElementById('cd-date').value = (tx.date && (tx.date.value || tx.date)) ? (tx.date.value || tx.date).substring(0,10) : new Date().toISOString().split('T')[0];
+        document.getElementById('cd-status').value = 'active';
+        document.getElementById('cd-direction').value = tx.direction || 'expense';
+        document.getElementById('cd-total').value = Math.abs(parseFloat(tx.amount||0)).toFixed(2);
+        openModal('modal-create-doc');
+        setTimeout(() => document.getElementById('cd-name').focus(), 100);
+      }
+
+      if (action === 'link-doc') {
+        const tx = allTransactions.find(x => x.id === btn.dataset.trxId);
+        if (!tx) return;
+        currentLinkDocTrx = tx;
+        document.getElementById('ld-date-from').value = '';
+        document.getElementById('ld-date-to').value   = '';
+        document.getElementById('ld-amount-min').value = '';
+        document.getElementById('ld-amount-max').value = '';
+        const hint = `${t('navFolders')}: ${(foldersCache.find(f=>f.id===tx.folder_id)||{}).name || '—'} · ${t('category')}: ${catLabelById(tx.category_id) || '—'}`;
+        document.getElementById('ld-hint').textContent = hint;
+        openModal('modal-link-doc');
+        runLinkDocSearch();
+      }
+
+      if (action === 'pick-doc') {
+        if (!confirm(t('confirmLinkDoc'))) return;
+        const tx = currentLinkDocTrx;
+        try {
+          await apiFetch(`/transactions/${tx.id}`, {
+            method: 'PUT',
+            body: JSON.stringify({
+              date: (tx.date && (tx.date.value || tx.date)) || '',
+              amount: tx.amount, direction: tx.direction,
+              category_id: tx.category_id, description: tx.description,
+              invoice_id: btn.dataset.docId,
+            }),
+          });
+          closeModal('modal-link-doc');
+          showToast(t('saved'), 'success');
+          await loadTransactions();
+          if (expandedTrx[tx.id]) loadTrxFiles(tx.id);
+        } catch (err) { showToast(err.message, 'error'); }
+      }
+
       if (action === 'download-file') {
         apiFetch(`/transaction_files/${btn.dataset.fileId}/signed-download-url`)
           .then(r => { if (r.url) window.open(r.url, '_blank'); else showToast('No URL', 'error'); })
@@ -1075,6 +1260,78 @@
         loadTransactions();
       } catch(e) { console.error(e); showToast(e.message, 'error'); }
     });
+
+    // СОЗДАТЬ ДОКУМЕНТ
+    document.getElementById('btn-cd-cancel').addEventListener('click', () => closeModal('modal-create-doc'));
+    document.getElementById('btn-cd-save').addEventListener('click', async () => {
+      const tx = currentCreateDocTrx; if (!tx) return;
+      const name      = document.getElementById('cd-name').value.trim();
+      const date      = document.getElementById('cd-date').value;
+      const status    = document.getElementById('cd-status').value;
+      const direction = document.getElementById('cd-direction').value;
+      const total     = document.getElementById('cd-total').value;
+      if (!name) { showToast(t('fillAllFields'), 'error'); return; }
+      closeModal('modal-create-doc');
+      try {
+        const r = await apiFetch('/invoices', {
+          method: 'POST',
+          body: JSON.stringify({
+            folder_id: tx.folder_id, name, date, status, direction,
+            total_amount: total, paid_amount: 0,
+            category_id: tx.category_id || null,
+          }),
+        });
+        // Сразу линкуем транзакцию на новый документ
+        await apiFetch(`/transactions/${tx.id}`, {
+          method: 'PUT',
+          body: JSON.stringify({
+            date: (tx.date && (tx.date.value || tx.date)) || '',
+            amount: tx.amount, direction: tx.direction,
+            category_id: tx.category_id, description: tx.description,
+            invoice_id: r.id,
+          }),
+        });
+        showToast(t('saved'), 'success');
+        await loadTransactions();
+        if (expandedTrx[tx.id]) loadTrxFiles(tx.id);
+      } catch (e) { showToast(e.message, 'error'); }
+    });
+
+    // ПРИВЯЗАТЬ ДОКУМЕНТ — поиск
+    async function runLinkDocSearch() {
+      const tx = currentLinkDocTrx; if (!tx) return;
+      const container = document.getElementById('ld-results');
+      container.innerHTML = `<div class="loading" style="padding:20px">${t('loading')}</div>`;
+      try {
+        const df = document.getElementById('ld-date-from').value;
+        const dt = document.getElementById('ld-date-to').value;
+        const amin = document.getElementById('ld-amount-min').value;
+        const amax = document.getElementById('ld-amount-max').value;
+        let url = `/invoices?folder_id=${tx.folder_id}&limit=200`;
+        if (tx.category_id) url += `&category_id=${tx.category_id}`;
+        if (df)   url += `&date_from=${df}`;
+        if (dt)   url += `&date_to=${dt}`;
+        // amount_min/max добавим как клиент фильтрацию (у invoices backend не поддерживает)
+        const data = await apiFetch(url);
+        let rows = (data.rows || []);
+        if (amin) rows = rows.filter(r => parseFloat(r.total_amount||0) >= parseFloat(amin));
+        if (amax) rows = rows.filter(r => parseFloat(r.total_amount||0) <= parseFloat(amax));
+        if (!rows.length) { container.innerHTML = `<div class="empty-state">${t('noInvoices')}</div>`; return; }
+        container.innerHTML = rows.map(r => `
+          <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid #f0f0f0">
+            <div style="flex:1">
+              <div style="font-weight:500">${r.name}</div>
+              <div style="font-size:0.78rem;color:#999;margin-top:2px">${formatDate(r.date)} · ${catLabelById(r.category_id)||''} · ${t('totalAmount')}: ${fmt(r.total_amount)} · ${t('paidAmount')}: ${fmt(r.paid_amount)}</div>
+            </div>
+            <button class="btn btn-primary" style="padding:4px 10px;font-size:0.82rem" data-action="pick-doc" data-doc-id="${r.id}">${t('linkDoc')}</button>
+          </div>
+        `).join('');
+      } catch (e) { container.innerHTML = `<div class="empty-state" style="color:#c33">${e.message}</div>`; }
+    }
+    ['ld-date-from','ld-date-to','ld-amount-min','ld-amount-max'].forEach(id => {
+      document.getElementById(id).addEventListener('change', runLinkDocSearch);
+    });
+    document.getElementById('btn-ld-cancel').addEventListener('click', () => closeModal('modal-link-doc'));
 
     // ЗАГРУЗИТЬ ФАЙЛ
     document.getElementById('btn-file-cancel').addEventListener('click', () => closeModal('modal-file'));

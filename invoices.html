@@ -295,7 +295,7 @@
         </div>
         <div class="field-group">
           <label id="t-inv-paid-label"></label>
-          <input type="number" id="inv-paid" min="0" step="0.01" placeholder="0.00">
+          <input type="number" id="inv-paid" min="0" step="0.01" placeholder="0.00" readonly style="background:#f5f5f5;color:#888">
         </div>
       </div>
       <div class="modal-actions">
@@ -339,6 +339,24 @@
       <div class="modal-actions">
         <button class="btn btn-outline" id="btn-trx-cancel"></button>
         <button class="btn btn-primary" id="btn-trx-save"></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Модалка: поиск транзакций для привязки -->
+  <div class="modal-overlay" id="modal-find-trx">
+    <div class="modal" style="width:780px;max-width:95vw;max-height:90vh;overflow-y:auto">
+      <h3 id="t-modal-find-trx-title"></h3>
+      <div id="ft-hint" style="font-size:0.8rem;color:#999;margin-bottom:8px"></div>
+      <div class="fields-row" style="grid-template-columns:1fr 1fr 1fr 1fr;gap:10px">
+        <div class="field-group"><label></label><input type="date" id="ft-date-from"></div>
+        <div class="field-group"><label></label><input type="date" id="ft-date-to"></div>
+        <div class="field-group"><label></label><input type="number" id="ft-amount-min" placeholder="min"></div>
+        <div class="field-group"><label></label><input type="number" id="ft-amount-max" placeholder="max"></div>
+      </div>
+      <div id="ft-results" style="max-height:420px;overflow-y:auto;border:1px solid #e8e8e8;border-radius:8px"></div>
+      <div class="modal-actions">
+        <button class="btn btn-outline" id="btn-ft-cancel"></button>
       </div>
     </div>
   </div>
@@ -732,6 +750,8 @@
       document.getElementById('t-inv-name-label').textContent   = t('name');
       document.getElementById('t-inv-date-label').textContent   = t('date');
       const tfl = document.getElementById('t-inv-folder-label'); if (tfl) tfl.textContent = t('navFolders');
+      setText('t-modal-find-trx-title', t('findTransaction'));
+      setText('btn-ft-cancel', t('cancel'));
       document.getElementById('t-inv-status-label').textContent = t('statusLabel');
       document.getElementById('t-inv-direction-label').textContent = t('direction');
       document.getElementById('inv-opt-expense').textContent        = t('expense');
@@ -768,6 +788,38 @@
       try {
         categoriesCache = await apiFetch('/categories');
       } catch(e) { categoriesCache = []; }
+    }
+
+    let currentFindTrxInv = null;
+    async function runFindTrxSearch() {
+      const inv = currentFindTrxInv; if (!inv) return;
+      const container = document.getElementById('ft-results');
+      container.innerHTML = `<div class="loading" style="padding:20px">${t('loading')}</div>`;
+      try {
+        const df = document.getElementById('ft-date-from').value;
+        const dt = document.getElementById('ft-date-to').value;
+        const amin = document.getElementById('ft-amount-min').value;
+        const amax = document.getElementById('ft-amount-max').value;
+        const p = new URLSearchParams();
+        p.set('folder_id', inv.folder_id);
+        if (inv.category_id) p.set('category_id', inv.category_id);
+        if (df) p.set('date_from', df);
+        if (dt) p.set('date_to', dt);
+        if (amin) p.set('amount_min', amin);
+        if (amax) p.set('amount_max', amax);
+        p.set('only_unlinked', '1');
+        const rows = await apiFetch(`/transactions?${p.toString()}`);
+        if (!rows.length) { container.innerHTML = `<div class="empty-state">${t('noTransactions')}</div>`; return; }
+        container.innerHTML = rows.map(r => `
+          <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid #f0f0f0">
+            <div style="flex:1">
+              <div style="font-weight:500">${formatDate(r.date)} · ${fmt(r.amount)} · ${r.account_name||'—'}</div>
+              <div style="font-size:0.78rem;color:#999;margin-top:2px">${r.description || '—'}</div>
+            </div>
+            <button class="btn btn-primary" style="padding:4px 10px;font-size:0.82rem" data-action="pick-trx" data-trx-id="${r.id}">${t('linkDoc')}</button>
+          </div>
+        `).join('');
+      } catch (e) { container.innerHTML = `<div class="empty-state" style="color:#c33">${e.message}</div>`; }
     }
 
     let modalInvCatCombo = null;
@@ -1064,6 +1116,7 @@
                   ? `<span class="deleted-label">DELETED</span>`
                   : `<button class="icon-btn" data-action="delete-inv" data-id="${r.id}" title="${t('markDeleted')}">${ICON_EYE_OFF}</button>`}
                 ${isAdmin ? `<button class="icon-btn" data-action="hard-delete-inv" data-id="${r.id}" title="${t('hardDelete')}">${ICON_TRASH}</button>` : ''}
+                ${r.trx_count > 0 ? `<span title="${t('linkedToDoc')}" style="color:#1a73e8;font-size:0.82rem">💳 ${r.trx_count}</span>` : ''}
                 <button class="chat-btn" data-doc-id="${r.id}" data-doc-type="invoice" data-doc-name="${r.name}"
                   title="${t('chat')}">💬<span class="chat-badge" style="display:none"></span></button>
               </div>
@@ -1123,7 +1176,10 @@
         <div class="trx-section">
           <div class="section-header">
             <span class="section-title">${t('transactions')}</span>
-            <button class="btn btn-outline" style="padding:4px 10px;font-size:0.8rem" data-action="add-trx" data-inv-id="${invId}">${t('addTransaction')}</button>
+            <div style="display:flex;gap:6px">
+              <button class="btn btn-outline" style="padding:4px 10px;font-size:0.8rem" data-action="find-trx" data-inv-id="${invId}">${t('findTransaction')}</button>
+              <button class="btn btn-outline" style="padding:4px 10px;font-size:0.8rem" data-action="add-trx" data-inv-id="${invId}">${t('addTransaction')}</button>
+            </div>
           </div>
       `;
 
@@ -1350,6 +1406,46 @@
           .catch(e => { showToast(e.message, 'error'); });
       }
 
+      if (action === 'find-trx') {
+        const inv = invoicesById[btn.dataset.invId];
+        if (!inv) return;
+        currentFindTrxInv = inv;
+        document.getElementById('ft-date-from').value = '';
+        document.getElementById('ft-date-to').value   = '';
+        document.getElementById('ft-amount-min').value = '';
+        document.getElementById('ft-amount-max').value = '';
+        const hint = `${t('navFolders')}: ${(foldersCache.find(f=>f.id===inv.folder_id)||{}).name || '—'} · ${t('category')}: ${inv.category_name || '—'}`;
+        document.getElementById('ft-hint').textContent = hint;
+        openModal('modal-find-trx');
+        runFindTrxSearch();
+      }
+
+      if (action === 'pick-trx') {
+        if (!confirm(t('confirmLinkDoc'))) return;
+        const inv = currentFindTrxInv;
+        const trxId = btn.dataset.trxId;
+        // Загружаем транзакцию
+        try {
+          const params = new URLSearchParams({ folder_id: inv.folder_id });
+          const all = await apiFetch(`/transactions?${params.toString()}`);
+          const tx = all.find(x => x.id === trxId);
+          if (!tx) { showToast('—', 'error'); return; }
+          await apiFetch(`/transactions/${trxId}`, {
+            method: 'PUT',
+            body: JSON.stringify({
+              date: (tx.date && (tx.date.value || tx.date)) || '',
+              amount: tx.amount, direction: tx.direction,
+              category_id: tx.category_id, description: tx.description,
+              invoice_id: inv.id,
+            }),
+          });
+          closeModal('modal-find-trx');
+          showToast(t('saved'), 'success');
+          loadInvoices();
+          if (expandedInv[inv.id]) loadInvoiceDetail(inv.id);
+        } catch (e) { showToast(e.message, 'error'); }
+      }
+
       if (action === 'add-trx') {
         currentTrxMode = 'create'; currentTrxId = null; currentTrxInvId = btn.dataset.invId;
         document.getElementById('trx-date').value      = new Date().toISOString().split('T')[0];
@@ -1427,6 +1523,11 @@
     });
 
     // СОХРАНИТЬ НАКЛАДНУЮ
+    ['ft-date-from','ft-date-to','ft-amount-min','ft-amount-max'].forEach(id => {
+      document.getElementById(id).addEventListener('change', runFindTrxSearch);
+    });
+    document.getElementById('btn-ft-cancel').addEventListener('click', () => closeModal('modal-find-trx'));
+
     document.getElementById('btn-inv-cancel').addEventListener('click', () => closeModal('modal-inv'));
     document.getElementById('btn-inv-save').addEventListener('click', async () => {
       const name        = document.getElementById('inv-name').value.trim();

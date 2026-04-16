@@ -93,10 +93,13 @@ exports.invoices = async (req, res) => {
       if (dateFrom) { where += ` AND i.date >= @date_from`; params.date_from = dateFrom; }
       if (dateTo)   { where += ` AND i.date <= @date_to`;   params.date_to   = dateTo; }
 
+      const trxTable = `\`${PROJECT}.${DATASET}.transactions\``;
       const [rows] = await bigquery.query({
         query: `SELECT i.id, i.folder_id, i.name, i.status, i.direction, i.total_amount, i.paid_amount,
                        i.category_id, i.uploaded_by, i.uploaded_at, i.date,
-                       c.name as category_name
+                       c.name as category_name,
+                       (SELECT COUNT(*) FROM ${trxTable} t
+                        WHERE t.invoice_id = i.id AND IFNULL(t.status, 'active') != 'deleted') AS trx_count
                 FROM ${table} i
                 LEFT JOIN ${catTable} c ON i.category_id = c.id
                 ${where}

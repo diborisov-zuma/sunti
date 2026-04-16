@@ -22,6 +22,21 @@ async function verifyToken(req) {
   return info.email || null;
 }
 
+async function recalcInvoicePaid(invoiceId) {
+  if (!invoiceId) return;
+  const invTable = `\`${PROJECT}.${DATASET}.invoices\``;
+  const trxTable = `\`${PROJECT}.${DATASET}.transactions\``;
+  await bigquery.query({
+    query: `UPDATE ${invTable}
+            SET paid_amount = IFNULL((
+              SELECT SUM(amount) FROM ${trxTable}
+              WHERE invoice_id = @id AND IFNULL(status, 'active') != 'deleted'
+            ), 0)
+            WHERE id = @id`,
+    params: { id: invoiceId },
+  });
+}
+
 exports.transactions = async (req, res) => {
   setCors(res);
   if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
@@ -46,14 +61,25 @@ exports.transactions = async (req, res) => {
         ? 'IFNULL(t.status, \'active\') = \'deleted\''
         : 'IFNULL(t.status, \'active\') != \'deleted\'';
 
+      const { amount_min, amount_max, category_id, search } = req.query;
+      const extras = [];
+      if (amount_min) { extras.push(`t.amount >= @amount_min`); params.amount_min = parseFloat(amount_min); }
+      if (amount_max) { extras.push(`t.amount <= @amount_max`); params.amount_max = parseFloat(amount_max); }
+      if (req.query.date_from) { extras.push(`t.date >= @date_from`); params.date_from = req.query.date_from; }
+      if (req.query.date_to)   { extras.push(`t.date <= @date_to`);   params.date_to   = req.query.date_to; }
+      if (req.query.only_unlinked) extras.push(`t.invoice_id IS NULL`);
+      if (category_id) { extras.push(`t.category_id = @cat_id`); params.cat_id = category_id; }
+      if (search) { extras.push(`LOWER(t.description) LIKE LOWER(@search)`); params.search = `%${search.trim()}%`; }
+      const extraClause = extras.length ? ' AND ' + extras.join(' AND ') : '';
+
       if (invoiceId) {
-        where = `WHERE t.invoice_id = @invoice_id AND ${statusClause}`;
+        where = `WHERE t.invoice_id = @invoice_id AND ${statusClause}` + extraClause;
         params.invoice_id = invoiceId;
       } else if (folderId) {
-        where = `WHERE t.folder_id = @folder_id AND ${statusClause}`;
+        where = `WHERE t.folder_id = @folder_id AND ${statusClause}` + extraClause;
         params.folder_id = folderId;
       } else if (folderIds.length) {
-        where = `WHERE t.folder_id IN UNNEST(@folder_ids) AND ${statusClause}`;
+        where = `WHERE t.folder_id IN UNNEST(@folder_ids) AND ${statusClause}` + extraClause;
         params.folder_ids = folderIds;
       } else {
         res.status(400).json({ error: 'invoice_id, folder_id or folder_ids is required' });
@@ -103,6 +129,7 @@ exports.transactions = async (req, res) => {
           description:     description     || '',
         },
       });
+      if (invoice_id) await recalcInvoicePaid(invoice_id);
       res.json({ success: true, id });
       return;
     }
@@ -138,6 +165,10 @@ exports.transactions = async (req, res) => {
           created_at:      cur.created_at,
         },
       });
+      const oldInv = cur.invoice_id || '';
+      const newInv = (invoice_id !== undefined ? (invoice_id || '') : oldInv);
+      if (oldInv) await recalcInvoicePaid(oldInv);
+      if (newInv && newInv !== oldInv) await recalcInvoicePaid(newInv);
       res.json({ success: true });
       return;
     }
@@ -147,6 +178,12 @@ exports.transactions = async (req, res) => {
       const id   = req.url.split('/').filter(Boolean).pop().split('?')[0];
       const hard = req.query.hard === 'true';
       if (!id) { res.status(400).json({ error: 'id is required' }); return; }
+
+      // сохраняем invoice_id ДО изменений для recalc
+      const [preRows] = await bigquery.query({
+        query: `SELECT invoice_id FROM ${table} WHERE id = @id`, params: { id },
+      });
+      const linkedInv = preRows[0]?.invoice_id || '';
 
       if (hard) {
         const filesTable = `\`${PROJECT}.${DATASET}.transaction_files\``;
@@ -183,6 +220,7 @@ exports.transactions = async (req, res) => {
           },
         });
       }
+      if (linkedInv) await recalcInvoicePaid(linkedInv);
 
       res.json({ success: true });
       return;
