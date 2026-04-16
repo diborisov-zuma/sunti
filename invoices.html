@@ -252,20 +252,20 @@
     <div class="modal" style="width:500px;max-width:95vw">
       <h3 id="t-modal-inv-title"></h3>
       <div class="field-group">
-        <label id="t-inv-name-label"></label>
+        <label id="t-inv-name-label" class="required"></label>
         <input type="text" id="inv-name">
       </div>
       <div class="field-group" id="inv-folder-group">
-        <label id="t-inv-folder-label"></label>
+        <label id="t-inv-folder-label" class="required"></label>
         <select id="inv-folder"></select>
       </div>
       <div class="field-group">
-        <label id="t-inv-date-label"></label>
+        <label id="t-inv-date-label" class="required"></label>
         <input type="date" id="inv-date">
       </div>
       <div class="fields-row">
         <div class="field-group">
-          <label id="t-inv-status-label"></label>
+          <label id="t-inv-status-label" class="required"></label>
           <select id="inv-status">
             <option value="active"  id="inv-opt-active"></option>
             <option value="to_pay"  id="inv-opt-to_pay"></option>
@@ -282,7 +282,7 @@
         </div>
       </div>
       <div class="field-group">
-        <label id="t-inv-cat-label"></label>
+        <label id="t-inv-cat-label" class="required"></label>
         <span class="combo" style="display:block">
           <input type="text" id="inv-category-input" style="width:100%;border:1px solid #ddd;border-radius:6px;padding:9px 12px;font-size:0.9rem;outline:none;box-sizing:border-box;min-width:0">
           <ul id="inv-category-list"></ul>
@@ -311,7 +311,7 @@
       <h3 id="t-modal-trx-title"></h3>
       <div class="fields-row">
         <div class="field-group">
-          <label id="t-trx-date-label"></label>
+          <label id="t-trx-date-label" class="required"></label>
           <input type="date" id="trx-date">
         </div>
         <div class="field-group">
@@ -328,9 +328,13 @@
           <input type="number" id="trx-amount" min="0" step="0.01" placeholder="0.00">
         </div>
         <div class="field-group">
-          <label id="t-trx-cat-label"></label>
+          <label id="t-trx-cat-label" class="required"></label>
           <select id="trx-category"><option value="">—</option></select>
         </div>
+      </div>
+      <div class="field-group">
+        <label id="t-trx-account-label" class="required"></label>
+        <select id="trx-account"></select>
       </div>
       <div class="field-group">
         <label id="t-trx-desc-label"></label>
@@ -352,10 +356,10 @@
         <input type="text" id="ft-search" placeholder="Search by description">
       </div>
       <div class="fields-row" style="grid-template-columns:1fr 1fr 1fr 1fr;gap:10px">
-        <div class="field-group"><label></label><input type="date" id="ft-date-from"></div>
-        <div class="field-group"><label></label><input type="date" id="ft-date-to"></div>
-        <div class="field-group"><label></label><input type="number" id="ft-amount-min" placeholder="min"></div>
-        <div class="field-group"><label></label><input type="number" id="ft-amount-max" placeholder="max"></div>
+        <div class="field-group"><label id="t-ft-date-from"></label><input type="date" id="ft-date-from"></div>
+        <div class="field-group"><label id="t-ft-date-to"></label><input type="date" id="ft-date-to"></div>
+        <div class="field-group"><label id="t-ft-amount-min"></label><input type="number" id="ft-amount-min"></div>
+        <div class="field-group"><label id="t-ft-amount-max"></label><input type="number" id="ft-amount-max"></div>
       </div>
       <div id="ft-results" style="max-height:420px;overflow-y:auto;border:1px solid #e8e8e8;border-radius:8px"></div>
       <div class="modal-actions">
@@ -755,6 +759,10 @@
       const tfl = document.getElementById('t-inv-folder-label'); if (tfl) tfl.textContent = t('navFolders');
       setText('t-modal-find-trx-title', t('findTransaction'));
       setText('btn-ft-cancel', t('cancel'));
+      setText('t-ft-date-from',  t('dateFrom'));
+      setText('t-ft-date-to',    t('dateTo'));
+      setText('t-ft-amount-min', t('amountFrom'));
+      setText('t-ft-amount-max', t('amountTo'));
       document.getElementById('t-inv-status-label').textContent = t('statusLabel');
       document.getElementById('t-inv-direction-label').textContent = t('direction');
       document.getElementById('inv-opt-expense').textContent        = t('expense');
@@ -773,6 +781,7 @@
       document.getElementById('t-trx-amount-label').textContent = t('amount');
       document.getElementById('t-trx-cat-label').textContent    = t('category');
       document.getElementById('t-trx-desc-label').textContent   = t('description');
+      const tal = document.getElementById('t-trx-account-label'); if (tal) tal.textContent = t('companyAccounts');
       document.getElementById('trx-opt-income').textContent     = t('income');
       document.getElementById('trx-opt-expense').textContent    = t('expense');
       document.getElementById('btn-trx-cancel').textContent     = t('cancel');
@@ -846,6 +855,15 @@
         if (f.id === selectedId) opt.selected = true;
         sel.appendChild(opt);
       });
+    }
+
+    let accountsCacheLocal = null;
+    function fillTrxAccountSelect(selectedId) {
+      const sel = document.getElementById('trx-account');
+      if (!sel) return;
+      const list = accountsCache || [];
+      sel.innerHTML = `<option value="">— —</option>` + list.map(a => `<option value="${a.id}">${a.name}</option>`).join('');
+      sel.value = selectedId || '';
     }
 
     function fillCategorySelect(selectId, selectedId) {
@@ -1217,6 +1235,7 @@
                     data-id="${tx.id}" data-inv-id="${invId}"
                     data-date="${tx.date ? (tx.date.value || tx.date) : ''}" data-direction="${tx.direction}"
                     data-amount="${tx.amount}" data-category="${tx.category_id||''}"
+                    data-account="${tx.account_id||''}"
                     data-desc="${tx.description||''}">${t('edit')}</button>
                   ${tx.status === 'deleted'
                     ? `<span class="deleted-label" style="font-size:0.7rem;padding:3px 9px">DELETED</span>`
@@ -1458,6 +1477,7 @@
         document.getElementById('trx-amount').value    = '';
         document.getElementById('trx-desc').value      = '';
         fillCategorySelect('trx-category', null);
+        fillTrxAccountSelect('');
         openModal('modal-trx');
         setTimeout(() => document.getElementById('trx-amount').focus(), 100);
       }
@@ -1469,6 +1489,7 @@
         document.getElementById('trx-amount').value    = btn.dataset.amount;
         document.getElementById('trx-desc').value      = btn.dataset.desc;
         fillCategorySelect('trx-category', btn.dataset.category);
+        fillTrxAccountSelect(btn.dataset.account || '');
         openModal('modal-trx');
         setTimeout(() => document.getElementById('trx-amount').focus(), 100);
       }
@@ -1548,7 +1569,17 @@
       const total       = document.getElementById('inv-total').value;
       const paid        = document.getElementById('inv-paid').value;
       const category_id = (modalInvCatCombo && modalInvCatCombo.getSelected()) || null;
-      if (!name) { showToast(t('fillAllFields'), 'error'); return; }
+      const folder_id_for_check = currentInvMode === 'create' ? document.getElementById('inv-folder').value : 'ok';
+
+      const missing = [];
+      if (!name)              missing.push('inv-name');
+      if (!date)              missing.push('inv-date');
+      if (!status)            missing.push('inv-status');
+      if (!category_id)       missing.push('inv-category-input');
+      if (!folder_id_for_check) missing.push('inv-folder');
+      document.querySelectorAll('#modal-inv .invalid').forEach(el => el.classList.remove('invalid'));
+      missing.forEach(id => { const el = document.getElementById(id); if (el) el.classList.add('invalid'); });
+      if (missing.length) { showToast(t('fillAllFields'), 'error'); return; }
       closeModal('modal-inv');
       try {
         if (currentInvMode === 'create') {
@@ -1571,15 +1602,24 @@
       const amount      = document.getElementById('trx-amount').value;
       const description = document.getElementById('trx-desc').value;
       const category_id = document.getElementById('trx-category').value || null;
-      if (!date || !amount) { showToast(t('fillAllFields'), 'error'); return; }
+      const account_id  = document.getElementById('trx-account').value || '';
+      const invFolder   = (invoicesById[currentTrxInvId] || {}).folder_id || '';
+
+      const missing = [];
+      if (!invFolder)   missing.push('__folder'); // folder из invoice должен быть
+      if (!account_id)  missing.push('trx-account');
+      if (!date)        missing.push('trx-date');
+      if (!category_id) missing.push('trx-category');
+      document.querySelectorAll('#modal-trx .invalid').forEach(el => el.classList.remove('invalid'));
+      missing.forEach(id => { const el = document.getElementById(id); if (el) el.classList.add('invalid'); });
+      if (missing.length) { showToast(t('fillAllFields'), 'error'); return; }
       closeModal('modal-trx');
       try {
         if (currentTrxMode === 'create') {
-          const invFolder = (invoicesById[currentTrxInvId] || {}).folder_id || '';
-          await apiFetch('/transactions', { method: 'POST', body: JSON.stringify({ date, amount, direction, category_id, description, invoice_id: currentTrxInvId, folder_id: invFolder }) });
+          await apiFetch('/transactions', { method: 'POST', body: JSON.stringify({ date, amount, direction, category_id, description, invoice_id: currentTrxInvId, folder_id: invFolder, account_id }) });
           showToast(t('saved'), 'success');
         } else {
-          await apiFetch(`/transactions/${currentTrxId}`, { method: 'PUT', body: JSON.stringify({ date, amount, direction, category_id, description }) });
+          await apiFetch(`/transactions/${currentTrxId}`, { method: 'PUT', body: JSON.stringify({ date, amount, direction, category_id, description, account_id }) });
           showToast(t('saved'), 'success');
         }
         loadInvoiceDetail(currentTrxInvId);

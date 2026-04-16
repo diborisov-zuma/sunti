@@ -1,5 +1,8 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
+label.required::after { content: ' *'; color: #c5221f; font-weight: 700; }
+input.invalid, select.invalid { border-color: #c5221f !important; background: #fff5f5; }
+
 body {
   font-family: sans-serif;
   background: #f4f4f4;

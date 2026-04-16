@@ -161,7 +161,7 @@
       <h3 id="t-modal-trx-title"></h3>
       <div class="fields-row">
         <div class="field-group">
-          <label id="t-trx-date-label"></label>
+          <label id="t-trx-date-label" class="required"></label>
           <input type="date" id="trx-date">
         </div>
         <div class="field-group">
@@ -178,15 +178,19 @@
           <input type="number" id="trx-amount" min="0" step="0.01" placeholder="0.00">
         </div>
         <div class="field-group">
-          <label id="t-trx-cat-label"></label>
+          <label id="t-trx-cat-label" class="required"></label>
           <span class="combo" style="display:block">
             <input type="text" id="trx-category-input" style="width:100%;border:1px solid #ddd;border-radius:6px;padding:9px 12px;font-size:0.9rem;outline:none;box-sizing:border-box">
             <ul id="trx-category-list"></ul>
           </span>
         </div>
       </div>
-      <div class="field-group" id="trx-folder-group" style="display:none">
-        <label id="t-trx-folder-label"></label>
+      <div class="field-group">
+        <label id="t-trx-account-label" class="required"></label>
+        <select id="trx-account"></select>
+      </div>
+      <div class="field-group" id="trx-folder-group">
+        <label id="t-trx-folder-label" class="required"></label>
         <span class="combo" style="display:block">
           <input type="text" id="trx-folder-input" style="width:100%;border:1px solid #ddd;border-radius:6px;padding:9px 12px;font-size:0.9rem;outline:none;box-sizing:border-box">
           <ul id="trx-folder-list"></ul>
@@ -216,16 +220,16 @@
     <div class="modal" style="width:560px;max-width:95vw">
       <h3 id="t-modal-create-doc-title"></h3>
       <div class="field-group">
-        <label id="t-cd-name-label"></label>
+        <label id="t-cd-name-label" class="required"></label>
         <input type="text" id="cd-name">
       </div>
       <div class="fields-row">
         <div class="field-group">
-          <label id="t-cd-date-label"></label>
+          <label id="t-cd-date-label" class="required"></label>
           <input type="date" id="cd-date">
         </div>
         <div class="field-group">
-          <label id="t-cd-status-label"></label>
+          <label id="t-cd-status-label" class="required"></label>
           <select id="cd-status">
             <option value="active">active</option>
             <option value="to_pay">to_pay</option>
@@ -262,10 +266,10 @@
         <input type="text" id="ld-search" placeholder="Search by name">
       </div>
       <div class="fields-row" style="grid-template-columns:1fr 1fr 1fr 1fr;gap:10px">
-        <div class="field-group"><label>${''}</label><input type="date" id="ld-date-from"></div>
-        <div class="field-group"><label>${''}</label><input type="date" id="ld-date-to"></div>
-        <div class="field-group"><label>${''}</label><input type="number" id="ld-amount-min" placeholder="min"></div>
-        <div class="field-group"><label>${''}</label><input type="number" id="ld-amount-max" placeholder="max"></div>
+        <div class="field-group"><label id="t-ld-date-from"></label><input type="date" id="ld-date-from"></div>
+        <div class="field-group"><label id="t-ld-date-to"></label><input type="date" id="ld-date-to"></div>
+        <div class="field-group"><label id="t-ld-amount-min"></label><input type="number" id="ld-amount-min"></div>
+        <div class="field-group"><label id="t-ld-amount-max"></label><input type="number" id="ld-amount-max"></div>
       </div>
       <div id="ld-hint" style="font-size:0.8rem;color:#999;margin-bottom:8px"></div>
       <div id="ld-results" style="max-height:420px;overflow-y:auto;border:1px solid #e8e8e8;border-radius:8px"></div>
@@ -518,6 +522,7 @@
       document.getElementById('t-trx-amount-label').textContent = t('amount');
       document.getElementById('t-trx-cat-label').textContent    = t('category');
       setText('t-trx-folder-label',                                 t('navFolders'));
+      setText('t-trx-account-label',                                t('companyAccounts'));
       setText('t-trx-invoice-label',                                t('navInvoices'));
       const pdb = document.getElementById('btn-pick-doc-modal'); if (pdb) pdb.textContent = t('linkDoc');
       setText('t-modal-create-doc-title', t('createDoc'));
@@ -530,6 +535,10 @@
       setText('btn-cd-save',          t('save'));
       setText('t-modal-link-doc-title', t('linkDoc'));
       setText('btn-ld-cancel',          t('cancel'));
+      setText('t-ld-date-from',   t('dateFrom'));
+      setText('t-ld-date-to',     t('dateTo'));
+      setText('t-ld-amount-min',  t('amountFrom'));
+      setText('t-ld-amount-max',  t('amountTo'));
       document.getElementById('t-trx-desc-label').textContent   = t('description');
       document.getElementById('trx-opt-income').textContent     = t('income');
       document.getElementById('trx-opt-expense').textContent    = t('expense');
@@ -583,7 +592,15 @@
       runLinkDocSearch();
     }
 
-    async function mountModalCombos(selectedCatId, selectedFolderId, showFolder, folderList, selectedInvoiceId) {
+    function fillTrxAccountSelect(selectedId) {
+      const sel = document.getElementById('trx-account');
+      if (!sel) return;
+      sel.innerHTML = `<option value="">— —</option>` +
+        accountsCache.map(a => `<option value="${a.id}">${a.name}</option>`).join('');
+      sel.value = selectedId || '';
+    }
+
+    async function mountModalCombos(selectedCatId, selectedFolderId, showFolder, folderList, selectedInvoiceId, selectedAccountId) {
       modalCategoryCombo = bindCombo('trx-category-input', 'trx-category-list',
         catItemsGrouped(),
         { placeholder: t('noCategory'), allowAll: true, allLabel: '— ' + t('noCategory') + ' —', selectedId: selectedCatId || '' });
@@ -601,7 +618,6 @@
       // предустановим pending, если есть
       if (selectedInvoiceId) {
         pendingInvoiceId = selectedInvoiceId;
-        // подпись подтянем асинхронно
         try {
           const data = await apiFetch(`/invoices?folder_id=${selectedFolderId}&limit=500`);
           const inv = (data.rows || []).find(r => r.id === selectedInvoiceId);
@@ -611,6 +627,7 @@
         pendingInvoiceId = null; pendingInvoiceLabel = '';
       }
       renderInvoiceChip();
+      fillTrxAccountSelect(selectedAccountId || '');
     }
 
     function getWritableFolders() {
@@ -771,7 +788,7 @@
         const writableFolders = getWritableFolders();
         if (!writableFolders.length) { showToast('—', 'error'); return; }
         const defaultFolder = filterFolder !== 'all' ? filterFolder : writableFolders[0].id;
-        mountModalCombos(null, defaultFolder, true, writableFolders);
+        mountModalCombos(null, defaultFolder, true, writableFolders, null, null);
         openModal('modal-trx');
         setTimeout(() => document.getElementById('trx-amount').focus(), 100);
       });
@@ -868,6 +885,7 @@
                 data-category="${tx.category_id||''}"
                 data-folder="${tx.folder_id||''}"
                 data-invoice="${tx.invoice_id||''}"
+                data-account="${tx.account_id||''}"
                 data-desc="${(tx.description||'').replace(/"/g,'&quot;')}">${t('edit')}</button>
               ${deletedOrMark}
               ${isAdmin ? `<button class="icon-btn" data-action="hard-delete-trx" data-id="${tx.id}" title="${t('hardDelete')}">${ICON_TRASH}</button>` : ''}
@@ -1195,8 +1213,8 @@
         document.getElementById('trx-direction').value = btn.dataset.direction;
         document.getElementById('trx-amount').value    = btn.dataset.amount;
         document.getElementById('trx-desc').value      = btn.dataset.desc;
-        const showFolderPicker = !currentTrxInvoiceId; // нет invoice → можно менять folder
-        mountModalCombos(btn.dataset.category || '', btn.dataset.folder || '', showFolderPicker, foldersCache, currentTrxInvoiceId);
+        const showFolderPicker = !currentTrxInvoiceId;
+        mountModalCombos(btn.dataset.category || '', btn.dataset.folder || '', showFolderPicker, foldersCache, currentTrxInvoiceId, btn.dataset.account || '');
         openModal('modal-trx');
         setTimeout(() => document.getElementById('trx-amount').focus(), 100);
       }
@@ -1337,20 +1355,30 @@
       const category_id = (modalCategoryCombo && modalCategoryCombo.getSelected()) || null;
       const folder_id   = (modalFolderCombo && modalFolderCombo.getSelected()) || '';
       const invoice_id  = pendingInvoiceId || null;
-      if (!date || !amount) { showToast(t('fillAllFields'), 'error'); return; }
+      const account_id  = document.getElementById('trx-account').value || '';
+
+      // Валидация обязательных полей
+      const missing = [];
+      if (!folder_id)   missing.push('trx-folder-input');
+      if (!account_id)  missing.push('trx-account');
+      if (!date)        missing.push('trx-date');
+      if (!category_id) missing.push('trx-category-input');
+      document.querySelectorAll('#modal-trx .invalid').forEach(el => el.classList.remove('invalid'));
+      missing.forEach(id => { const el = document.getElementById(id); if (el) el.classList.add('invalid'); });
+      if (missing.length) { showToast(t('fillAllFields'), 'error'); return; }
       closeModal('modal-trx');
       try {
         if (currentTrxMode === 'create') {
           const r = await apiFetch('/transactions', {
             method: 'POST',
-            body: JSON.stringify({ date, amount, direction, category_id, description, folder_id, invoice_id }),
+            body: JSON.stringify({ date, amount, direction, category_id, description, folder_id, invoice_id, account_id }),
           });
           highlightTrxId = r.id;
           showToast(t('saved'), 'success');
         } else {
           await apiFetch(`/transactions/${currentTrxId}`, {
             method: 'PUT',
-            body: JSON.stringify({ date, amount, direction, category_id, description, folder_id, invoice_id }),
+            body: JSON.stringify({ date, amount, direction, category_id, description, folder_id, invoice_id, account_id }),
           });
           highlightTrxId = currentTrxId;
           showToast(t('saved'), 'success');
@@ -1381,7 +1409,18 @@
       const status    = document.getElementById('cd-status').value;
       const direction = document.getElementById('cd-direction').value;
       const total     = document.getElementById('cd-total').value;
-      if (!name) { showToast(t('fillAllFields'), 'error'); return; }
+
+      const missing = [];
+      if (!name)     missing.push('cd-name');
+      if (!date)     missing.push('cd-date');
+      if (!status)   missing.push('cd-status');
+      if (!tx.folder_id || !tx.category_id) {
+        showToast(t('fillAllFields') + ' (folder / category on tx)', 'error');
+        return;
+      }
+      document.querySelectorAll('#modal-create-doc .invalid').forEach(el => el.classList.remove('invalid'));
+      missing.forEach(id => { const el = document.getElementById(id); if (el) el.classList.add('invalid'); });
+      if (missing.length) { showToast(t('fillAllFields'), 'error'); return; }
       closeModal('modal-create-doc');
       try {
         const r = await apiFetch('/invoices', {
