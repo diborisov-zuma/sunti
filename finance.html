@@ -371,9 +371,23 @@
         });
         list.innerHTML = html;
       }
+      function positionList() {
+        const rect = input.getBoundingClientRect();
+        const spaceBelow = window.innerHeight - rect.bottom - 16;
+        const spaceAbove = rect.top - 16;
+        if (spaceBelow < 200 && spaceAbove > spaceBelow) {
+          list.style.top = 'auto'; list.style.bottom = '100%';
+          list.style.marginTop = '0'; list.style.marginBottom = '2px';
+          list.style.maxHeight = Math.max(150, Math.min(440, spaceAbove)) + 'px';
+        } else {
+          list.style.top = '100%'; list.style.bottom = 'auto';
+          list.style.marginTop = '2px'; list.style.marginBottom = '0';
+          list.style.maxHeight = Math.max(150, Math.min(440, spaceBelow)) + 'px';
+        }
+      }
       render('');
-      input.addEventListener('focus', () => { render(''); wrap.classList.add('open'); });
-      input.addEventListener('input', () => { render(input.value); wrap.classList.add('open'); });
+      input.addEventListener('focus', () => { render(''); positionList(); wrap.classList.add('open'); });
+      input.addEventListener('input', () => { render(input.value); positionList(); wrap.classList.add('open'); });
       document.addEventListener('click', e => {
         if (!wrap.contains(e.target)) wrap.classList.remove('open');
       });
