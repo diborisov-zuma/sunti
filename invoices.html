@@ -870,11 +870,12 @@
       });
     }
 
-    let accountsCacheLocal = null;
     function fillTrxAccountSelect(selectedId) {
       const sel = document.getElementById('trx-account');
       if (!sel) return;
-      const list = accountsCache || [];
+      const list = (filterCompany && filterCompany !== 'all')
+        ? accountsCache.filter(a => a.company_id === filterCompany)
+        : (accountsCache || []);
       sel.innerHTML = `<option value="">— —</option>` + list.map(a => `<option value="${a.id}">${a.name}</option>`).join('');
       sel.value = selectedId || '';
     }
@@ -903,8 +904,9 @@
     }
 
     function getWritableFolders() {
-      if (typeof isAdmin !== 'undefined' && isAdmin) return foldersCache.slice();
-      return foldersCache.filter(f => f.docs_access === 'editor');
+      let list = (typeof isAdmin !== 'undefined' && isAdmin) ? foldersCache.slice() : foldersCache.filter(f => f.docs_access === 'editor');
+      if (filterCompany && filterCompany !== 'all') list = list.filter(f => f.company_id === filterCompany);
+      return list;
     }
 
     function updateFolderFilter() {

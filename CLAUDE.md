@@ -110,6 +110,7 @@ On save, if there's a `invoice_id`, enforce `transaction.folder_id == invoice.fo
 - Once a company is picked:
   - The **Account** filter's options are limited to that company's `company_accounts`.
   - The **Project (folder)** filter's options are limited to folders with `folder.company_id = selected`.
+- **Modal dropdowns on these pages inherit the selected company.** Any transaction or document modal opened from invoices.html / finance.html must also filter its dropdowns the same way: account options — only `company_accounts` of the selected company; folder options — only folders with that `company_id`. Never show company-agnostic lists while a company context is active.
 
 **Amount sign convention**
 - In DB and in UI input, `amount` / `total_amount` / `paid_amount` are always **positive**. Direction is carried separately via `direction` (`income` / `expense`).

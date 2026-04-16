@@ -547,8 +547,9 @@
     function fillTrxAccountSelect(selectedId) {
       const sel = document.getElementById('trx-account');
       if (!sel) return;
+      const list = filterCompany === 'all' ? accountsCache : accountsCache.filter(a => a.company_id === filterCompany);
       sel.innerHTML = `<option value="">— —</option>` +
-        accountsCache.map(a => `<option value="${a.id}">${a.name}</option>`).join('');
+        list.map(a => `<option value="${a.id}">${a.name}</option>`).join('');
       sel.value = selectedId || '';
     }
 
@@ -563,7 +564,8 @@
       if (showFolder) {
         comboWrap.style.display = 'block';
         lockedInput.style.display = 'none';
-        const items = (folderList || foldersCache).map(f => ({ id: f.id, label: f.name }));
+        const baseList = folderList || (filterCompany === 'all' ? foldersCache : foldersCache.filter(f => f.company_id === filterCompany));
+        const items = baseList.map(f => ({ id: f.id, label: f.name }));
         modalFolderCombo = bindCombo('trx-folder-input', 'trx-folder-list', items, {
           placeholder: t('navFolders'), allowAll: false, selectedId: selectedFolderId || '',
           onSelect: () => { pendingInvoiceId = null; pendingInvoiceLabel = ''; renderInvoiceChip(); },
@@ -590,9 +592,9 @@
     }
 
     function getWritableFolders() {
-      // Админ: все. Иначе: только с docs_access === 'editor'.
-      if (typeof isAdmin !== 'undefined' && isAdmin) return foldersCache.slice();
-      return foldersCache.filter(f => f.docs_access === 'editor');
+      let list = (typeof isAdmin !== 'undefined' && isAdmin) ? foldersCache.slice() : foldersCache.filter(f => f.docs_access === 'editor');
+      if (filterCompany !== 'all') list = list.filter(f => f.company_id === filterCompany);
+      return list;
     }
 
     function updateFolderFilter() {
