@@ -117,6 +117,7 @@ exports.transactions = async (req, res) => {
         res.status(400).json({ error: 'date, amount and direction are required' });
         return;
       }
+      if (parseFloat(amount) < 0) { res.status(400).json({ error: 'amount must be non-negative' }); return; }
       if (invoice_id) {
         const [invRows] = await bigquery.query({
           query: `SELECT folder_id FROM \`${PROJECT}.${DATASET}.invoices\` WHERE id = @id`,
@@ -155,6 +156,7 @@ exports.transactions = async (req, res) => {
       const id = req.url.split('/').filter(Boolean).pop().split('?')[0];
       const { date, amount, direction, account_id, counterparty_id, category_id, folder_id, invoice_id, description } = req.body;
       if (!id || !date || !amount) { res.status(400).json({ error: 'id, date and amount are required' }); return; }
+      if (parseFloat(amount) < 0) { res.status(400).json({ error: 'amount must be non-negative' }); return; }
       if (invoice_id) {
         const [invRows] = await bigquery.query({
           query: `SELECT folder_id FROM \`${PROJECT}.${DATASET}.invoices\` WHERE id = @id`,

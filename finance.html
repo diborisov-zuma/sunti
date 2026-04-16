@@ -1305,6 +1305,8 @@
       if (!account_id)  missing.push('trx-account');
       if (!date)        missing.push('trx-date');
       if (!category_id) missing.push('trx-category-input');
+      const amtNum = parseFloat(amount);
+      if (amount !== '' && (isNaN(amtNum) || amtNum < 0)) missing.push('trx-amount');
       document.querySelectorAll('#modal-trx .invalid').forEach(el => el.classList.remove('invalid'));
       missing.forEach(id => { const el = document.getElementById(id); if (el) el.classList.add('invalid'); });
       if (missing.length) { showToast(t('fillAllFields'), 'error'); return; }

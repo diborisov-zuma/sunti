@@ -103,6 +103,11 @@ The Folder and Document fields behave by context:
 
 On save, if there's a `invoice_id`, enforce `transaction.folder_id == invoice.folder_id` (server-side check as well — reject mismatch).
 
+**Amount sign convention**
+- In DB and in UI input, `amount` / `total_amount` / `paid_amount` are always **positive**. Direction is carried separately via `direction` (`income` / `expense`).
+- All numeric inputs must reject negative values: `min="0"` on the input and a server-side rejection for negative amounts on POST/PUT.
+- All *displayed* monetary values in listings show a leading sign based on direction: `-amount` for expense (red), `+amount` or plain number for income (green). Applies to both transactions (finance.html) and invoices (invoices.html).
+
 **Invariants / cascades**
 - Hard-delete of an invoice cascades: invoice_files → transactions → transaction_files → GCS blobs.
 - Soft-delete (`status='deleted'`) is the default for invoices and transactions; the table always holds the row.

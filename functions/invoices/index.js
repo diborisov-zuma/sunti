@@ -133,6 +133,7 @@ exports.invoices = async (req, res) => {
     if (req.method === 'POST') {
       const { folder_id, name, status, direction, total_amount, paid_amount, category_id, date } = req.body;
       if (!folder_id || !name) { res.status(400).json({ error: 'folder_id and name are required' }); return; }
+      if (parseFloat(total_amount || 0) < 0 || parseFloat(paid_amount || 0) < 0) { res.status(400).json({ error: 'amounts must be non-negative' }); return; }
       const id = uuidv4();
       await bigquery.query({
         query: `INSERT INTO ${table} (id, folder_id, name, status, direction, total_amount, paid_amount, category_id, date, uploaded_by, uploaded_at)
@@ -157,6 +158,7 @@ exports.invoices = async (req, res) => {
       const id = req.url.split('/').filter(Boolean).pop().split('?')[0];
       const { name, status, direction, total_amount, paid_amount, category_id, date } = req.body;
       if (!name || !id) { res.status(400).json({ error: 'name and id are required' }); return; }
+      if (parseFloat(total_amount || 0) < 0 || parseFloat(paid_amount || 0) < 0) { res.status(400).json({ error: 'amounts must be non-negative' }); return; }
 
       const [rows] = await bigquery.query({
         query: `SELECT folder_id, uploaded_by, FORMAT_TIMESTAMP('%Y-%m-%dT%H:%M:%S', uploaded_at) as uploaded_at FROM ${table} WHERE id = @id`,

@@ -57,7 +57,9 @@
     .inv-table tr.inv-row.status-deleted td { opacity:0.6; }
 
     .amount-col { text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap; }
-    .amount-remaining { color:#c5221f;font-weight:500; }
+    .amount-col.income  { color:#1e8e3e; }
+    .amount-col.expense { color:#c5221f; }
+    .amount-remaining { font-weight:500; }
 
     /* Раскрытый контент накладной */
     .inv-detail-row td { padding:0;background:#f8faff;border-bottom:1px solid #e0e8ff; }
@@ -1134,9 +1136,9 @@
             </td>
             <td>${r.category_name ? `<span class="cat-badge">${r.category_name}</span>` : '<span style="color:#ccc">—</span>'}</td>
             <td><span class="status-badge status-${r.status}">${statusLabel(r.status)}</span></td>
-            <td class="amount-col">${fmt(r.total_amount)}</td>
-            <td class="amount-col">${fmt(r.paid_amount)}</td>
-            <td class="amount-col ${remaining>0?'amount-remaining':''}">${fmt(remaining)}</td>
+            <td class="amount-col ${r.direction==='expense'?'expense':'income'}">${r.direction==='expense'?'-':''}${fmt(r.total_amount)}</td>
+            <td class="amount-col ${r.direction==='expense'?'expense':'income'}">${r.direction==='expense'?'-':''}${fmt(r.paid_amount)}</td>
+            <td class="amount-col ${remaining>0?'amount-remaining':''} ${r.direction==='expense'?'expense':'income'}">${r.direction==='expense'?'-':''}${fmt(remaining)}</td>
             <td>
               <div style="display:flex;gap:6px;align-items:center">
                 <button class="btn btn-outline" data-action="edit-inv"
@@ -1596,6 +1598,8 @@
       if (!status)            missing.push('inv-status');
       if (!category_id)       missing.push('inv-category-input');
       if (!folder_id_for_check) missing.push('inv-folder');
+      const totNum = parseFloat(total);
+      if (total !== '' && (isNaN(totNum) || totNum < 0)) missing.push('inv-total');
       document.querySelectorAll('#modal-inv .invalid').forEach(el => el.classList.remove('invalid'));
       missing.forEach(id => { const el = document.getElementById(id); if (el) el.classList.add('invalid'); });
       if (missing.length) { showToast(t('fillAllFields'), 'error'); return; }
@@ -1629,6 +1633,8 @@
       if (!account_id)  missing.push('trx-account');
       if (!date)        missing.push('trx-date');
       if (!category_id) missing.push('trx-category');
+      const amtNum = parseFloat(amount);
+      if (amount !== '' && (isNaN(amtNum) || amtNum < 0)) missing.push('trx-amount');
       document.querySelectorAll('#modal-trx .invalid').forEach(el => el.classList.remove('invalid'));
       missing.forEach(id => { const el = document.getElementById(id); if (el) el.classList.add('invalid'); });
       if (missing.length) { showToast(t('fillAllFields'), 'error'); return; }
