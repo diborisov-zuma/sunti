@@ -85,6 +85,10 @@ Shared conventions (see `functions/users/index.js` as the canonical example):
 - A transaction that is already linked to a document **cannot be re-linked** to a different document directly. The user must explicitly unlink first (in the edit modal: click the × next to the document chip, or in the expanded row: "Unlink document"). Only once the link is cleared does the "Link to document" action open the picker.
 - **Invariant: both must share the same `folder_id`.** When linking, the picker for invoices is filtered by the transaction's `folder_id` (and vice versa). `paid_amount` on the invoice is recomputed after every link/unlink/create/delete/edit.
 
+**Transaction display inside an expanded invoice on invoices.html**
+- Columns of the nested trx table do not include `direction`/type — the sign and color of the amount already convey it.
+- Amount cell: prefix `-` and red color for `direction='expense'`, green (plain) for `direction='income'`. Same rule everywhere transactions are listed (finance.html main table already follows it).
+
 **Transaction modal contract (create and edit)**
 
 Applies to both `finance.html` and `invoices.html` modal-trx. The modal always has these fields: Name (description), Date (required), Type (direction), Amount, Category (required), Account (required), Folder, Document link.

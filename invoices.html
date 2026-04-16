@@ -1257,21 +1257,20 @@
         trxHtml += `<table class="trx-table"><thead><tr>
           <th style="width:24px"></th>
           <th>${t('date')}</th>
-          <th>${t('direction')}</th>
           <th>${t('amount')}</th>
           <th>${t('category')}</th>
-          <th>${t('description')}</th>
+          <th>${t('name')}</th>
           <th></th>
         </tr></thead><tbody id="trx-tbody-${invId}">`;
 
         transactions.forEach(tx => {
           const isTrxExpanded = expandedTrx[tx.id] || false;
+          const cls = tx.direction === 'expense' ? 'expense' : 'income';
           trxHtml += `
             <tr class="trx-row" data-trx-id="${tx.id}">
               <td><button class="trx-expand-btn${isTrxExpanded?' open':''}" data-trx-id="${tx.id}">${isTrxExpanded?'▼':'▶'}</button></td>
               <td>${formatDate(tx.date)}</td>
-              <td><span class="direction-${tx.direction}">${tx.direction === 'income' ? t('income') : t('expense')}</span></td>
-              <td class="amount-col">${fmt(tx.amount)}</td>
+              <td class="amount-col ${cls}">${tx.direction==='expense'?'-':''}${fmt(tx.amount)}</td>
               <td>${tx.category_name ? `<span class="cat-badge">${tx.category_name}</span>` : '—'}</td>
               <td style="color:#666">${tx.description||'—'}</td>
               <td>
@@ -1292,7 +1291,7 @@
               </td>
             </tr>
             <tr class="trx-files-row" data-trx-files-for="${tx.id}" style="display:${isTrxExpanded?'':'none'}">
-              <td colspan="7"><div class="trx-files-inner" id="trx-files-${tx.id}"><div style="padding:8px;color:#bbb;font-size:0.83rem">${t('loading')}</div></div></td>
+              <td colspan="6"><div class="trx-files-inner" id="trx-files-${tx.id}"><div style="padding:8px;color:#bbb;font-size:0.83rem">${t('loading')}</div></div></td>
             </tr>
           `;
           if (isTrxExpanded) loadTrxFiles(tx.id);
