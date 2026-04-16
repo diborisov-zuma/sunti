@@ -24,7 +24,7 @@ There is no build, bundler, linter, or test suite. Each `functions/<name>/` subd
 
 ### Frontend (repo root)
 
-Page-per-feature static HTML (`index.html`, `folders.html`, `invoices.html`, `reports.html`, `users.html`, `telegram.html`) sharing a handful of global scripts loaded via `<script>` tags. No module system — everything lives on `window`.
+Page-per-feature static HTML sharing a handful of global scripts loaded via `<script>` tags. No module system — everything lives on `window`. Current pages: `index.html`, `invoices.html` (documents), `finance.html` (transactions ledger), `statements.html` (bank statements), `reports.html`, plus admin pages accessed through the header "⚙ Settings" dropdown: `folders.html`, `companies.html`, `users.html`, `categories.html`. `telegram.html` handles the bot linking flow.
 
 Shared scripts:
 - `_config.js` — `API_URL` + `apiFetch()` helper that attaches `Bearer ${window._accessToken}`.
@@ -36,7 +36,9 @@ Be aware that `_config.js` uses `API_URL` while `_auth.js`/`_header.js` use `API
 
 ### Backend (`functions/`)
 
-Each entity is a separate Cloud Function directory exporting a single HTTP handler (Functions Framework v2). Current functions: `users`, `users_folders`, `folders`, `categories`, `invoices`, `invoice_files`, `transactions`, `transaction_files`, `messages`, `telegram`, `telegram_webhook`.
+Each entity is a separate Cloud Function directory exporting a single HTTP handler (Functions Framework v2). Current functions: `users`, `users_folders`, `users_statements`, `folders`, `companies`, `company_accounts`, `categories`, `category_types`, `invoices`, `invoice_files`, `transactions`, `transaction_files`, `bank_statements`, `messages`, `telegram`, `telegram_webhook`.
+
+Cloud Functions are auto-deployed on push to `main` by `.github/workflows/functions-deploy.yml` — changed subdirs under `functions/` trigger redeploys (any change to the workflow file itself redeploys all). The job runs as compute SA `6445860840-compute@developer.gserviceaccount.com`, which needs the following roles to work: Cloud Functions Admin, Cloud Run Admin, Cloud Build Editor, Storage Admin (on bucket), Service Account User, Artifact Registry Writer, Service Account Token Creator (on itself — required for V4 signed URL signing).
 
 Shared conventions (see `functions/users/index.js` as the canonical example):
 - Every handler sets permissive CORS and handles `OPTIONS` preflight.
@@ -46,13 +48,50 @@ Shared conventions (see `functions/users/index.js` as the canonical example):
 - Soft deletes: `documents` (renamed from `invoices`) and `transactions` use soft-delete flags rather than row removal — recent commits: `Soft delete for invoices and transactions`, `Rename invoices to documents, add folder_id to transactions`.
 - Role-based access control is recent (commit `Role-based access control`) — new endpoints should respect `is_admin` / `can_see_salary` and the `users_folders` join table for per-folder access.
 
-### Data model notes
+### Data model — BigQuery `sunti` dataset
 
-- `users` table holds roles (`is_admin`, `can_see_salary`, `is_active`) and Telegram linking fields (`telegram_chat_id`, `telegram_username`).
-- `users_folders` grants folder-level access to non-admin users.
-- "Invoices" in the UI and in some function names correspond to the `documents` table after the rename; `transactions` now carry a `folder_id`.
+**Access / RBAC**
+- `users` — `{email, name, is_admin, can_see_salary, is_active, telegram_chat_id, telegram_username, first_login, last_login}`. `email` is the lookup key.
+- `users_folders` — grants folder access: `{id, user_email, folder_id, docs_access}`. `docs_access` ∈ `viewer/editor` (absence of row = no access). Non-admin sees only folders joined via this table; admins see all.
+- `users_statements` — same pattern for bank statements per company: `{id, user_email, company_id, statement_access}`.
 
-BigQuery console for inspecting tables: https://console.cloud.google.com/bigquery?project=project-9718e7d4-4cd7-4f52-8d6
+**Org structure**
+- `companies` — `{id, name, registration_number}`.
+- `company_accounts` — `{id, company_id, name, bank_name, bank_account, is_active}`. Used as `transactions.account_id`.
+- `folders` — projects: `{id, name, order, status (active|archive), company_id, created_by, created_at}`. Everything (invoices, transactions) lives inside a folder.
+
+**Directories**
+- `category_types` — `{id, name, name_en, name_th, sort_order}`. Seeded with `expense/income/transfer`, user-editable from `categories.html`.
+- `categories` — `{id, name, name_en, name_th, type, sort_order}`. `type` is a string FK to `category_types.id`.
+
+**Documents + payments (core domain)**
+- `invoices` — `{id, folder_id, name, status, direction, total_amount, paid_amount, category_id, date, uploaded_by, uploaded_at}`. `paid_amount` is **computed server-side** — recalculated after any transaction mutation that touches `invoice_id` (`recalcInvoicePaid` in `functions/transactions/index.js`). Treat it as read-only from UI.
+- `transactions` — `{id, date, amount (NUMERIC), direction, account_id, category_id, invoice_id?, folder_id, description, status (active|deleted), created_at}`. `invoice_id` is optional; if set, folder must match the invoice's folder.
+
+**Files (stored in GCS `sunti-site`, accessed via V4 signed URLs)**
+- `invoice_files` — `{id, invoice_id, file_url, file_name, file_size, uploaded_by, uploaded_at}`.
+- `transaction_files` — same shape, keyed by `transaction_id`.
+- `bank_statements` holds file columns inline (one file per statement).
+
+**Bank statements (separate domain — not bound to folders/invoices)**
+- `bank_statements` — `{id, company_id, account_id, name, date, file_url, file_name, file_size, uploaded_by, uploaded_at}`. Visibility controlled by `users_statements`.
+
+**Communication**
+- `messages` — chat attached to any doc: `{id, document_id, document_type (invoice|transaction), text, from_user, to_users, is_read, created_at}`. Drives the notification bell.
+
+**Invoice ↔ transaction linking (two-way)**
+- Invoice can spawn transactions (from the document's expanded view, button "Add transaction" or "Find transaction").
+- Transaction can spawn or attach to an invoice (from the payment's expanded view in finance.html: "Create document" / "Link to document" / "Unlink").
+- **Invariant: both must share the same `folder_id`.** When linking, the picker for invoices is filtered by the transaction's `folder_id` (and vice versa); when creating an invoice from a transaction, `folder_id` is inherited. `paid_amount` on the invoice is recomputed after every link/unlink/create/delete/edit.
+
+**Invariants / cascades**
+- Hard-delete of an invoice cascades: invoice_files → transactions → transaction_files → GCS blobs.
+- Soft-delete (`status='deleted'`) is the default for invoices and transactions; the table always holds the row.
+- Transaction amount is stored unsigned NUMERIC; sign of the cashflow comes from `direction`. Inserts must `CAST(@amount AS NUMERIC)` — BigQuery won't coerce FLOAT64.
+- BigQuery DML quirks: batch UPDATEs use `UPDATE ... SET x = CASE id WHEN ... END WHERE id IN UNNEST(@ids)` (one round-trip instead of a loop — avoids "concurrent update" on the same table).
+- `categories.type` groups items in combo dropdowns but has **no business logic** otherwise; direction/totals are computed from `transactions.direction`.
+
+BigQuery console: https://console.cloud.google.com/bigquery?project=project-9718e7d4-4cd7-4f52-8d6
 
 ### Storage buckets
 
