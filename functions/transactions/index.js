@@ -26,19 +26,23 @@ async function recalcInvoicePaid(invoiceId) {
   if (!invoiceId) return;
   const invTable = `\`${PROJECT}.${DATASET}.invoices\``;
   const trxTable = `\`${PROJECT}.${DATASET}.transactions\``;
+  // Читаем direction документа, потом считаем сумму:
+  // tx с тем же direction — прибавляем, с противоположным — вычитаем.
+  const [invRows] = await bigquery.query({
+    query: `SELECT direction FROM ${invTable} WHERE id = @id`,
+    params: { id: invoiceId },
+  });
+  if (!invRows.length) return;
+  const dir = invRows[0].direction || 'expense';
   await bigquery.query({
     query: `UPDATE ${invTable}
             SET paid_amount = IFNULL((
-              SELECT SUM(CASE
-                       WHEN direction = 'income'  THEN amount
-                       WHEN direction = 'expense' THEN -amount
-                       ELSE 0
-                     END)
+              SELECT SUM(CASE WHEN direction = @dir THEN amount ELSE -amount END)
               FROM ${trxTable}
               WHERE invoice_id = @id AND IFNULL(status, 'active') != 'deleted'
             ), 0)
             WHERE id = @id`,
-    params: { id: invoiceId },
+    params: { id: invoiceId, dir },
   });
 }
 

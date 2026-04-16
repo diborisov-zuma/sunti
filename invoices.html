@@ -544,8 +544,9 @@
     let filterStatus       = 'all';
     let filterCategory     = 'all';
     let filterSearch       = '';
-    let filterDateFrom     = '';
-    let filterDateTo       = '';
+    const _today_inv       = new Date().toISOString().split('T')[0];
+    let filterDateFrom     = _today_inv;
+    let filterDateTo       = _today_inv;
     let searchDebounce     = null;
     let totalCount         = 0;
     let categoriesCache    = [];
@@ -906,6 +907,23 @@
       return foldersCache.filter(f => f.docs_access === 'editor');
     }
 
+    function updateFolderFilter() {
+      const sel = document.getElementById('filter-folder');
+      if (!sel) return;
+      const list = filterCompany === 'all' ? [] : foldersCache.filter(f => f.company_id === filterCompany);
+      sel.innerHTML = `<option value="all">${t('allFolders')}</option>` + list.map(f => `<option value="${f.id}">${f.name}</option>`).join('');
+      if (![...sel.options].some(o => o.value === filterFolder)) filterFolder = 'all';
+      sel.value = filterFolder;
+    }
+
+    function updateFilterLockState() {
+      const locked = filterCompany === 'all';
+      ['filter-search','filter-date-from','filter-date-to','filter-folder','filter-status','filter-direction','filter-category-input','page-size-select','btn-create-inv']
+        .forEach(id => { const el = document.getElementById(id); if (el) el.disabled = locked; });
+      const ce = document.getElementById('filter-company');
+      if (ce) ce.classList.toggle('invalid', locked);
+    }
+
     function updateAccountFilter() {
       const sel = document.getElementById('filter-account');
       if (!sel) return;
@@ -1040,8 +1058,10 @@
 
       document.getElementById('filter-company').value = filterCompany;
       document.getElementById('filter-company').addEventListener('change', e => {
-        filterCompany = e.target.value; filterAccount = 'all';
+        filterCompany = e.target.value; filterAccount = 'all'; filterFolder = 'all';
         updateAccountFilter();
+        updateFolderFilter();
+        updateFilterLockState();
         currentPage = 1; expandedInv = {}; loadInvoices();
       });
       document.getElementById('filter-folder').value = filterFolder;
@@ -1049,6 +1069,8 @@
         filterFolder = e.target.value; currentPage = 1; expandedInv = {}; loadInvoices();
       });
       updateAccountFilter();
+      updateFolderFilter();
+      updateFilterLockState();
 
       document.getElementById('btn-create-inv').addEventListener('click', () => {
         const writable = getWritableFolders();
@@ -1075,6 +1097,10 @@
     async function loadInvoices() {
       const tbody = document.getElementById('inv-tbody');
       if (!tbody) return;
+      if (filterCompany === 'all') {
+        tbody.innerHTML = `<tr><td colspan="8" class="empty-state">${t('selectCompanyFirst')}</td></tr>`;
+        return;
+      }
       tbody.innerHTML = `<tr><td colspan="8" class="loading">${t('loading')}</td></tr>`;
 
       const offset = (currentPage - 1) * pageSize;
@@ -1122,7 +1148,11 @@
         tbody.innerHTML = '';
         data.rows.forEach(r => {
           invoicesById[r.id] = r;
-          const remaining  = parseFloat(r.total_amount||0) - parseFloat(r.paid_amount||0);
+          const sign       = r.direction === 'expense' ? -1 : 1;
+          const totalDisp  = sign * parseFloat(r.total_amount || 0);
+          const paidDisp   = sign * parseFloat(r.paid_amount  || 0);
+          const remaining  = totalDisp - paidDisp;
+          const cls        = r.direction === 'expense' ? 'expense' : 'income';
           const isExpanded = expandedInv[r.id] || false;
 
           const tr = document.createElement('tr');
@@ -1136,9 +1166,9 @@
             </td>
             <td>${r.category_name ? `<span class="cat-badge">${r.category_name}</span>` : '<span style="color:#ccc">—</span>'}</td>
             <td><span class="status-badge status-${r.status}">${statusLabel(r.status)}</span></td>
-            <td class="amount-col ${r.direction==='expense'?'expense':'income'}">${r.direction==='expense'?'-':''}${fmt(r.total_amount)}</td>
-            <td class="amount-col ${r.direction==='expense'?'expense':'income'}">${r.direction==='expense'?'-':''}${fmt(r.paid_amount)}</td>
-            <td class="amount-col ${remaining>0?'amount-remaining':''} ${r.direction==='expense'?'expense':'income'}">${r.direction==='expense'?'-':''}${fmt(remaining)}</td>
+            <td class="amount-col ${cls}">${fmt(totalDisp)}</td>
+            <td class="amount-col ${cls}">${fmt(paidDisp)}</td>
+            <td class="amount-col ${cls} ${remaining !== 0 ? 'amount-remaining' : ''}">${fmt(remaining)}</td>
             <td>
               <div style="display:flex;gap:6px;align-items:center">
                 <button class="btn btn-outline" data-action="edit-inv"

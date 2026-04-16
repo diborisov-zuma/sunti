@@ -65,7 +65,7 @@ Shared conventions (see `functions/users/index.js` as the canonical example):
 - `categories` — `{id, name, name_en, name_th, type, sort_order}`. `type` is a string FK to `category_types.id`.
 
 **Documents + payments (core domain)**
-- `invoices` — `{id, folder_id, name, status, direction, total_amount, paid_amount, category_id, date, uploaded_by, uploaded_at}`. `paid_amount` is **computed server-side** (`recalcInvoicePaid` in `functions/transactions/index.js`) after any transaction mutation that touches `invoice_id`. Formula: `paid_amount = SUM(CASE WHEN t.direction = 'income' THEN t.amount WHEN t.direction = 'expense' THEN -t.amount END)` across all active linked transactions. Treat as read-only from UI.
+- `invoices` — `{id, folder_id, name, status, direction, total_amount, paid_amount, category_id, date, uploaded_by, uploaded_at}`. `paid_amount` is **computed server-side** (`recalcInvoicePaid` in `functions/transactions/index.js`) after any transaction mutation that touches `invoice_id`. Formula is **relative to the document's own direction**: transactions with the same direction as the doc add to `paid_amount`, transactions with the opposite direction subtract. Result can be negative and is stored as-is. On render, if `doc.direction = 'expense'`, multiply both `total_amount` and `paid_amount` by -1 before displaying (so expense docs look negative in the table). Treat as read-only from UI.
 - `transactions` — `{id, date, amount (NUMERIC), direction, account_id, category_id, invoice_id?, folder_id, description, status (active|deleted), created_at}`. `invoice_id` is optional; if set, folder must match the invoice's folder.
 
 **Files (stored in GCS `sunti-site`, accessed via V4 signed URLs)**
@@ -82,6 +82,7 @@ Shared conventions (see `functions/users/index.js` as the canonical example):
 **Invoice ↔ transaction linking (two-way)**
 - Invoice can spawn transactions (from the document's expanded view, button "Add transaction" or "Find transaction").
 - From finance.html a transaction can only **link** to or **unlink** from an existing invoice — **no creation of invoices outside invoices.html**. Rule: documents are created and edited only on the documents page (`invoices.html`).
+- A transaction that is already linked to a document **cannot be re-linked** to a different document directly. The user must explicitly unlink first (in the edit modal: click the × next to the document chip, or in the expanded row: "Unlink document"). Only once the link is cleared does the "Link to document" action open the picker.
 - **Invariant: both must share the same `folder_id`.** When linking, the picker for invoices is filtered by the transaction's `folder_id` (and vice versa). `paid_amount` on the invoice is recomputed after every link/unlink/create/delete/edit.
 
 **Transaction modal contract (create and edit)**
@@ -102,6 +103,13 @@ The Folder and Document fields behave by context:
 | Edit on invoices.html | Locked (from invoice) | Chip, no unlink |
 
 On save, if there's a `invoice_id`, enforce `transaction.folder_id == invoice.folder_id` (server-side check as well — reject mismatch).
+
+**Filter defaults on invoices.html and finance.html**
+- `date_from` and `date_to` default to today.
+- **Company** is a required filter — mark its label with the red asterisk and treat it as invalid until chosen. Until a company is picked, no data is loaded and the rest of the filters stay disabled.
+- Once a company is picked:
+  - The **Account** filter's options are limited to that company's `company_accounts`.
+  - The **Project (folder)** filter's options are limited to folders with `folder.company_id = selected`.
 
 **Amount sign convention**
 - In DB and in UI input, `amount` / `total_amount` / `paid_amount` are always **positive**. Direction is carried separately via `direction` (`income` / `expense`).

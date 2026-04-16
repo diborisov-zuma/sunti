@@ -515,15 +515,18 @@
       const chip  = document.getElementById('trx-invoice-chip');
       const btnP  = document.getElementById('btn-pick-doc-modal');
       const btnX  = document.getElementById('btn-clear-doc-pick');
+      btnP.textContent = t('linkDoc');
       if (pendingInvoiceId) {
         chip.textContent = pendingInvoiceLabel || pendingInvoiceId.substring(0, 8);
         chip.style.display = 'inline-block';
-        btnP.textContent = t('linkDoc');
         btnX.style.display = 'inline-block';
+        btnP.disabled = true;
+        btnP.style.opacity = '0.4';
       } else {
         chip.style.display = 'none';
-        btnP.textContent = t('linkDoc');
         btnX.style.display = 'none';
+        btnP.disabled = false;
+        btnP.style.opacity = '';
       }
     }
 
@@ -590,6 +593,23 @@
       // Админ: все. Иначе: только с docs_access === 'editor'.
       if (typeof isAdmin !== 'undefined' && isAdmin) return foldersCache.slice();
       return foldersCache.filter(f => f.docs_access === 'editor');
+    }
+
+    function updateFolderFilter() {
+      const sel = document.getElementById('filter-folder');
+      if (!sel) return;
+      const list = filterCompany === 'all' ? [] : foldersCache.filter(f => f.company_id === filterCompany);
+      sel.innerHTML = `<option value="all">${t('allFolders')}</option>` + list.map(f => `<option value="${f.id}">${f.name}</option>`).join('');
+      if (![...sel.options].some(o => o.value === filterFolder)) filterFolder = 'all';
+      sel.value = filterFolder;
+    }
+
+    function updateFilterLockState() {
+      const locked = filterCompany === 'all';
+      ['filter-search','filter-date-from','filter-date-to','filter-folder','filter-status','filter-direction','filter-category-input','page-size-select','btn-create-trx']
+        .forEach(id => { const el = document.getElementById(id); if (el) el.disabled = locked; });
+      const ce = document.getElementById('filter-company');
+      if (ce) ce.classList.toggle('invalid', locked);
     }
 
     function updateAccountFilter() {
@@ -723,9 +743,12 @@
       document.getElementById('filter-company').addEventListener('change', e => {
         filterCompany = e.target.value;
         filterAccount = 'all';
+        filterFolder  = 'all';
         updateAccountFilter();
+        updateFolderFilter();
+        updateFilterLockState();
         currentPage = 1;
-        renderTransactions();
+        loadTransactions();
       });
       document.getElementById('filter-folder').value = filterFolder;
       document.getElementById('filter-folder').addEventListener('change', e => {
@@ -734,6 +757,8 @@
         renderTransactions();
       });
       updateAccountFilter();
+      updateFolderFilter();
+      updateFilterLockState();
 
       document.getElementById('btn-create-trx').addEventListener('click', () => {
         currentTrxMode = 'create'; currentTrxId = null; currentTrxInvoiceId = null;
@@ -755,9 +780,13 @@
     async function loadTransactions() {
       const tbody = document.getElementById('trx-tbody');
       if (!tbody) return;
+      if (filterCompany === 'all') {
+        tbody.innerHTML = `<tr><td colspan="8" class="empty-state">${t('selectCompanyFirst')}</td></tr>`;
+        return;
+      }
       tbody.innerHTML = `<tr><td colspan="8" class="loading">${t('loading')}</td></tr>`;
       try {
-        const ids = foldersCache.map(f => f.id).join(',');
+        const ids = foldersCache.filter(f => f.company_id === filterCompany).map(f => f.id).join(',');
         if (!ids) { allTransactions = []; renderTransactions(); return; }
         allTransactions = await apiFetch(`/transactions?folder_ids=${ids}&status=${filterStatus}`);
         renderTransactions();
@@ -906,7 +935,10 @@
         if (!inv) {
           return `<div style="margin-bottom:12px;padding:10px;background:#fff;border:1px solid #e8e8e8;border-radius:8px;color:#c33;font-size:0.85rem">—</div>`;
         }
-        const remaining = parseFloat(inv.total_amount||0) - parseFloat(inv.paid_amount||0);
+        const sign        = inv.direction === 'expense' ? -1 : 1;
+        const totalDisp   = sign * parseFloat(inv.total_amount || 0);
+        const paidDisp    = sign * parseFloat(inv.paid_amount  || 0);
+        const remaining   = totalDisp - paidDisp;
         let filesHtml = invFiles.map(f => {
           const size = f.file_size > 1048576 ? (f.file_size/1048576).toFixed(1)+' MB' : (f.file_size/1024).toFixed(0)+' KB';
           return `
@@ -935,9 +967,9 @@
               <div><div style="color:#888;font-size:0.72rem">${t('statusLabel')}</div><span class="status-badge status-${inv.status}">${inv.status}</span></div>
               <div><div style="color:#888;font-size:0.72rem">${t('category')}</div>${catLabelById(inv.category_id) || '—'}</div>
               <div><div style="color:#888;font-size:0.72rem">${t('date')}</div>${formatDate(inv.date)}</div>
-              <div><div style="color:#888;font-size:0.72rem">${t('totalAmount')}</div>${fmt(inv.total_amount)}</div>
-              <div><div style="color:#888;font-size:0.72rem">${t('paidAmount')}</div>${fmt(inv.paid_amount)}</div>
-              <div><div style="color:#888;font-size:0.72rem">${t('remainingAmount')}</div><span style="color:${remaining>0?'#c5221f':'#1e8e3e'}">${fmt(remaining)}</span></div>
+              <div><div style="color:#888;font-size:0.72rem">${t('totalAmount')}</div>${fmt(totalDisp)}</div>
+              <div><div style="color:#888;font-size:0.72rem">${t('paidAmount')}</div>${fmt(paidDisp)}</div>
+              <div><div style="color:#888;font-size:0.72rem">${t('remainingAmount')}</div>${fmt(remaining)}</div>
             </div>
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
               <span style="font-size:0.72rem;color:#888;text-transform:uppercase;letter-spacing:0.04em">${t('invoiceFiles')}</span>
