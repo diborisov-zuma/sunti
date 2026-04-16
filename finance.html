@@ -876,22 +876,43 @@
     async function renderInvoiceBlock(tx) {
       if (!tx) return '';
       if (tx.invoice_id) {
-        let inv = null;
+        let inv = null, invFiles = [];
         try {
-          const data = await apiFetch(`/invoices?folder_id=${tx.folder_id}&limit=500`);
+          const [data, files] = await Promise.all([
+            apiFetch(`/invoices?folder_id=${tx.folder_id}&limit=500`),
+            apiFetch(`/invoice_files?invoice_id=${tx.invoice_id}`),
+          ]);
           inv = (data.rows || []).find(r => r.id === tx.invoice_id);
+          invFiles = files || [];
         } catch(e) {}
         if (!inv) {
           return `<div style="margin-bottom:12px;padding:10px;background:#fff;border:1px solid #e8e8e8;border-radius:8px;color:#c33;font-size:0.85rem">—</div>`;
         }
         const remaining = parseFloat(inv.total_amount||0) - parseFloat(inv.paid_amount||0);
+        let filesHtml = invFiles.map(f => {
+          const size = f.file_size > 1048576 ? (f.file_size/1048576).toFixed(1)+' MB' : (f.file_size/1024).toFixed(0)+' KB';
+          return `
+            <div class="file-card" style="margin-bottom:4px">
+              <div class="file-icon">${fileIcon(f.file_name)}</div>
+              <div class="file-info">
+                <div class="fname">${f.name||f.file_name}</div>
+                <div class="fmeta">${f.file_name} · ${size} · ${formatDate(f.uploaded_at)}</div>
+              </div>
+              <div class="file-actions-row">
+                <button class="btn btn-outline" style="font-size:0.78rem;padding:3px 8px" data-action="download-inv-file" data-file-id="${f.id}">${t('download')}</button>
+                <button class="btn btn-danger" style="font-size:0.78rem;padding:3px 8px" data-action="delete-inv-file" data-file-id="${f.id}" data-trx-id="${tx.id}">${t('delete')}</button>
+              </div>
+            </div>
+          `;
+        }).join('');
+        if (!invFiles.length) filesHtml = `<div style="color:#bbb;font-size:0.83rem">${t('noFiles')}</div>`;
         return `
           <div style="margin-bottom:12px;padding:12px;background:#fff;border:1px solid #d0e0ff;border-radius:8px">
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
               <span style="font-size:0.78rem;color:#888;text-transform:uppercase;letter-spacing:0.04em">📄 ${t('navInvoices')}</span>
               <button class="btn btn-outline" style="padding:3px 10px;font-size:0.78rem;color:#c5221f;border-color:#c5221f" data-action="unlink-doc" data-trx-id="${tx.id}" data-inv-id="${inv.id}">${t('unlinkDoc')}</button>
             </div>
-            <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px;font-size:0.85rem">
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px;font-size:0.85rem;margin-bottom:12px">
               <div><div style="color:#888;font-size:0.72rem">${t('name')}</div><strong>${inv.name}</strong></div>
               <div><div style="color:#888;font-size:0.72rem">${t('statusLabel')}</div><span class="status-badge status-${inv.status}">${inv.status}</span></div>
               <div><div style="color:#888;font-size:0.72rem">${t('category')}</div>${catLabelById(inv.category_id) || '—'}</div>
@@ -900,6 +921,11 @@
               <div><div style="color:#888;font-size:0.72rem">${t('paidAmount')}</div>${fmt(inv.paid_amount)}</div>
               <div><div style="color:#888;font-size:0.72rem">${t('remainingAmount')}</div><span style="color:${remaining>0?'#c5221f':'#1e8e3e'}">${fmt(remaining)}</span></div>
             </div>
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+              <span style="font-size:0.72rem;color:#888;text-transform:uppercase;letter-spacing:0.04em">${t('invoiceFiles')}</span>
+              <button class="btn btn-outline" style="padding:3px 8px;font-size:0.78rem" data-action="add-inv-file" data-inv-id="${inv.id}" data-folder-id="${inv.folder_id}" data-trx-id="${tx.id}">${t('addFile')}</button>
+            </div>
+            ${filesHtml}
           </div>
         `;
       }
@@ -1145,6 +1171,27 @@
           .catch(e => showToast(e.message, 'error'));
       }
 
+      if (action === 'add-inv-file') {
+        currentFileTarget = { type: 'invoice', id: btn.dataset.invId, folder_id: btn.dataset.folderId, trx_id: btn.dataset.trxId };
+        document.getElementById('file-display-name').value = '';
+        document.getElementById('file-input').value = '';
+        openModal('modal-file');
+      }
+
+      if (action === 'delete-inv-file') {
+        if (!confirm(t('confirmDelete'))) return;
+        const trxId = btn.dataset.trxId;
+        apiFetch(`/invoice_files/${btn.dataset.fileId}`, { method: 'DELETE' })
+          .then(() => { showToast(t('deleted'), 'success'); loadTrxFiles(trxId); })
+          .catch(e => showToast(e.message, 'error'));
+      }
+
+      if (action === 'download-inv-file') {
+        apiFetch(`/invoice_files/${btn.dataset.fileId}/signed-download-url`)
+          .then(r => { if (r.url) window.open(r.url, '_blank'); else showToast('No URL', 'error'); })
+          .catch(e => showToast(e.message, 'error'));
+      }
+
       if (action === 'add-trx-file') {
         currentFileTarget = { type: 'transaction', id: btn.dataset.trxId };
         document.getElementById('file-display-name').value = '';
@@ -1354,9 +1401,16 @@
       showToast(t('uploading'));
       try {
         const contentType = file.type || 'application/octet-stream';
-        const { upload_url, file_url } = await apiFetch('/transaction_files/signed-upload-url', {
+        const isInvoice = currentFileTarget.type === 'invoice';
+        const endpoint = isInvoice ? '/invoice_files' : '/transaction_files';
+        const parentKey = isInvoice ? 'invoice_id' : 'transaction_id';
+        const folderId  = isInvoice
+          ? currentFileTarget.folder_id
+          : ((allTransactions.find(x => x.id === currentFileTarget.id) || {}).folder_id || '');
+
+        const { upload_url, file_url } = await apiFetch(endpoint + '/signed-upload-url', {
           method: 'POST',
-          body: JSON.stringify({ transaction_id: currentFileTarget.id, folder_id: (allTransactions.find(x => x.id === currentFileTarget.id) || {}).folder_id || '', file_name: file.name, content_type: contentType }),
+          body: JSON.stringify({ [parentKey]: currentFileTarget.id, folder_id: folderId, file_name: file.name, content_type: contentType }),
         });
 
         await new Promise((resolve, reject) => {
@@ -1368,11 +1422,12 @@
           xhr.send(file);
         });
 
-        await apiFetch('/transaction_files', {
+        await apiFetch(endpoint, {
           method: 'POST',
-          body: JSON.stringify({ transaction_id: currentFileTarget.id, name: displayName||file.name, file_name: file.name, file_url, file_size: file.size }),
+          body: JSON.stringify({ [parentKey]: currentFileTarget.id, name: displayName||file.name, file_name: file.name, file_url, file_size: file.size }),
         });
-        loadTrxFiles(currentFileTarget.id);
+        const trxId = isInvoice ? currentFileTarget.trx_id : currentFileTarget.id;
+        if (trxId) loadTrxFiles(trxId);
         showToast(t('uploaded'), 'success');
       } catch(e) { console.error(e); showToast(e.message, 'error'); }
     });

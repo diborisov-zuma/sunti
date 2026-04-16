@@ -136,7 +136,7 @@ exports.invoices = async (req, res) => {
       const id = uuidv4();
       await bigquery.query({
         query: `INSERT INTO ${table} (id, folder_id, name, status, direction, total_amount, paid_amount, category_id, date, uploaded_by, uploaded_at)
-                VALUES (@id, @folder_id, @name, @status, @direction, @total_amount, @paid_amount, NULLIF(@category_id, ''), IF(@date = '', NULL, DATE(@date)), @uploaded_by, CURRENT_TIMESTAMP())`,
+                VALUES (@id, @folder_id, @name, @status, @direction, CAST(@total_amount AS NUMERIC), CAST(@paid_amount AS NUMERIC), NULLIF(@category_id, ''), IF(@date = '', NULL, DATE(@date)), @uploaded_by, CURRENT_TIMESTAMP())`,
         params: {
           id, folder_id, name,
           status:       status     || 'active',
@@ -168,7 +168,7 @@ exports.invoices = async (req, res) => {
       await bigquery.query({ query: `DELETE FROM ${table} WHERE id = @id`, params: { id } });
       await bigquery.query({
         query: `INSERT INTO ${table} (id, folder_id, name, status, direction, total_amount, paid_amount, category_id, date, uploaded_by, uploaded_at)
-                VALUES (@id, @folder_id, @name, @status, @direction, @total_amount, @paid_amount, NULLIF(@category_id, ''), IF(@date = '', NULL, DATE(@date)), @uploaded_by, TIMESTAMP(@uploaded_at))`,
+                VALUES (@id, @folder_id, @name, @status, @direction, CAST(@total_amount AS NUMERIC), CAST(@paid_amount AS NUMERIC), NULLIF(@category_id, ''), IF(@date = '', NULL, DATE(@date)), @uploaded_by, TIMESTAMP(@uploaded_at))`,
         params: {
           id, folder_id: cur.folder_id, name,
           status:       status     || 'active',
@@ -247,7 +247,7 @@ exports.invoices = async (req, res) => {
         await bigquery.query({ query: `DELETE FROM ${table} WHERE id = @id`, params: { id } });
         await bigquery.query({
           query: `INSERT INTO ${table} (id, folder_id, name, status, direction, total_amount, paid_amount, category_id, date, uploaded_by, uploaded_at)
-                  VALUES (@id, @folder_id, @name, 'deleted', @direction, @total_amount, @paid_amount, NULLIF(@category_id,''), IF(@date = '', NULL, DATE(@date)), @uploaded_by, TIMESTAMP(@uploaded_at))`,
+                  VALUES (@id, @folder_id, @name, 'deleted', @direction, CAST(@total_amount AS NUMERIC), CAST(@paid_amount AS NUMERIC), NULLIF(@category_id,''), IF(@date = '', NULL, DATE(@date)), @uploaded_by, TIMESTAMP(@uploaded_at))`,
           params: {
             id,
             folder_id:    cur.folder_id,

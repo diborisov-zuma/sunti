@@ -115,7 +115,7 @@ exports.transactions = async (req, res) => {
       const id = uuidv4();
       await bigquery.query({
         query: `INSERT INTO ${table} (id, date, amount, direction, account_id, counterparty_id, category_id, invoice_id, folder_id, description, created_at)
-                VALUES (@id, @date, @amount, @direction, NULLIF(@account_id,''), NULLIF(@counterparty_id,''), NULLIF(@category_id,''), NULLIF(@invoice_id,''), NULLIF(@folder_id,''), @description, CURRENT_TIMESTAMP())`,
+                VALUES (@id, @date, CAST(@amount AS NUMERIC), @direction, NULLIF(@account_id,''), NULLIF(@counterparty_id,''), NULLIF(@category_id,''), NULLIF(@invoice_id,''), NULLIF(@folder_id,''), @description, CURRENT_TIMESTAMP())`,
         params: {
           id,
           date,
@@ -150,7 +150,7 @@ exports.transactions = async (req, res) => {
       await bigquery.query({ query: `DELETE FROM ${table} WHERE id = @id`, params: { id } });
       await bigquery.query({
         query: `INSERT INTO ${table} (id, date, amount, direction, account_id, counterparty_id, category_id, invoice_id, folder_id, description, created_at)
-                VALUES (@id, @date, @amount, @direction, NULLIF(@account_id,''), NULLIF(@counterparty_id,''), NULLIF(@category_id,''), NULLIF(@invoice_id,''), NULLIF(@folder_id,''), @description, TIMESTAMP(@created_at))`,
+                VALUES (@id, @date, CAST(@amount AS NUMERIC), @direction, NULLIF(@account_id,''), NULLIF(@counterparty_id,''), NULLIF(@category_id,''), NULLIF(@invoice_id,''), NULLIF(@folder_id,''), @description, TIMESTAMP(@created_at))`,
         params: {
           id,
           date,
@@ -204,7 +204,7 @@ exports.transactions = async (req, res) => {
         await bigquery.query({ query: `DELETE FROM ${table} WHERE id = @id`, params: { id } });
         await bigquery.query({
           query: `INSERT INTO ${table} (id, date, amount, direction, account_id, counterparty_id, category_id, invoice_id, folder_id, description, status, created_at)
-                  VALUES (@id, @date, @amount, @direction, NULLIF(@account_id,''), NULLIF(@counterparty_id,''), NULLIF(@category_id,''), NULLIF(@invoice_id,''), NULLIF(@folder_id,''), @description, 'deleted', TIMESTAMP(@created_at))`,
+                  VALUES (@id, @date, CAST(@amount AS NUMERIC), @direction, NULLIF(@account_id,''), NULLIF(@counterparty_id,''), NULLIF(@category_id,''), NULLIF(@invoice_id,''), NULLIF(@folder_id,''), @description, 'deleted', TIMESTAMP(@created_at))`,
           params: {
             id,
             date:            cur.date,
