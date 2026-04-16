@@ -251,6 +251,9 @@
   <div class="modal-overlay" id="modal-link-doc">
     <div class="modal" style="width:780px;max-width:95vw;max-height:90vh;overflow-y:auto">
       <h3 id="t-modal-link-doc-title"></h3>
+      <div class="field-group">
+        <input type="text" id="ld-search" placeholder="Search by name">
+      </div>
       <div class="fields-row" style="grid-template-columns:1fr 1fr 1fr 1fr;gap:10px">
         <div class="field-group"><label>${''}</label><input type="date" id="ld-date-from"></div>
         <div class="field-group"><label>${''}</label><input type="date" id="ld-date-to"></div>
@@ -1095,7 +1098,7 @@
     // ========================
     // EVENTS
     // ========================
-    document.addEventListener('click', e => {
+    document.addEventListener('click', async e => {
       const chatBtn = e.target.closest('.chat-btn');
       if (chatBtn) { openChat(chatBtn.dataset.docId, chatBtn.dataset.docType, chatBtn.dataset.docName); return; }
 
@@ -1307,10 +1310,12 @@
         const dt = document.getElementById('ld-date-to').value;
         const amin = document.getElementById('ld-amount-min').value;
         const amax = document.getElementById('ld-amount-max').value;
+        const searchVal = document.getElementById('ld-search').value.trim();
         let url = `/invoices?folder_id=${tx.folder_id}&limit=200`;
         if (tx.category_id) url += `&category_id=${tx.category_id}`;
         if (df)   url += `&date_from=${df}`;
         if (dt)   url += `&date_to=${dt}`;
+        if (searchVal) url += `&search=${encodeURIComponent(searchVal)}`;
         // amount_min/max добавим как клиент фильтрацию (у invoices backend не поддерживает)
         const data = await apiFetch(url);
         let rows = (data.rows || []);
@@ -1331,6 +1336,12 @@
     ['ld-date-from','ld-date-to','ld-amount-min','ld-amount-max'].forEach(id => {
       document.getElementById(id).addEventListener('change', runLinkDocSearch);
     });
+    (function(){
+      let td = null;
+      document.getElementById('ld-search').addEventListener('input', () => {
+        clearTimeout(td); td = setTimeout(runLinkDocSearch, 300);
+      });
+    })();
     document.getElementById('btn-ld-cancel').addEventListener('click', () => closeModal('modal-link-doc'));
 
     // ЗАГРУЗИТЬ ФАЙЛ

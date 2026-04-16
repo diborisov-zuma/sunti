@@ -348,6 +348,9 @@
     <div class="modal" style="width:780px;max-width:95vw;max-height:90vh;overflow-y:auto">
       <h3 id="t-modal-find-trx-title"></h3>
       <div id="ft-hint" style="font-size:0.8rem;color:#999;margin-bottom:8px"></div>
+      <div class="field-group">
+        <input type="text" id="ft-search" placeholder="Search by description">
+      </div>
       <div class="fields-row" style="grid-template-columns:1fr 1fr 1fr 1fr;gap:10px">
         <div class="field-group"><label></label><input type="date" id="ft-date-from"></div>
         <div class="field-group"><label></label><input type="date" id="ft-date-to"></div>
@@ -807,6 +810,8 @@
         if (dt) p.set('date_to', dt);
         if (amin) p.set('amount_min', amin);
         if (amax) p.set('amount_max', amax);
+        const s = document.getElementById('ft-search').value.trim();
+        if (s) p.set('search', s);
         p.set('only_unlinked', '1');
         const rows = await apiFetch(`/transactions?${p.toString()}`);
         if (!rows.length) { container.innerHTML = `<div class="empty-state">${t('noTransactions')}</div>`; return; }
@@ -1336,7 +1341,7 @@
     }
 
     // ДЕЛЕГИРОВАНИЕ СОБЫТИЙ
-    document.addEventListener('click', e => {
+    document.addEventListener('click', async e => {
 
       // Открыть чат
       const chatBtn = e.target.closest('.chat-btn');
@@ -1526,6 +1531,12 @@
     ['ft-date-from','ft-date-to','ft-amount-min','ft-amount-max'].forEach(id => {
       document.getElementById(id).addEventListener('change', runFindTrxSearch);
     });
+    (function(){
+      let td = null;
+      document.getElementById('ft-search').addEventListener('input', () => {
+        clearTimeout(td); td = setTimeout(runFindTrxSearch, 300);
+      });
+    })();
     document.getElementById('btn-ft-cancel').addEventListener('click', () => closeModal('modal-find-trx'));
 
     document.getElementById('btn-inv-cancel').addEventListener('click', () => closeModal('modal-inv'));
