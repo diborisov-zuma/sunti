@@ -65,7 +65,7 @@ Shared conventions (see `functions/users/index.js` as the canonical example):
 - `categories` — `{id, name, name_en, name_th, type, sort_order}`. `type` is a string FK to `category_types.id`.
 
 **Documents + payments (core domain)**
-- `invoices` — `{id, folder_id, name, status, direction, total_amount, paid_amount, category_id, date, uploaded_by, uploaded_at}`. `paid_amount` is **computed server-side** — recalculated after any transaction mutation that touches `invoice_id` (`recalcInvoicePaid` in `functions/transactions/index.js`). Treat it as read-only from UI.
+- `invoices` — `{id, folder_id, name, status, direction, total_amount, paid_amount, category_id, date, uploaded_by, uploaded_at}`. `paid_amount` is **computed server-side** (`recalcInvoicePaid` in `functions/transactions/index.js`) after any transaction mutation that touches `invoice_id`. Formula: `paid_amount = SUM(CASE WHEN t.direction = 'income' THEN t.amount WHEN t.direction = 'expense' THEN -t.amount END)` across all active linked transactions. Treat as read-only from UI.
 - `transactions` — `{id, date, amount (NUMERIC), direction, account_id, category_id, invoice_id?, folder_id, description, status (active|deleted), created_at}`. `invoice_id` is optional; if set, folder must match the invoice's folder.
 
 **Files (stored in GCS `sunti-site`, accessed via V4 signed URLs)**

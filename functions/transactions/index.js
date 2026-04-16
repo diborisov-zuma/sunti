@@ -29,7 +29,12 @@ async function recalcInvoicePaid(invoiceId) {
   await bigquery.query({
     query: `UPDATE ${invTable}
             SET paid_amount = IFNULL((
-              SELECT SUM(amount) FROM ${trxTable}
+              SELECT SUM(CASE
+                       WHEN direction = 'income'  THEN amount
+                       WHEN direction = 'expense' THEN -amount
+                       ELSE 0
+                     END)
+              FROM ${trxTable}
               WHERE invoice_id = @id AND IFNULL(status, 'active') != 'deleted'
             ), 0)
             WHERE id = @id`,
