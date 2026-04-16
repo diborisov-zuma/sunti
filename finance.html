@@ -37,6 +37,12 @@
     .combo li.group-label { font-size:0.7rem;font-weight:600;color:#bbb;text-transform:uppercase;letter-spacing:0.05em;padding:8px 10px 4px;cursor:default;background:#f8f8f8; }
     .combo li.group-label:hover { background:#f8f8f8;color:#bbb; }
 
+    @keyframes trxFadeHighlight {
+      0%   { background:#fff59d; }
+      100% { background:transparent; }
+    }
+    tr.trx-main-row.highlight-fade td { animation: trxFadeHighlight 3s ease-out; }
+
     .inv-wrap { background:#fff;border:1px solid #e8e8e8;border-radius:10px;overflow:hidden; }
     .inv-table { width:100%;border-collapse:collapse; }
     .inv-table thead { background:#f8f8f8;border-bottom:1px solid #e8e8e8; }
@@ -188,10 +194,11 @@
       </div>
       <div class="field-group" id="trx-invoice-group" style="display:none">
         <label id="t-trx-invoice-label"></label>
-        <span class="combo" style="display:block">
-          <input type="text" id="trx-invoice-input" style="width:100%;border:1px solid #ddd;border-radius:6px;padding:9px 12px;font-size:0.9rem;outline:none;box-sizing:border-box">
-          <ul id="trx-invoice-list"></ul>
-        </span>
+        <div id="trx-invoice-picker" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <span id="trx-invoice-chip" style="display:none;background:#e8f0fe;color:#1a3a6e;border-radius:16px;padding:4px 10px;font-size:0.85rem"></span>
+          <button type="button" class="btn btn-outline" id="btn-pick-doc-modal" style="padding:5px 10px;font-size:0.82rem"></button>
+          <button type="button" class="btn btn-outline" id="btn-clear-doc-pick" style="display:none;padding:5px 10px;font-size:0.82rem;color:#c5221f;border-color:#c5221f">×</button>
+        </div>
       </div>
       <div class="field-group">
         <label id="t-trx-desc-label"></label>
@@ -343,6 +350,10 @@
     let currentTrxInvoiceId = null;
     let currentCreateDocTrx = null;
     let currentLinkDocTrx   = null;
+    let currentLinkDocCtx   = null; // { folder_id, category_id, onPick }
+    let pendingInvoiceId    = null;
+    let pendingInvoiceLabel = '';
+    let highlightTrxId      = null;
     let searchDebounce     = null;
     let categoriesCache    = [];
     let usersCache         = [];
@@ -508,6 +519,7 @@
       document.getElementById('t-trx-cat-label').textContent    = t('category');
       setText('t-trx-folder-label',                                 t('navFolders'));
       setText('t-trx-invoice-label',                                t('navInvoices'));
+      const pdb = document.getElementById('btn-pick-doc-modal'); if (pdb) pdb.textContent = t('linkDoc');
       setText('t-modal-create-doc-title', t('createDoc'));
       setText('t-cd-name-label',      t('name'));
       setText('t-cd-date-label',      t('date'));
@@ -540,25 +552,35 @@
 
     let modalCategoryCombo = null;
     let modalFolderCombo   = null;
-    let modalInvoiceCombo  = null;
-    let modalInvoicesCache = [];
 
-    async function loadInvoicesForFolder(folderId) {
-      if (!folderId) return [];
-      try {
-        const data = await apiFetch(`/invoices?folder_id=${folderId}&limit=500`);
-        return data.rows || [];
-      } catch(e) { return []; }
+    function renderInvoiceChip() {
+      const chip  = document.getElementById('trx-invoice-chip');
+      const btnP  = document.getElementById('btn-pick-doc-modal');
+      const btnX  = document.getElementById('btn-clear-doc-pick');
+      if (pendingInvoiceId) {
+        chip.textContent = pendingInvoiceLabel || pendingInvoiceId.substring(0, 8);
+        chip.style.display = 'inline-block';
+        btnP.textContent = t('linkDoc');
+        btnX.style.display = 'inline-block';
+      } else {
+        chip.style.display = 'none';
+        btnP.textContent = t('linkDoc');
+        btnX.style.display = 'none';
+      }
     }
 
-    async function mountInvoiceCombo(folderId, selectedInvoiceId) {
-      modalInvoicesCache = await loadInvoicesForFolder(folderId);
-      const items = modalInvoicesCache.map(i => ({ id: i.id, label: i.name + (i.date ? ' · ' + formatDate(i.date) : '') }));
-      modalInvoiceCombo = bindCombo('trx-invoice-input', 'trx-invoice-list', items, {
-        placeholder: t('navInvoices'),
-        allowAll: true, allLabel: '— —',
-        selectedId: selectedInvoiceId || '',
-      });
+    function openLinkDocModal(ctx) {
+      currentLinkDocCtx = ctx;
+      document.getElementById('ld-date-from').value = '';
+      document.getElementById('ld-date-to').value   = '';
+      document.getElementById('ld-amount-min').value = '';
+      document.getElementById('ld-amount-max').value = '';
+      document.getElementById('ld-search').value = '';
+      const fname = (foldersCache.find(f => f.id === ctx.folder_id) || {}).name || '—';
+      const cname = ctx.category_id ? (catLabelById(ctx.category_id) || '—') : '—';
+      document.getElementById('ld-hint').textContent = `${t('navFolders')}: ${fname} · ${t('category')}: ${cname}`;
+      openModal('modal-link-doc');
+      runLinkDocSearch();
     }
 
     async function mountModalCombos(selectedCatId, selectedFolderId, showFolder, folderList, selectedInvoiceId) {
@@ -571,12 +593,24 @@
         const items = (folderList || foldersCache).map(f => ({ id: f.id, label: f.name }));
         modalFolderCombo = bindCombo('trx-folder-input', 'trx-folder-list', items, {
           placeholder: t('navFolders'), allowAll: false, selectedId: selectedFolderId || '',
-          onSelect: async (fid) => { await mountInvoiceCombo(fid, null); },
+          onSelect: () => { pendingInvoiceId = null; pendingInvoiceLabel = ''; renderInvoiceChip(); },
         });
       } else {
         modalFolderCombo = null;
       }
-      await mountInvoiceCombo(selectedFolderId, selectedInvoiceId);
+      // предустановим pending, если есть
+      if (selectedInvoiceId) {
+        pendingInvoiceId = selectedInvoiceId;
+        // подпись подтянем асинхронно
+        try {
+          const data = await apiFetch(`/invoices?folder_id=${selectedFolderId}&limit=500`);
+          const inv = (data.rows || []).find(r => r.id === selectedInvoiceId);
+          if (inv) pendingInvoiceLabel = inv.name + (inv.date ? ' · ' + formatDate(inv.date) : '');
+        } catch(e) {}
+      } else {
+        pendingInvoiceId = null; pendingInvoiceLabel = '';
+      }
+      renderInvoiceChip();
     }
 
     function getWritableFolders() {
@@ -856,6 +890,16 @@
       });
 
       loadUnreadForCurrentPage();
+
+      if (highlightTrxId) {
+        const row = tbody.querySelector(`tr.trx-main-row[data-id="${highlightTrxId}"]`);
+        if (row) {
+          row.classList.add('highlight-fade');
+          row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          setTimeout(() => row.classList.remove('highlight-fade'), 3000);
+        }
+        highlightTrxId = null;
+      }
     }
 
     async function loadTrxFiles(trxId) {
@@ -1244,34 +1288,36 @@
         const tx = allTransactions.find(x => x.id === btn.dataset.trxId);
         if (!tx) return;
         currentLinkDocTrx = tx;
-        document.getElementById('ld-date-from').value = '';
-        document.getElementById('ld-date-to').value   = '';
-        document.getElementById('ld-amount-min').value = '';
-        document.getElementById('ld-amount-max').value = '';
-        const hint = `${t('navFolders')}: ${(foldersCache.find(f=>f.id===tx.folder_id)||{}).name || '—'} · ${t('category')}: ${catLabelById(tx.category_id) || '—'}`;
-        document.getElementById('ld-hint').textContent = hint;
-        openModal('modal-link-doc');
-        runLinkDocSearch();
+        openLinkDocModal({
+          folder_id: tx.folder_id, category_id: tx.category_id,
+          onPick: async (invId) => {
+            if (!confirm(t('confirmLinkDoc'))) return;
+            try {
+              await apiFetch(`/transactions/${tx.id}`, {
+                method: 'PUT',
+                body: JSON.stringify({
+                  date: (tx.date && (tx.date.value || tx.date)) || '',
+                  amount: tx.amount, direction: tx.direction,
+                  category_id: tx.category_id, description: tx.description,
+                  invoice_id: invId,
+                }),
+              });
+              showToast(t('saved'), 'success');
+              highlightTrxId = tx.id;
+              await loadTransactions();
+              if (expandedTrx[tx.id]) loadTrxFiles(tx.id);
+            } catch (err) { showToast(err.message, 'error'); }
+          },
+        });
       }
 
       if (action === 'pick-doc') {
-        if (!confirm(t('confirmLinkDoc'))) return;
-        const tx = currentLinkDocTrx;
-        try {
-          await apiFetch(`/transactions/${tx.id}`, {
-            method: 'PUT',
-            body: JSON.stringify({
-              date: (tx.date && (tx.date.value || tx.date)) || '',
-              amount: tx.amount, direction: tx.direction,
-              category_id: tx.category_id, description: tx.description,
-              invoice_id: btn.dataset.docId,
-            }),
-          });
-          closeModal('modal-link-doc');
-          showToast(t('saved'), 'success');
-          await loadTransactions();
-          if (expandedTrx[tx.id]) loadTrxFiles(tx.id);
-        } catch (err) { showToast(err.message, 'error'); }
+        const ctx = currentLinkDocCtx;
+        if (!ctx) return;
+        const invId = btn.dataset.docId;
+        const label = btn.dataset.docLabel || '';
+        closeModal('modal-link-doc');
+        if (ctx.onPick) await ctx.onPick(invId, label);
       }
 
       if (action === 'download-file') {
@@ -1290,21 +1336,23 @@
       const description = document.getElementById('trx-desc').value;
       const category_id = (modalCategoryCombo && modalCategoryCombo.getSelected()) || null;
       const folder_id   = (modalFolderCombo && modalFolderCombo.getSelected()) || '';
-      const invoice_id  = (modalInvoiceCombo && modalInvoiceCombo.getSelected()) || null;
+      const invoice_id  = pendingInvoiceId || null;
       if (!date || !amount) { showToast(t('fillAllFields'), 'error'); return; }
       closeModal('modal-trx');
       try {
         if (currentTrxMode === 'create') {
-          await apiFetch('/transactions', {
+          const r = await apiFetch('/transactions', {
             method: 'POST',
             body: JSON.stringify({ date, amount, direction, category_id, description, folder_id, invoice_id }),
           });
+          highlightTrxId = r.id;
           showToast(t('saved'), 'success');
         } else {
           await apiFetch(`/transactions/${currentTrxId}`, {
             method: 'PUT',
             body: JSON.stringify({ date, amount, direction, category_id, description, folder_id, invoice_id }),
           });
+          highlightTrxId = currentTrxId;
           showToast(t('saved'), 'success');
         }
         loadTransactions();
@@ -1312,6 +1360,19 @@
     });
 
     // СОЗДАТЬ ДОКУМЕНТ
+    document.getElementById('btn-pick-doc-modal').addEventListener('click', () => {
+      const folder_id = (modalFolderCombo && modalFolderCombo.getSelected()) || '';
+      const category_id = (modalCategoryCombo && modalCategoryCombo.getSelected()) || '';
+      if (!folder_id) { showToast(t('fillAllFields'), 'error'); return; }
+      openLinkDocModal({
+        folder_id, category_id,
+        onPick: (invoiceId, label) => { pendingInvoiceId = invoiceId; pendingInvoiceLabel = label; renderInvoiceChip(); },
+      });
+    });
+    document.getElementById('btn-clear-doc-pick').addEventListener('click', () => {
+      pendingInvoiceId = null; pendingInvoiceLabel = ''; renderInvoiceChip();
+    });
+
     document.getElementById('btn-cd-cancel').addEventListener('click', () => closeModal('modal-create-doc'));
     document.getElementById('btn-cd-save').addEventListener('click', async () => {
       const tx = currentCreateDocTrx; if (!tx) return;
@@ -1349,7 +1410,7 @@
 
     // ПРИВЯЗАТЬ ДОКУМЕНТ — поиск
     async function runLinkDocSearch() {
-      const tx = currentLinkDocTrx; if (!tx) return;
+      const ctx = currentLinkDocCtx; if (!ctx) return;
       const container = document.getElementById('ld-results');
       container.innerHTML = `<div class="loading" style="padding:20px">${t('loading')}</div>`;
       try {
@@ -1358,26 +1419,28 @@
         const amin = document.getElementById('ld-amount-min').value;
         const amax = document.getElementById('ld-amount-max').value;
         const searchVal = document.getElementById('ld-search').value.trim();
-        let url = `/invoices?folder_id=${tx.folder_id}&limit=200`;
-        if (tx.category_id) url += `&category_id=${tx.category_id}`;
+        let url = `/invoices?folder_id=${ctx.folder_id}&limit=200`;
+        if (ctx.category_id) url += `&category_id=${ctx.category_id}`;
         if (df)   url += `&date_from=${df}`;
         if (dt)   url += `&date_to=${dt}`;
         if (searchVal) url += `&search=${encodeURIComponent(searchVal)}`;
-        // amount_min/max добавим как клиент фильтрацию (у invoices backend не поддерживает)
         const data = await apiFetch(url);
         let rows = (data.rows || []);
         if (amin) rows = rows.filter(r => parseFloat(r.total_amount||0) >= parseFloat(amin));
         if (amax) rows = rows.filter(r => parseFloat(r.total_amount||0) <= parseFloat(amax));
         if (!rows.length) { container.innerHTML = `<div class="empty-state">${t('noInvoices')}</div>`; return; }
-        container.innerHTML = rows.map(r => `
-          <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid #f0f0f0">
-            <div style="flex:1">
-              <div style="font-weight:500">${r.name}</div>
-              <div style="font-size:0.78rem;color:#999;margin-top:2px">${formatDate(r.date)} · ${catLabelById(r.category_id)||''} · ${t('totalAmount')}: ${fmt(r.total_amount)} · ${t('paidAmount')}: ${fmt(r.paid_amount)}</div>
+        container.innerHTML = rows.map(r => {
+          const label = (r.name + (r.date ? ' · ' + formatDate(r.date) : '')).replace(/"/g, '&quot;');
+          return `
+            <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid #f0f0f0">
+              <div style="flex:1">
+                <div style="font-weight:500">${r.name}</div>
+                <div style="font-size:0.78rem;color:#999;margin-top:2px">${formatDate(r.date)} · ${catLabelById(r.category_id)||''} · ${t('totalAmount')}: ${fmt(r.total_amount)} · ${t('paidAmount')}: ${fmt(r.paid_amount)}</div>
+              </div>
+              <button class="btn btn-primary" style="padding:4px 10px;font-size:0.82rem" data-action="pick-doc" data-doc-id="${r.id}" data-doc-label="${label}">${t('linkDoc')}</button>
             </div>
-            <button class="btn btn-primary" style="padding:4px 10px;font-size:0.82rem" data-action="pick-doc" data-doc-id="${r.id}">${t('linkDoc')}</button>
-          </div>
-        `).join('');
+          `;
+        }).join('');
       } catch (e) { container.innerHTML = `<div class="empty-state" style="color:#c33">${e.message}</div>`; }
     }
     ['ld-date-from','ld-date-to','ld-amount-min','ld-amount-max'].forEach(id => {
