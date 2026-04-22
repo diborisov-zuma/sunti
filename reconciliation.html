@@ -355,14 +355,14 @@
       document.getElementById('val-opening').textContent = formatMoney(statement.opening_balance);
       document.getElementById('val-closing').textContent = formatMoney(statement.closing_balance);
 
-      const total   = lines.filter(l => l.status === 'active').length;
-      const matched = lines.filter(l => l.status === 'active' && (l.match_status === 'matched' || l.match_status === 'manual_created')).length;
+      const total   = lines.filter(l => (l.status || 'active') === 'active').length;
+      const matched = lines.filter(l => (l.status || 'active') === 'active' && (l.match_status === 'matched' || l.match_status === 'manual_created')).length;
       document.getElementById('val-lines-progress').textContent = `${matched} / ${total}`;
     }
 
     function renderLines() {
       const container = document.getElementById('lines-list');
-      let filtered = lines.filter(l => l.status === 'active');
+      let filtered = lines.filter(l => (l.status || 'active') === 'active');
       if (filterStatus) filtered = filtered.filter(l => l.match_status === filterStatus);
 
       if (!filtered.length) {
