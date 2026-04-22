@@ -99,7 +99,7 @@
       </div>
       <div class="fields-row">
         <div class="field-group">
-          <label id="t-st-account-label"></label>
+          <label class="required" id="t-st-account-label"></label>
           <select id="st-account"></select>
         </div>
         <div class="field-group">
@@ -328,8 +328,17 @@
         const periodStr = (s.period_from && s.period_to)
           ? `${formatDate(s.period_from)} — ${formatDate(s.period_to)}`
           : '—';
-        const linesCount = s.lines_count != null ? s.lines_count : '—';
         const status = s.import_status || 'parsed';
+        const matched = parseInt(s.matched_count) || 0;
+        const unmatched = parseInt(s.unmatched_count) || 0;
+        const total = matched + unmatched;
+        let linesBadges = '—';
+        if (s.lines_count > 0 || total > 0) {
+          linesBadges = '';
+          if (matched > 0) linesBadges += `<span style="display:inline-block;background:#1e8e3e;color:#fff;padding:1px 7px;border-radius:10px;font-size:0.72rem;font-weight:600;margin-right:4px">${matched}</span>`;
+          if (unmatched > 0) linesBadges += `<span style="display:inline-block;background:#c5221f;color:#fff;padding:1px 7px;border-radius:10px;font-size:0.72rem;font-weight:600">${unmatched}</span>`;
+          if (!linesBadges) linesBadges = `<span style="color:#888">${s.lines_count || 0}</span>`;
+        }
 
         return `
         <tr data-id="${s.id}">
@@ -337,7 +346,7 @@
           <td>${s.name}</td>
           <td style="font-size:0.82rem;color:#666">${getAccountName(s.account_id)}</td>
           <td style="font-size:0.82rem">${periodStr}</td>
-          <td style="text-align:center">${linesCount}</td>
+          <td style="text-align:center">${linesBadges}</td>
           <td>${importStatusBadge(status)}</td>
           <td>
             <div style="display:flex;gap:6px;align-items:center;justify-content:flex-end">
@@ -432,7 +441,18 @@
       const account_id = document.getElementById('st-account').value || '';
       const bank_format = document.getElementById('st-format').value || '';
       const file = document.getElementById('st-file').files[0];
-      if (!name) { showToast(t('fillAllFields'), 'error'); return; }
+
+      // Validation
+      ['st-name','st-account'].forEach(id => document.getElementById(id).classList.remove('invalid'));
+      const missing = [];
+      if (!name) missing.push('st-name');
+      if (!account_id) missing.push('st-account');
+      if (missing.length) {
+        missing.forEach(id => document.getElementById(id).classList.add('invalid'));
+        showToast(t('fillAllFields'), 'error');
+        return;
+      }
+
       closeModal('modal-st');
       showToast(t('uploading'));
 

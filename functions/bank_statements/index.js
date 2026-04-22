@@ -303,21 +303,32 @@ exports.bank_statements = async (req, res) => {
         const acc = await getCompanyAccess(email, company_id);
         if (acc === 'none') { res.status(403).json({ error: 'Forbidden' }); return; }
       }
-      let where = 'WHERE company_id = @company_id AND IFNULL(status, \'active\') != \'deleted\'';
+      let where = 'WHERE s.company_id = @company_id AND IFNULL(s.status, \'active\') != \'deleted\'';
       const params = { company_id };
-      if (search)    { where += ' AND LOWER(name) LIKE LOWER(@search)'; params.search = `%${search.trim()}%`; }
-      if (date_from) { where += ' AND date >= @date_from'; params.date_from = date_from; }
-      if (date_to)   { where += ' AND date <= @date_to';   params.date_to   = date_to; }
-      if (req.query.account_id) { where += ' AND account_id = @account_id'; params.account_id = req.query.account_id; }
+      if (search)    { where += ' AND LOWER(s.name) LIKE LOWER(@search)'; params.search = `%${search.trim()}%`; }
+      if (date_from) { where += ' AND s.date >= @date_from'; params.date_from = date_from; }
+      if (date_to)   { where += ' AND s.date <= @date_to';   params.date_to   = date_to; }
+      if (req.query.account_id) { where += ' AND s.account_id = @account_id'; params.account_id = req.query.account_id; }
 
       const [rows] = await bigquery.query({
-        query: `SELECT id, company_id, account_id, name, date,
-                       file_name, file_url, file_size,
-                       period_from, period_to, opening_balance, closing_balance,
-                       bank_format, lines_count, import_status, import_error,
-                       uploaded_at, uploaded_by
-                FROM ${table} ${where}
-                ORDER BY date DESC NULLS LAST, uploaded_at DESC`,
+        query: `SELECT s.id, s.company_id, s.account_id, s.name, s.date,
+                       s.file_name, s.file_url, s.file_size,
+                       s.period_from, s.period_to, s.opening_balance, s.closing_balance,
+                       s.bank_format, s.lines_count, s.import_status, s.import_error,
+                       s.uploaded_at, s.uploaded_by,
+                       IFNULL(lc.matched_count, 0) AS matched_count,
+                       IFNULL(lc.unmatched_count, 0) AS unmatched_count
+                FROM ${table} s
+                LEFT JOIN (
+                  SELECT statement_id,
+                         COUNTIF(match_status IN ('matched','manual_created')) AS matched_count,
+                         COUNTIF(match_status = 'unmatched') AS unmatched_count
+                  FROM ${linesTable}
+                  WHERE status = 'active'
+                  GROUP BY statement_id
+                ) lc ON lc.statement_id = s.id
+                ${where}
+                ORDER BY s.date DESC NULLS LAST, s.uploaded_at DESC`,
         params,
       });
       res.json(rows);
@@ -447,7 +458,17 @@ exports.bank_statements = async (req, res) => {
         params: { id },
       });
 
-      // Soft delete all lines (не трогаем связанные transactions)
+      // Очищаем statement_line_id в связанных транзакциях
+      const trxTable = `\`${PROJECT}.${DATASET}.transactions\``;
+      await bigquery.query({
+        query: `UPDATE ${trxTable} SET statement_line_id = NULL
+                WHERE statement_line_id IN (
+                  SELECT id FROM ${linesTable} WHERE statement_id = @id
+                )`,
+        params: { id },
+      });
+
+      // Soft delete all lines
       await bigquery.query({
         query: `UPDATE ${linesTable} SET status = 'deleted' WHERE statement_id = @id`,
         params: { id },
