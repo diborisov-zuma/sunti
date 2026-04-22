@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sunti — Сверка выписки</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="stylesheet" href="style.css">
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <script src="_i18n.js"></script>
+  <script src="_config.js"></script>
+  <script src="_auth.js"></script>
+  <script src="_header.js"></script>
+  <style>
+    .recon-header { display:flex;align-items:center;gap:12px;padding:16px 24px;background:#fff;border-bottom:1px solid #e8e8e8;flex-wrap:wrap; }
+    .recon-header h2 { font-size:1.05rem;color:#222;flex:1; }
+    .recon-header .info { font-size:0.82rem;color:#666; }
+
+    .summary-bar { display:flex;gap:16px;padding:12px 24px;background:#fafafa;border-bottom:1px solid #e8e8e8;flex-wrap:wrap;align-items:center; }
+    .summary-card { background:#fff;border:1px solid #e8e8e8;border-radius:8px;padding:8px 14px; }
+    .summary-card .label { font-size:0.7rem;color:#888;text-transform:uppercase;letter-spacing:0.03em; }
+    .summary-card .value { font-size:0.95rem;font-weight:600;color:#222; }
+
+    .filter-bar { display:flex;gap:8px;padding:0 24px 0 0;align-items:center;flex-wrap:wrap; }
+    .filter-bar select, .filter-bar input { border:1px solid #ddd;border-radius:6px;padding:5px 10px;font-size:0.82rem;outline:none;background:#fff; }
+
+    .recon-body { display:flex;height:calc(100vh - 56px - 56px - 52px);overflow:hidden; }
+    .recon-col { flex:1;overflow-y:auto;padding:16px; }
+    .recon-col + .recon-col { border-left:1px solid #e8e8e8; }
+    .recon-col-title { font-size:0.82rem;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:12px; }
+
+    .line-card { background:#fff;border:1px solid #e8e8e8;border-radius:8px;padding:12px 14px;margin-bottom:8px;cursor:pointer;transition:all 0.15s; }
+    .line-card:hover { border-color:#1a73e8;box-shadow:0 2px 8px rgba(26,115,232,0.1); }
+    .line-card.selected { border-color:#1a73e8;background:#f0f4ff; }
+    .line-card.matched { border-color:#1e8e3e;background:#f0faf0;opacity:0.7; }
+    .line-card.ignored { border-color:#ccc;background:#f8f8f8;opacity:0.6; }
+
+    .line-top { display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:4px; }
+    .line-date { font-size:0.78rem;color:#888; }
+    .line-amount { font-size:0.95rem;font-weight:600; }
+    .line-amount.income { color:#1e8e3e; }
+    .line-amount.expense { color:#c5221f; }
+    .line-desc { font-size:0.85rem;color:#333;margin-bottom:6px;word-break:break-word; }
+    .line-meta { font-size:0.72rem;color:#999; }
+    .line-actions { display:flex;gap:6px;margin-top:8px; }
+    .line-actions .btn { font-size:0.75rem;padding:3px 10px; }
+
+    .badge { display:inline-block;padding:2px 8px;border-radius:10px;font-size:0.72rem;font-weight:600; }
+    .badge-green { background:#e6f4ea;color:#1e8e3e; }
+    .badge-yellow { background:#fef7e0;color:#e37400; }
+    .badge-red { background:#fce8e6;color:#c5221f; }
+    .badge-gray { background:#f0f0f0;color:#888; }
+
+    .trx-card { background:#fff;border:1px solid #e8e8e8;border-radius:8px;padding:10px 14px;margin-bottom:6px;transition:all 0.15s; }
+    .trx-card:hover { border-color:#1a73e8;background:#fafcff; }
+    .trx-card.used { opacity:0.5;pointer-events:none; }
+
+    .empty-col { text-align:center;padding:48px 16px;color:#bbb;font-size:0.88rem; }
+
+    /* Модалка создания транзакции */
+    .field-group { margin-bottom:12px; }
+    .field-group label { display:block;font-size:0.82rem;color:#666;margin-bottom:4px; }
+    .field-group input, .field-group select { width:100%;border:1px solid #ddd;border-radius:6px;padding:8px 12px;font-size:0.9rem;outline:none;box-sizing:border-box;background:#fff; }
+    .field-group input:focus, .field-group select:focus { border-color:#1a73e8; }
+    .fields-row { display:grid;grid-template-columns:1fr 1fr;gap:12px; }
+
+    .progress-ring { display:inline-block;width:40px;height:40px;position:relative; }
+    .progress-ring svg { transform:rotate(-90deg); }
+    .progress-ring .bg { fill:none;stroke:#e8e8e8;stroke-width:4; }
+    .progress-ring .fg { fill:none;stroke:#1e8e3e;stroke-width:4;stroke-linecap:round;transition:stroke-dashoffset 0.3s; }
+  </style>
+</head>
+<body>
+  <header id="header"></header>
+
+  <div id="guest-view" style="text-align:center;padding:100px 24px">
+    <h2 id="t-guest-title"></h2>
+    <p id="t-guest-sub"></p>
+  </div>
+
+  <div id="app-view" style="display:none">
+    <div class="recon-header">
+      <a href="statements.html" class="btn btn-outline" style="font-size:0.78rem" id="btn-back">&larr;</a>
+      <h2 id="recon-title"></h2>
+      <div class="info" id="recon-period"></div>
+      <div class="info" id="recon-account"></div>
+    </div>
+
+    <div class="summary-bar">
+      <div class="summary-card">
+        <div class="label" id="t-opening-label"></div>
+        <div class="value" id="val-opening">—</div>
+      </div>
+      <div class="summary-card">
+        <div class="label" id="t-closing-label"></div>
+        <div class="value" id="val-closing">—</div>
+      </div>
+      <div class="summary-card">
+        <div class="label" id="t-lines-label"></div>
+        <div class="value" id="val-lines-progress">—</div>
+      </div>
+
+      <div style="flex:1"></div>
+
+      <div class="filter-bar">
+        <select id="filter-match-status">
+          <option value="">(all)</option>
+          <option value="unmatched">Unmatched</option>
+          <option value="matched">Matched</option>
+          <option value="ignored">Ignored</option>
+          <option value="manual_created">Created</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="recon-body">
+      <div class="recon-col" id="col-lines">
+        <div class="recon-col-title" id="t-col-lines"></div>
+        <div id="lines-list"></div>
+      </div>
+      <div class="recon-col" id="col-trx">
+        <div class="recon-col-title" id="t-col-trx"></div>
+        <div id="trx-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Модалка: создать транзакцию из строки -->
+  <div class="modal-overlay" id="modal-create-trx">
+    <div class="modal" style="width:480px;max-width:95vw">
+      <h3 id="t-create-trx-title"></h3>
+      <div class="fields-row">
+        <div class="field-group">
+          <label class="required">${'date'}</label>
+          <input type="date" id="ct-date">
+        </div>
+        <div class="field-group">
+          <label>${'direction'}</label>
+          <select id="ct-direction">
+            <option value="expense"></option>
+            <option value="income"></option>
+          </select>
+        </div>
+      </div>
+      <div class="fields-row">
+        <div class="field-group">
+          <label>${'amount'}</label>
+          <input type="number" id="ct-amount" min="0" step="0.01">
+        </div>
+        <div class="field-group">
+          <label class="required">${'category'}</label>
+          <select id="ct-category"></select>
+        </div>
+      </div>
+      <div class="fields-row">
+        <div class="field-group">
+          <label class="required">${'folder'}</label>
+          <select id="ct-folder"></select>
+        </div>
+        <div class="field-group">
+          <label>${'account'}</label>
+          <input type="text" id="ct-account-display" readonly style="background:#f4f4f4;color:#666">
+        </div>
+      </div>
+      <div class="field-group">
+        <label>${'description'}</label>
+        <input type="text" id="ct-desc">
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-outline" id="btn-ct-cancel"></button>
+        <button class="btn btn-primary" id="btn-ct-save"></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Модалка: выбрать транзакцию для сверки -->
+  <div class="modal-overlay" id="modal-match">
+    <div class="modal" style="width:560px;max-width:95vw;max-height:80vh;display:flex;flex-direction:column">
+      <h3 id="t-match-title"></h3>
+      <input type="text" id="match-search" placeholder="..." style="margin-bottom:12px">
+      <div id="match-trx-list" style="flex:1;overflow-y:auto;max-height:400px"></div>
+      <div class="modal-actions" style="margin-top:12px">
+        <button class="btn btn-outline" id="btn-match-cancel"></button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    const statementId = new URLSearchParams(location.search).get('statement_id');
+
+    let statement     = null;
+    let lines         = [];
+    let trxList       = [];
+    let categoriesCache = [];
+    let typesCache      = [];
+    let foldersCache    = [];
+    let accountsCache   = [];
+    let selectedLineId  = null;
+    let filterStatus    = '';
+
+    function formatDate(val) {
+      if (!val) return '—';
+      const d = new Date(val.value || val);
+      if (isNaN(d)) return '—';
+      return `${String(d.getUTCDate()).padStart(2,'0')}.${String(d.getUTCMonth()+1).padStart(2,'0')}.${d.getUTCFullYear()}`;
+    }
+
+    function formatMoney(val) {
+      if (val == null) return '—';
+      const n = typeof val === 'object' ? parseFloat(val.value || val) : parseFloat(val);
+      if (isNaN(n)) return '—';
+      return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function showToast(msg, type) {
+      const el = document.getElementById('toast');
+      el.textContent = msg;
+      el.className = 'toast show' + (type ? ' ' + type : '');
+      clearTimeout(el._t);
+      el._t = setTimeout(() => el.className = 'toast', 3000);
+    }
+
+    function openModal(id)  { document.getElementById(id).classList.add('open'); }
+    function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+    function setText(id, val) { const el = document.getElementById(id); if (el) el.textContent = val; }
+
+    function matchStatusBadge(s) {
+      if (s === 'matched')        return `<span class="badge badge-green">${t('matched')}</span>`;
+      if (s === 'manual_created') return `<span class="badge badge-green">${t('manualCreated')}</span>`;
+      if (s === 'ignored')        return `<span class="badge badge-gray">${t('ignored')}</span>`;
+      return `<span class="badge badge-yellow">${t('unmatched')}</span>`;
+    }
+
+    function updateTexts() {
+      setText('t-guest-title', t('guestTitle'));
+      setText('t-guest-sub',   t('guestSub'));
+      setText('t-opening-label', t('openingBalance'));
+      setText('t-closing-label', t('closingBalance'));
+      setText('t-lines-label', t('linesCount'));
+      setText('t-col-lines', t('statementLines'));
+      setText('t-col-trx',   t('bankTransactions'));
+      setText('t-create-trx-title', t('createTrxFromLine'));
+      setText('t-match-title', t('selectTransaction'));
+      setText('btn-ct-cancel', t('cancel'));
+      setText('btn-ct-save',   t('save'));
+      setText('btn-match-cancel', t('cancel'));
+      setText('btn-back', `← ${t('backToStatements')}`);
+
+      // Filter dropdown
+      const fsel = document.getElementById('filter-match-status');
+      if (fsel) {
+        fsel.options[0].text = t('allMatchStatuses');
+        fsel.options[1].text = t('unmatched');
+        fsel.options[2].text = t('matched');
+        fsel.options[3].text = t('ignored');
+        fsel.options[4].text = t('manualCreated');
+      }
+
+      // Create-trx modal static labels
+      const labels = document.querySelectorAll('#modal-create-trx label');
+      const labelKeys = ['date','direction','amount','category','folder','account','description'];
+      labels.forEach((lbl, i) => {
+        if (labelKeys[i]) lbl.textContent = t(labelKeys[i]) || t(labelKeys[i] + 'Label') || labelKeys[i];
+      });
+
+      const dirSel = document.getElementById('ct-direction');
+      if (dirSel) {
+        dirSel.options[0].text = t('expense');
+        dirSel.options[1].text = t('income');
+      }
+
+      updateHeaderTexts();
+    }
+
+    // ─── Load data ───
+
+    async function loadStatement() {
+      if (!statementId) { location.href = 'statements.html'; return; }
+      try {
+        // Загружаем выписку через GET list и находим нужную
+        // (нет отдельного GET /:id, используем lines для company_id)
+        const lineData = await apiFetch(`/bank_statement_lines?statement_id=${statementId}`);
+        lines = lineData;
+
+        if (lines.length > 0) {
+          const companyId = lines[0].company_id;
+          const stList = await apiFetch(`/bank_statements?company_id=${companyId}`);
+          statement = stList.find(s => s.id === statementId);
+        }
+
+        if (!statement) {
+          showToast('Statement not found', 'error');
+          return;
+        }
+
+        // Параллельно загружаем справочники
+        const [cats, types, folders, accounts] = await Promise.all([
+          apiFetch('/categories'),
+          apiFetch('/category_types'),
+          apiFetch(`/folders?company_id=${statement.company_id}`).catch(() => apiFetch('/folders')),
+          apiFetch(`/company_accounts?company_id=${statement.company_id}`),
+        ]);
+        categoriesCache = cats;
+        typesCache = types;
+        foldersCache = folders;
+        accountsCache = accounts;
+
+        renderHeader_();
+        renderSummary();
+        renderLines();
+        loadTransactions();
+      } catch(e) {
+        console.error(e);
+        showToast(e.message, 'error');
+      }
+    }
+
+    async function loadTransactions() {
+      if (!statement) return;
+      try {
+        // Загружаем транзакции по account_id за период выписки
+        let url = `/transactions?folder_ids=`;
+        // Нужен folder_id или folder_ids, но для сверки мы хотим все по account
+        // Транзакции требуют folder_id — загрузим по всем папкам компании
+        const folderIds = foldersCache.map(f => f.id).join(',');
+        if (!folderIds) { trxList = []; renderTrx(); return; }
+        url = `/transactions?folder_ids=${folderIds}`;
+        if (statement.account_id) url += `&account_id=${statement.account_id}`;
+        if (statement.period_from) url += `&date_from=${statement.period_from.value || statement.period_from}`;
+        if (statement.period_to)   url += `&date_to=${statement.period_to.value || statement.period_to}`;
+        trxList = await apiFetch(url);
+        renderTrx();
+      } catch(e) {
+        console.error('Load transactions error:', e);
+        trxList = [];
+        renderTrx();
+      }
+    }
+
+    // ─── Render ───
+
+    function renderHeader_() {
+      if (!statement) return;
+      setText('recon-title', statement.name);
+      const pf = formatDate(statement.period_from);
+      const pt = formatDate(statement.period_to);
+      setText('recon-period', `${t('period')}: ${pf} — ${pt}`);
+      const acc = accountsCache.find(a => a.id === statement.account_id);
+      setText('recon-account', acc ? `${t('account')}: ${acc.name}${acc.bank_name ? ' · ' + acc.bank_name : ''}` : '');
+    }
+
+    function renderSummary() {
+      if (!statement) return;
+      document.getElementById('val-opening').textContent = formatMoney(statement.opening_balance);
+      document.getElementById('val-closing').textContent = formatMoney(statement.closing_balance);
+
+      const total   = lines.filter(l => l.status === 'active').length;
+      const matched = lines.filter(l => l.status === 'active' && (l.match_status === 'matched' || l.match_status === 'manual_created')).length;
+      document.getElementById('val-lines-progress').textContent = `${matched} / ${total}`;
+    }
+
+    function renderLines() {
+      const container = document.getElementById('lines-list');
+      let filtered = lines.filter(l => l.status === 'active');
+      if (filterStatus) filtered = filtered.filter(l => l.match_status === filterStatus);
+
+      if (!filtered.length) {
+        container.innerHTML = `<div class="empty-col">${filterStatus === 'unmatched' ? t('noUnmatchedLines') : '—'}</div>`;
+        return;
+      }
+
+      container.innerHTML = filtered.map(l => {
+        const cls = l.match_status === 'matched' || l.match_status === 'manual_created' ? 'matched' :
+                    l.match_status === 'ignored' ? 'ignored' : '';
+        const amtCls = l.direction === 'income' ? 'income' : 'expense';
+        const sign = l.direction === 'expense' ? '-' : '+';
+        const amt = typeof l.amount === 'object' ? parseFloat(l.amount.value || l.amount) : parseFloat(l.amount);
+
+        let actions = '';
+        if (l.match_status === 'unmatched') {
+          actions = `
+            <button class="btn btn-primary" data-line-action="match" data-id="${l.id}">${t('matchLine')}</button>
+            <button class="btn btn-outline" data-line-action="create-trx" data-id="${l.id}">${t('createTrxFromLine')}</button>
+            <button class="btn btn-outline" data-line-action="ignore" data-id="${l.id}">${t('ignoreLine')}</button>
+          `;
+        } else if (l.match_status === 'matched' || l.match_status === 'manual_created') {
+          actions = `
+            <button class="btn btn-outline" data-line-action="unmatch" data-id="${l.id}">${t('unmatchLine')}</button>
+          `;
+        } else if (l.match_status === 'ignored') {
+          actions = `
+            <button class="btn btn-outline" data-line-action="unignore" data-id="${l.id}">${t('unignoreLine')}</button>
+          `;
+        }
+
+        return `
+        <div class="line-card ${cls}" data-id="${l.id}">
+          <div class="line-top">
+            <span class="line-date">${formatDate(l.date)} ${matchStatusBadge(l.match_status)}</span>
+            <span class="line-amount ${amtCls}">${sign}${formatMoney(amt)}</span>
+          </div>
+          <div class="line-desc">${l.description || '—'}</div>
+          <div class="line-meta">
+            ${l.reference ? `Ref: ${l.reference}` : ''}
+            ${l.running_balance != null ? ` | Bal: ${formatMoney(l.running_balance)}` : ''}
+            ${l.transaction_id ? ` | → Trx: ${(l.transaction_description || l.transaction_id || '').substring(0,30)}` : ''}
+          </div>
+          <div class="line-actions">${actions}</div>
+        </div>`;
+      }).join('');
+    }
+
+    function renderTrx() {
+      const container = document.getElementById('trx-list');
+      // Показываем транзакции, которые ещё не привязаны к строке выписки
+      const matchedTrxIds = new Set(lines.filter(l => l.transaction_id).map(l => l.transaction_id));
+      const available = trxList.filter(t2 => !matchedTrxIds.has(t2.id));
+
+      if (!available.length) {
+        container.innerHTML = `<div class="empty-col">${t('noTransactions')}</div>`;
+        return;
+      }
+
+      container.innerHTML = available.map(tx => {
+        const amtCls = tx.direction === 'income' ? 'income' : 'expense';
+        const sign = tx.direction === 'expense' ? '-' : '+';
+        const amt = typeof tx.amount === 'object' ? parseFloat(tx.amount.value || tx.amount) : parseFloat(tx.amount);
+        return `
+        <div class="trx-card" data-id="${tx.id}">
+          <div class="line-top">
+            <span class="line-date">${formatDate(tx.date)}</span>
+            <span class="line-amount ${amtCls}">${sign}${formatMoney(amt)}</span>
+          </div>
+          <div class="line-desc">${tx.description || '—'}</div>
+          <div class="line-meta">${tx.category_name || ''} ${tx.account_name ? '| ' + tx.account_name : ''}</div>
+        </div>`;
+      }).join('');
+    }
+
+    // ─── Actions ───
+
+    document.addEventListener('click', async e => {
+      const btn = e.target.closest('[data-line-action]');
+      if (!btn) return;
+      const action = btn.dataset.lineAction;
+      const lineId = btn.dataset.id;
+
+      if (action === 'match') {
+        openMatchModal(lineId);
+      }
+
+      if (action === 'create-trx') {
+        openCreateTrxModal(lineId);
+      }
+
+      if (action === 'ignore') {
+        try {
+          await apiFetch(`/bank_statement_lines/${lineId}/ignore`, { method: 'PATCH' });
+          const l = lines.find(x => x.id === lineId);
+          if (l) { l.match_status = 'ignored'; l.matched_by = currentMe?.email; }
+          renderLines(); renderSummary();
+          showToast(t('saved'), 'success');
+        } catch(err) { showToast(err.message, 'error'); }
+      }
+
+      if (action === 'unmatch') {
+        try {
+          await apiFetch(`/bank_statement_lines/${lineId}/unmatch`, { method: 'PATCH' });
+          const l = lines.find(x => x.id === lineId);
+          if (l) { l.match_status = 'unmatched'; l.transaction_id = null; }
+          renderLines(); renderTrx(); renderSummary();
+          showToast(t('unmatchSuccess'), 'success');
+        } catch(err) { showToast(err.message, 'error'); }
+      }
+
+      if (action === 'unignore') {
+        try {
+          await apiFetch(`/bank_statement_lines/${lineId}/unignore`, { method: 'PATCH' });
+          const l = lines.find(x => x.id === lineId);
+          if (l) { l.match_status = 'unmatched'; }
+          renderLines(); renderSummary();
+          showToast(t('saved'), 'success');
+        } catch(err) { showToast(err.message, 'error'); }
+      }
+    });
+
+    // ─── Match modal ───
+
+    let pendingMatchLineId = null;
+
+    function openMatchModal(lineId) {
+      pendingMatchLineId = lineId;
+      const line = lines.find(l => l.id === lineId);
+      document.getElementById('match-search').value = '';
+      renderMatchList(line);
+      openModal('modal-match');
+    }
+
+    function renderMatchList(line) {
+      const container = document.getElementById('match-trx-list');
+      const search = (document.getElementById('match-search').value || '').toLowerCase();
+      const matchedTrxIds = new Set(lines.filter(l => l.transaction_id).map(l => l.transaction_id));
+
+      let candidates = trxList.filter(tx => !matchedTrxIds.has(tx.id));
+
+      // Sort by relevance: same amount + close date first
+      if (line) {
+        const lineAmt = typeof line.amount === 'object' ? parseFloat(line.amount.value) : parseFloat(line.amount);
+        const lineDate = line.date?.value || line.date;
+        candidates.sort((a, b) => {
+          const aAmt = typeof a.amount === 'object' ? parseFloat(a.amount.value) : parseFloat(a.amount);
+          const bAmt = typeof b.amount === 'object' ? parseFloat(b.amount.value) : parseFloat(b.amount);
+          const aMatch = Math.abs(aAmt - lineAmt) < 0.01 && a.direction === line.direction ? 0 : 1;
+          const bMatch = Math.abs(bAmt - lineAmt) < 0.01 && b.direction === line.direction ? 0 : 1;
+          if (aMatch !== bMatch) return aMatch - bMatch;
+          const aDate = a.date?.value || a.date || '';
+          const bDate = b.date?.value || b.date || '';
+          return Math.abs(new Date(aDate) - new Date(lineDate)) - Math.abs(new Date(bDate) - new Date(lineDate));
+        });
+      }
+
+      if (search) {
+        candidates = candidates.filter(tx =>
+          (tx.description || '').toLowerCase().includes(search) ||
+          String(tx.amount).includes(search)
+        );
+      }
+
+      if (!candidates.length) {
+        container.innerHTML = `<div style="padding:24px;text-align:center;color:#bbb">${t('noTransactions')}</div>`;
+        return;
+      }
+
+      container.innerHTML = candidates.map(tx => {
+        const amtCls = tx.direction === 'income' ? 'income' : 'expense';
+        const sign = tx.direction === 'expense' ? '-' : '+';
+        const amt = typeof tx.amount === 'object' ? parseFloat(tx.amount.value) : parseFloat(tx.amount);
+        const lineAmt = line ? (typeof line.amount === 'object' ? parseFloat(line.amount.value) : parseFloat(line.amount)) : 0;
+        const amtMatch = Math.abs(amt - lineAmt) < 0.01 && tx.direction === line?.direction;
+        return `
+        <div class="trx-card" style="cursor:pointer;${amtMatch ? 'border-color:#1e8e3e;background:#f0faf0' : ''}" data-match-trx="${tx.id}">
+          <div class="line-top">
+            <span class="line-date">${formatDate(tx.date)} ${amtMatch ? '<span class="badge badge-green">✓</span>' : ''}</span>
+            <span class="line-amount ${amtCls}">${sign}${formatMoney(amt)}</span>
+          </div>
+          <div class="line-desc">${tx.description || '—'}</div>
+          <div class="line-meta">${tx.category_name || ''} ${tx.account_name ? '| ' + tx.account_name : ''}</div>
+        </div>`;
+      }).join('');
+    }
+
+    document.getElementById('match-search').addEventListener('input', () => {
+      const line = lines.find(l => l.id === pendingMatchLineId);
+      renderMatchList(line);
+    });
+
+    document.getElementById('modal-match').addEventListener('click', async e => {
+      const card = e.target.closest('[data-match-trx]');
+      if (!card) return;
+      const trxId = card.dataset.matchTrx;
+      closeModal('modal-match');
+      try {
+        await apiFetch(`/bank_statement_lines/${pendingMatchLineId}/match`, {
+          method: 'PATCH',
+          body: JSON.stringify({ transaction_id: trxId }),
+        });
+        const l = lines.find(x => x.id === pendingMatchLineId);
+        if (l) { l.match_status = 'matched'; l.transaction_id = trxId; }
+        renderLines(); renderTrx(); renderSummary();
+        showToast(t('matchSuccess'), 'success');
+      } catch(err) { showToast(err.message, 'error'); }
+    });
+
+    document.getElementById('btn-match-cancel').addEventListener('click', () => closeModal('modal-match'));
+
+    // ─── Create transaction modal ───
+
+    let pendingCreateLineId = null;
+
+    function openCreateTrxModal(lineId) {
+      pendingCreateLineId = lineId;
+      const line = lines.find(l => l.id === lineId);
+      if (!line) return;
+
+      const dateVal = line.date?.value || line.date || '';
+      document.getElementById('ct-date').value = typeof dateVal === 'string' ? dateVal.split('T')[0] : dateVal;
+      document.getElementById('ct-direction').value = line.direction || 'expense';
+      const amt = typeof line.amount === 'object' ? line.amount.value : line.amount;
+      document.getElementById('ct-amount').value = amt;
+      document.getElementById('ct-desc').value = line.description || '';
+
+      // Account (locked)
+      const acc = accountsCache.find(a => a.id === (statement?.account_id || line.account_id));
+      document.getElementById('ct-account-display').value = acc ? `${acc.name}${acc.bank_name ? ' · ' + acc.bank_name : ''}` : '—';
+
+      // Fill category select
+      fillCategorySelect();
+      // Fill folder select
+      fillFolderSelect();
+
+      openModal('modal-create-trx');
+    }
+
+    function fillCategorySelect() {
+      const sel = document.getElementById('ct-category');
+      sel.innerHTML = `<option value="">— ${t('noCategory')} —</option>`;
+      // Group by type
+      const byType = {};
+      categoriesCache.forEach(c => {
+        const group = c.type || 'other';
+        if (!byType[group]) byType[group] = [];
+        byType[group].push(c);
+      });
+      for (const [typeId, cats] of Object.entries(byType)) {
+        const typeName = typesCache.find(t2 => t2.id === typeId);
+        const groupLabel = typeName ? (typeName['name_' + currentLang] || typeName.name) : typeId;
+        const optgroup = document.createElement('optgroup');
+        optgroup.label = groupLabel;
+        cats.forEach(c => {
+          const opt = document.createElement('option');
+          opt.value = c.id;
+          opt.textContent = c['name_' + currentLang] || c.name;
+          optgroup.appendChild(opt);
+        });
+        sel.appendChild(optgroup);
+      }
+    }
+
+    function fillFolderSelect() {
+      const sel = document.getElementById('ct-folder');
+      sel.innerHTML = `<option value="">— ${t('folder')} —</option>`;
+      foldersCache.forEach(f => {
+        if (f.status === 'archive') return;
+        const opt = document.createElement('option');
+        opt.value = f.id;
+        opt.textContent = f.name;
+        sel.appendChild(opt);
+      });
+    }
+
+    document.getElementById('btn-ct-cancel').addEventListener('click', () => closeModal('modal-create-trx'));
+
+    document.getElementById('btn-ct-save').addEventListener('click', async () => {
+      const date        = document.getElementById('ct-date').value;
+      const direction   = document.getElementById('ct-direction').value;
+      const amount      = document.getElementById('ct-amount').value;
+      const category_id = document.getElementById('ct-category').value;
+      const folder_id   = document.getElementById('ct-folder').value;
+      const description = document.getElementById('ct-desc').value;
+
+      // Validation
+      ['ct-date','ct-category','ct-folder'].forEach(id => {
+        document.getElementById(id).classList.remove('invalid');
+      });
+      const missing = [];
+      if (!date) missing.push('ct-date');
+      if (!category_id) missing.push('ct-category');
+      if (!folder_id) missing.push('ct-folder');
+      if (missing.length) {
+        missing.forEach(id => document.getElementById(id).classList.add('invalid'));
+        showToast(t('fillAllFields'), 'error');
+        return;
+      }
+
+      closeModal('modal-create-trx');
+      try {
+        const r = await apiFetch(`/bank_statement_lines/${pendingCreateLineId}/create-transaction`, {
+          method: 'POST',
+          body: JSON.stringify({
+            category_id, folder_id, description,
+            account_id: statement?.account_id || '',
+          }),
+        });
+        // Обновляем локальный стейт
+        const l = lines.find(x => x.id === pendingCreateLineId);
+        if (l) { l.match_status = 'manual_created'; l.transaction_id = r.transaction_id; }
+        renderLines(); renderSummary();
+        // Перезагружаем транзакции
+        await loadTransactions();
+        showToast(t('transactionCreated'), 'success');
+      } catch(err) { showToast(err.message, 'error'); }
+    });
+
+    // ─── Filter ───
+
+    document.getElementById('filter-match-status').addEventListener('change', e => {
+      filterStatus = e.target.value;
+      renderLines();
+    });
+
+    // ─── Keyboard ───
+
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape') {
+        closeModal('modal-create-trx');
+        closeModal('modal-match');
+      }
+    });
+
+    // ─── Init ───
+
+    window.onLogin = async () => { updateTexts(); await loadStatement(); };
+    window.onLogout = () => { location.href = 'statements.html'; };
+    window.onLangChange = () => {
+      updateTexts();
+      renderHeader_();
+      renderSummary();
+      renderLines();
+      renderTrx();
+    };
+
+    renderHeader('statements');
+    updateTexts();
+  </script>
+</body>
+</html>

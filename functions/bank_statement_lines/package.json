@@ -1,13 +1,11 @@
 {
-  "name": "bank_statements",
+  "name": "bank_statement_lines",
   "version": "1.0.0",
   "main": "index.js",
   "type": "commonjs",
   "dependencies": {
     "@google-cloud/bigquery": "^8.1.1",
-    "@google-cloud/storage": "^7.14.0",
     "@google-cloud/functions-framework": "^5.0.2",
-    "uuid": "^13.0.0",
-    "xlsx": "^0.18.5"
+    "uuid": "^13.0.0"
   }
 }

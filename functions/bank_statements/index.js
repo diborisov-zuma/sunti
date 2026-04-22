@@ -1,12 +1,14 @@
 const { BigQuery } = require('@google-cloud/bigquery');
 const { Storage }  = require('@google-cloud/storage');
 const { v4: uuidv4 } = require('uuid');
+const { getParser, availableFormats } = require('./parsers');
 
 const bigquery = new BigQuery();
 const storage  = new Storage();
 const PROJECT  = 'project-9718e7d4-4cd7-4f52-8d6';
 const DATASET  = 'sunti';
 const TABLE    = 'bank_statements';
+const LINES_TABLE = 'bank_statement_lines';
 const BUCKET   = 'sunti-site';
 const SIGN_TTL_MS = 10 * 60 * 1000;
 
@@ -53,6 +55,84 @@ function sanitize(name) {
   return (name || 'file').replace(/[^\w.\-]+/g, '_');
 }
 
+/**
+ * Download file from GCS into a Buffer.
+ */
+async function downloadFileBuffer(fileUrl) {
+  const parsed = parseKey(fileUrl);
+  if (!parsed) throw new Error('Invalid file URL');
+  const [buffer] = await storage.bucket(parsed.bucket).file(parsed.key).download();
+  return buffer;
+}
+
+/**
+ * Batch-insert parsed lines into bank_statement_lines.
+ * Uses INSERT ... SELECT FROM UNNEST — one DML operation.
+ */
+async function insertLines(statementId, accountId, companyId, lines, email) {
+  if (!lines.length) return;
+
+  const linesTable = `\`${PROJECT}.${DATASET}.${LINES_TABLE}\``;
+
+  // BigQuery UNNEST approach: build arrays of each column
+  const ids = [], lineNumbers = [], dates = [], valueDates = [];
+  const amounts = [], directions = [], descriptions = [], counterparties = [];
+  const references = [], runningBalances = [], currencies = [], rawDatas = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    const l = lines[i];
+    ids.push(uuidv4());
+    lineNumbers.push(i + 1);
+    dates.push(l.date);
+    valueDates.push(l.value_date || null);
+    amounts.push(l.amount);
+    directions.push(l.direction);
+    descriptions.push(l.description || '');
+    counterparties.push(l.counterparty || '');
+    references.push(l.reference || '');
+    runningBalances.push(l.running_balance != null ? l.running_balance : null);
+    currencies.push(l.currency || 'THB');
+    rawDatas.push(JSON.stringify(l.raw_data || {}));
+  }
+
+  await bigquery.query({
+    query: `INSERT INTO ${linesTable}
+              (id, statement_id, account_id, company_id, line_number, date, value_date,
+               amount, direction, description, counterparty, reference, running_balance,
+               currency, raw_data, transaction_id, match_status, matched_by, matched_at,
+               imported_at, status)
+            SELECT
+              id, @statement_id, @account_id, @company_id, line_number,
+              DATE(date), IF(value_date = '', NULL, DATE(value_date)),
+              CAST(amount AS NUMERIC), direction, description,
+              NULLIF(counterparty, ''), NULLIF(reference, ''), running_balance,
+              currency, SAFE.PARSE_JSON(raw_data),
+              NULL, 'unmatched', NULL, NULL,
+              CURRENT_TIMESTAMP(), 'active'
+            FROM UNNEST(@ids) AS id WITH OFFSET o
+            JOIN UNNEST(@line_numbers) AS line_number WITH OFFSET o2 ON o = o2
+            JOIN UNNEST(@dates) AS date WITH OFFSET o3 ON o = o3
+            JOIN UNNEST(@value_dates) AS value_date WITH OFFSET o4 ON o = o4
+            JOIN UNNEST(@amounts) AS amount WITH OFFSET o5 ON o = o5
+            JOIN UNNEST(@directions) AS direction WITH OFFSET o6 ON o = o6
+            JOIN UNNEST(@descriptions) AS description WITH OFFSET o7 ON o = o7
+            JOIN UNNEST(@counterparties) AS counterparty WITH OFFSET o8 ON o = o8
+            JOIN UNNEST(@refs) AS reference WITH OFFSET o9 ON o = o9
+            JOIN UNNEST(@running_balances) AS running_balance WITH OFFSET o10 ON o = o10
+            JOIN UNNEST(@currencies) AS currency WITH OFFSET o11 ON o = o11
+            JOIN UNNEST(@raw_datas) AS raw_data WITH OFFSET o12 ON o = o12`,
+    params: {
+      statement_id: statementId,
+      account_id: accountId,
+      company_id: companyId,
+      ids, line_numbers: lineNumbers, dates, value_dates: valueDates.map(v => v || ''),
+      amounts, directions, descriptions, counterparties,
+      refs: references, running_balances: runningBalances,
+      currencies, raw_datas: rawDatas,
+    },
+  });
+}
+
 exports.bank_statements = async (req, res) => {
   setCors(res);
   if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
@@ -61,11 +141,18 @@ exports.bank_statements = async (req, res) => {
   if (!email) { res.status(401).json({ error: 'Unauthorized' }); return; }
 
   const table = `\`${PROJECT}.${DATASET}.${TABLE}\``;
+  const linesTable = `\`${PROJECT}.${DATASET}.${LINES_TABLE}\``;
   const path  = (req.url || '').split('?')[0];
   const user  = await getUser(email);
   if (!user) { res.status(403).json({ error: 'Forbidden' }); return; }
 
   try {
+    // GET /bank_statements/formats — список доступных парсеров
+    if (req.method === 'GET' && path === '/formats') {
+      res.json(availableFormats);
+      return;
+    }
+
     // GET /bank_statements/my-companies — список доступных юр. лиц
     if (req.method === 'GET' && path === '/my-companies') {
       if (user.is_admin) {
@@ -92,7 +179,7 @@ exports.bank_statements = async (req, res) => {
       const id = path.split('/').filter(Boolean)[0];
       if (!id) { res.status(400).json({ error: 'id is required' }); return; }
       const [rows] = await bigquery.query({
-        query: `SELECT company_id, file_url, file_name FROM ${table} WHERE id = @id`,
+        query: `SELECT company_id, file_url, file_name FROM ${table} WHERE id = @id AND IFNULL(status, 'active') != 'deleted'`,
         params: { id },
       });
       if (!rows.length) { res.status(404).json({ error: 'Not found' }); return; }
@@ -132,6 +219,82 @@ exports.bank_statements = async (req, res) => {
       return;
     }
 
+    // POST /bank_statements/<id>/parse — парсить загруженный xlsx
+    if (req.method === 'POST' && path.endsWith('/parse')) {
+      const id = path.split('/').filter(Boolean)[0];
+      if (!id) { res.status(400).json({ error: 'id is required' }); return; }
+
+      // Читаем statement
+      const [rows] = await bigquery.query({
+        query: `SELECT id, company_id, account_id, file_url, bank_format, import_status
+                FROM ${table} WHERE id = @id AND IFNULL(status, 'active') != 'deleted'`,
+        params: { id },
+      });
+      if (!rows.length) { res.status(404).json({ error: 'Not found' }); return; }
+      const st = rows[0];
+
+      if (!user.is_admin) {
+        const acc = await getCompanyAccess(email, st.company_id);
+        if (acc !== 'editor') { res.status(403).json({ error: 'Forbidden' }); return; }
+      }
+
+      if (!st.file_url) { res.status(400).json({ error: 'No file to parse' }); return; }
+      if (!st.bank_format) { res.status(400).json({ error: 'bank_format is not set' }); return; }
+
+      // Удаляем старые строки, если был повторный парсинг
+      await bigquery.query({
+        query: `DELETE FROM ${linesTable} WHERE statement_id = @id`,
+        params: { id },
+      });
+
+      try {
+        const parser = getParser(st.bank_format);
+        const buffer = await downloadFileBuffer(st.file_url);
+        const result = parser.parse(buffer);
+
+        // Вставляем строки
+        await insertLines(id, st.account_id, st.company_id, result.lines, email);
+
+        // Обновляем statement
+        await bigquery.query({
+          query: `UPDATE ${table}
+                  SET import_status = 'parsed',
+                      import_error = NULL,
+                      lines_count = @lines_count,
+                      period_from = IF(@period_from = '', NULL, DATE(@period_from)),
+                      period_to   = IF(@period_to = '', NULL, DATE(@period_to)),
+                      opening_balance = @opening_balance,
+                      closing_balance = @closing_balance
+                  WHERE id = @id`,
+          params: {
+            id,
+            lines_count: result.lines.length,
+            period_from: result.period_from || '',
+            period_to: result.period_to || '',
+            opening_balance: result.opening_balance,
+            closing_balance: result.closing_balance,
+          },
+        });
+
+        res.json({
+          success: true,
+          lines_count: result.lines.length,
+          period_from: result.period_from,
+          period_to: result.period_to,
+          opening_balance: result.opening_balance,
+          closing_balance: result.closing_balance,
+        });
+      } catch (parseErr) {
+        // Ошибка парсинга — записываем в statement
+        await bigquery.query({
+          query: `UPDATE ${table} SET import_status = 'failed', import_error = @error WHERE id = @id`,
+          params: { id, error: parseErr.message },
+        });
+        res.status(422).json({ error: parseErr.message });
+      }
+      return;
+    }
+
     // GET /bank_statements?company_id=X&search=&date_from=&date_to=
     if (req.method === 'GET') {
       const { company_id, search, date_from, date_to } = req.query;
@@ -140,7 +303,7 @@ exports.bank_statements = async (req, res) => {
         const acc = await getCompanyAccess(email, company_id);
         if (acc === 'none') { res.status(403).json({ error: 'Forbidden' }); return; }
       }
-      let where = 'WHERE company_id = @company_id';
+      let where = 'WHERE company_id = @company_id AND IFNULL(status, \'active\') != \'deleted\'';
       const params = { company_id };
       if (search)    { where += ' AND LOWER(name) LIKE LOWER(@search)'; params.search = `%${search.trim()}%`; }
       if (date_from) { where += ' AND date >= @date_from'; params.date_from = date_from; }
@@ -148,7 +311,11 @@ exports.bank_statements = async (req, res) => {
       if (req.query.account_id) { where += ' AND account_id = @account_id'; params.account_id = req.query.account_id; }
 
       const [rows] = await bigquery.query({
-        query: `SELECT id, company_id, account_id, name, date, file_name, file_url, file_size, uploaded_at, uploaded_by
+        query: `SELECT id, company_id, account_id, name, date,
+                       file_name, file_url, file_size,
+                       period_from, period_to, opening_balance, closing_balance,
+                       bank_format, lines_count, import_status, import_error,
+                       uploaded_at, uploaded_by
                 FROM ${table} ${where}
                 ORDER BY date DESC NULLS LAST, uploaded_at DESC`,
         params,
@@ -157,9 +324,9 @@ exports.bank_statements = async (req, res) => {
       return;
     }
 
-    // POST — создать запись
+    // POST — создать запись (с новыми полями)
     if (req.method === 'POST') {
-      const { company_id, account_id, name, date, file_name, file_url, file_size } = req.body || {};
+      const { company_id, account_id, name, date, file_name, file_url, file_size, bank_format } = req.body || {};
       if (!company_id || !name) { res.status(400).json({ error: 'company_id and name are required' }); return; }
       if (!user.is_admin) {
         const acc = await getCompanyAccess(email, company_id);
@@ -168,19 +335,26 @@ exports.bank_statements = async (req, res) => {
       const id = req.body.id || uuidv4();
       await bigquery.query({
         query: `INSERT INTO ${table}
-                  (id, company_id, account_id, name, date, file_name, file_url, file_size, uploaded_by, uploaded_at)
+                  (id, company_id, account_id, name, date,
+                   file_name, file_url, file_size,
+                   bank_format, import_status, status,
+                   uploaded_by, uploaded_at)
                 VALUES
                   (@id, @company_id, NULLIF(@account_id,''), @name, IF(@date = '', NULL, DATE(@date)),
-                   NULLIF(@file_name,''), NULLIF(@file_url,''), @file_size, @uploaded_by, CURRENT_TIMESTAMP())`,
+                   NULLIF(@file_name,''), NULLIF(@file_url,''), @file_size,
+                   NULLIF(@bank_format,''), @import_status, 'active',
+                   @uploaded_by, CURRENT_TIMESTAMP())`,
         params: {
           id, company_id,
-          account_id: account_id || '',
+          account_id:    account_id    || '',
           name,
-          date:       date || '',
-          file_name:  file_name || '',
-          file_url:   file_url  || '',
-          file_size:  parseInt(file_size || 0),
-          uploaded_by: email,
+          date:          date          || '',
+          file_name:     file_name     || '',
+          file_url:      file_url      || '',
+          file_size:     parseInt(file_size || 0),
+          bank_format:   bank_format   || '',
+          import_status: file_url ? 'pending' : 'parsed',
+          uploaded_by:   email,
         },
       });
       res.json({ success: true, id });
@@ -190,11 +364,11 @@ exports.bank_statements = async (req, res) => {
     // PUT — редактировать
     if (req.method === 'PUT') {
       const id = path.split('/').filter(Boolean)[0];
-      const { account_id, name, date, file_name, file_url, file_size, replace_file } = req.body || {};
+      const { account_id, name, date, file_name, file_url, file_size, replace_file, bank_format } = req.body || {};
       if (!id || !name) { res.status(400).json({ error: 'id and name are required' }); return; }
 
       const [rows] = await bigquery.query({
-        query: `SELECT company_id, file_url AS old_file_url FROM ${table} WHERE id = @id`,
+        query: `SELECT company_id, file_url AS old_file_url FROM ${table} WHERE id = @id AND IFNULL(status, 'active') != 'deleted'`,
         params: { id },
       });
       if (!rows.length) { res.status(404).json({ error: 'Not found' }); return; }
@@ -205,7 +379,7 @@ exports.bank_statements = async (req, res) => {
         if (acc !== 'editor') { res.status(403).json({ error: 'Forbidden' }); return; }
       }
 
-      // Если заменяется файл или явно сносится — удалить старый из GCS
+      // Если заменяется файл — удалить старый из GCS
       if (replace_file && cur.old_file_url) {
         const p = parseKey(cur.old_file_url);
         if (p) {
@@ -216,35 +390,49 @@ exports.bank_statements = async (req, res) => {
 
       await bigquery.query({
         query: `UPDATE ${table}
-                SET account_id = NULLIF(@account_id,''),
-                    name       = @name,
-                    date       = IF(@date = '', NULL, DATE(@date)),
-                    file_name  = IF(@replace_file, NULLIF(@file_name,''), file_name),
-                    file_url   = IF(@replace_file, NULLIF(@file_url,''),  file_url),
-                    file_size  = IF(@replace_file, @file_size,            file_size)
+                SET account_id  = NULLIF(@account_id,''),
+                    name        = @name,
+                    date        = IF(@date = '', NULL, DATE(@date)),
+                    file_name   = IF(@replace_file, NULLIF(@file_name,''), file_name),
+                    file_url    = IF(@replace_file, NULLIF(@file_url,''),  file_url),
+                    file_size   = IF(@replace_file, @file_size,            file_size),
+                    bank_format = IF(@replace_file AND @bank_format != '', @bank_format, bank_format),
+                    import_status = IF(@replace_file, 'pending', import_status),
+                    import_error  = IF(@replace_file, NULL, import_error),
+                    lines_count   = IF(@replace_file, 0, lines_count)
                 WHERE id = @id`,
         params: {
           id,
-          account_id: account_id || '',
+          account_id:   account_id   || '',
           name,
-          date:       date || '',
-          file_name:  file_name || '',
-          file_url:   file_url  || '',
-          file_size:  parseInt(file_size || 0),
+          date:         date         || '',
+          file_name:    file_name    || '',
+          file_url:     file_url     || '',
+          file_size:    parseInt(file_size || 0),
           replace_file: !!replace_file,
+          bank_format:  bank_format  || '',
         },
       });
+
+      // Если заменили файл — удаляем старые строки
+      if (replace_file) {
+        await bigquery.query({
+          query: `DELETE FROM ${linesTable} WHERE statement_id = @id`,
+          params: { id },
+        });
+      }
+
       res.json({ success: true });
       return;
     }
 
-    // DELETE — удалить запись + GCS файл
+    // DELETE — soft delete + каскад на строки
     if (req.method === 'DELETE') {
       const id = path.split('/').filter(Boolean)[0];
       if (!id) { res.status(400).json({ error: 'id is required' }); return; }
 
       const [rows] = await bigquery.query({
-        query: `SELECT company_id, file_url FROM ${table} WHERE id = @id`,
+        query: `SELECT company_id, file_url FROM ${table} WHERE id = @id AND IFNULL(status, 'active') != 'deleted'`,
         params: { id },
       });
       if (!rows.length) { res.status(404).json({ error: 'Not found' }); return; }
@@ -252,14 +440,19 @@ exports.bank_statements = async (req, res) => {
         const acc = await getCompanyAccess(email, rows[0].company_id);
         if (acc !== 'editor') { res.status(403).json({ error: 'Forbidden' }); return; }
       }
-      if (rows[0].file_url) {
-        const p = parseKey(rows[0].file_url);
-        if (p) {
-          try { await storage.bucket(p.bucket).file(p.key).delete({ ignoreNotFound: true }); }
-          catch (e) { console.error('GCS delete failed', e.message); }
-        }
-      }
-      await bigquery.query({ query: `DELETE FROM ${table} WHERE id = @id`, params: { id } });
+
+      // Soft delete statement
+      await bigquery.query({
+        query: `UPDATE ${table} SET status = 'deleted' WHERE id = @id`,
+        params: { id },
+      });
+
+      // Soft delete all lines (не трогаем связанные transactions)
+      await bigquery.query({
+        query: `UPDATE ${linesTable} SET status = 'deleted' WHERE statement_id = @id`,
+        params: { id },
+      });
+
       res.json({ success: true });
       return;
     }
