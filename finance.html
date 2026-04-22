@@ -207,6 +207,10 @@
         </div>
       </div>
       <div class="field-group">
+        <label id="t-trx-contractor-label"></label>
+        <select id="trx-contractor"></select>
+      </div>
+      <div class="field-group">
         <label id="t-trx-desc-label"></label>
         <input type="text" id="trx-desc">
       </div>
@@ -318,6 +322,7 @@
     let highlightTrxId      = null;
     let searchDebounce     = null;
     let categoriesCache    = [];
+    let contractorsCache   = [];
     let usersCache         = [];
     let unreadMap          = {};
 
@@ -489,6 +494,7 @@
       setText('t-ld-date-to',     t('dateTo'));
       setText('t-ld-amount-min',  t('amountFrom'));
       setText('t-ld-amount-max',  t('amountTo'));
+      document.getElementById('t-trx-contractor-label').textContent = t('contractor');
       document.getElementById('t-trx-desc-label').textContent   = t('name');
       document.getElementById('trx-opt-income').textContent     = t('income');
       document.getElementById('trx-opt-expense').textContent    = t('expense');
@@ -769,6 +775,7 @@
         document.getElementById('trx-direction').value = 'expense';
         document.getElementById('trx-amount').value    = '';
         document.getElementById('trx-desc').value      = '';
+        fillContractorSelect('trx-contractor', '');
         const writableFolders = getWritableFolders();
         if (!writableFolders.length) { showToast('—', 'error'); return; }
         const defaultFolder = filterFolder !== 'all' ? filterFolder : writableFolders[0].id;
@@ -874,6 +881,7 @@
                 data-folder="${tx.folder_id||''}"
                 data-invoice="${tx.invoice_id||''}"
                 data-account="${tx.account_id||''}"
+                data-contractor="${tx.contractor_id||''}"
                 data-desc="${(tx.description||'').replace(/"/g,'&quot;')}">${t('edit')}</button>
               ${deletedOrMark}
               ${isAdmin ? `<button class="icon-btn" data-action="hard-delete-trx" data-id="${tx.id}" title="${t('hardDelete')}">${ICON_TRASH}</button>` : ''}
@@ -997,7 +1005,12 @@
     function renderTrxFiles(trxId, files, invBlockHtml) {
       const inner = document.getElementById(`detail-${trxId}`);
       if (!inner) return;
-      let html = invBlockHtml || '';
+      const tx = allTransactions.find(x => x.id === trxId);
+      let html = '';
+      if (tx && tx.contractor_id) {
+        html += `<div style="font-size:0.78rem;color:#888;margin-bottom:8px">${t('contractor')}: <strong style="color:#555">${contractorName(tx.contractor_id)}</strong></div>`;
+      }
+      html += invBlockHtml || '';
       html += `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
         <span style="font-size:0.78rem;color:#888;text-transform:uppercase;letter-spacing:0.04em">${t('files')}</span>
         <button class="btn btn-outline" style="padding:3px 8px;font-size:0.78rem" data-action="add-trx-file" data-trx-id="${trxId}">${t('addFile')}</button>
@@ -1207,6 +1220,7 @@
         document.getElementById('trx-direction').value = btn.dataset.direction;
         document.getElementById('trx-amount').value    = btn.dataset.amount;
         document.getElementById('trx-desc').value      = btn.dataset.desc;
+        fillContractorSelect('trx-contractor', btn.dataset.contractor || '');
         const showFolderPicker = !currentTrxInvoiceId;
         mountModalCombos(btn.dataset.category || '', btn.dataset.folder || '', showFolderPicker, foldersCache, currentTrxInvoiceId, btn.dataset.account || '');
         openModal('modal-trx');
@@ -1336,7 +1350,8 @@
       const category_id = (modalCategoryCombo && modalCategoryCombo.getSelected()) || null;
       const folder_id   = (modalFolderCombo && modalFolderCombo.getSelected()) || '';
       const invoice_id  = pendingInvoiceId || null;
-      const account_id  = document.getElementById('trx-account').value || '';
+      const account_id    = document.getElementById('trx-account').value || '';
+      const contractor_id = document.getElementById('trx-contractor').value || '';
 
       // Валидация обязательных полей
       const missing = [];
@@ -1354,14 +1369,14 @@
         if (currentTrxMode === 'create') {
           const r = await apiFetch('/transactions', {
             method: 'POST',
-            body: JSON.stringify({ date, amount, direction, category_id, description, folder_id, invoice_id, account_id }),
+            body: JSON.stringify({ date, amount, direction, category_id, description, folder_id, invoice_id, account_id, contractor_id }),
           });
           highlightTrxId = r.id;
           showToast(t('saved'), 'success');
         } else {
           await apiFetch(`/transactions/${currentTrxId}`, {
             method: 'PUT',
-            body: JSON.stringify({ date, amount, direction, category_id, description, folder_id, invoice_id, account_id }),
+            body: JSON.stringify({ date, amount, direction, category_id, description, folder_id, invoice_id, account_id, contractor_id }),
           });
           highlightTrxId = currentTrxId;
           showToast(t('saved'), 'success');
@@ -1493,9 +1508,33 @@
       catch(e) { typesCache = []; }
     }
 
+    async function loadContractors() {
+      try { contractorsCache = await apiFetch('/contractors?active=true'); }
+      catch(e) { contractorsCache = []; }
+    }
+
+    function fillContractorSelect(selectId, selectedId) {
+      const sel = document.getElementById(selectId);
+      if (!sel) return;
+      sel.innerHTML = `<option value="">— ${t('noContractor')} —</option>`;
+      contractorsCache.forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c.id;
+        opt.textContent = c.name_en || c.name_th || '—';
+        if (c.id === selectedId) opt.selected = true;
+        sel.appendChild(opt);
+      });
+    }
+
+    function contractorName(id) {
+      if (!id) return '—';
+      const c = contractorsCache.find(x => x.id === id);
+      return c ? (c.name_en || c.name_th || '—') : '—';
+    }
+
     window.onLogin  = async () => {
       updateTexts();
-      await Promise.all([loadCategories(), loadAccounts(), loadCompanies(), loadFolders(), loadTypes()]);
+      await Promise.all([loadCategories(), loadContractors(), loadAccounts(), loadCompanies(), loadFolders(), loadTypes()]);
       renderMainArea();
       loadTransactions();
     };

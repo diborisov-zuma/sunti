@@ -291,6 +291,10 @@
           <ul id="inv-category-list"></ul>
         </span>
       </div>
+      <div class="field-group">
+        <label id="t-inv-contractor-label" class="required"></label>
+        <select id="inv-contractor"></select>
+      </div>
       <div class="fields-row">
         <div class="field-group">
           <label id="t-inv-total-label"></label>
@@ -551,6 +555,7 @@
     let searchDebounce     = null;
     let totalCount         = 0;
     let categoriesCache    = [];
+    let contractorsCache   = [];
     let usersCache         = [];
     let unreadMap          = {}; // { document_id: count }
     let invoicesById       = {};
@@ -779,6 +784,7 @@
       document.getElementById('t-inv-direction-label').textContent = t('direction');
       document.getElementById('inv-opt-expense').textContent        = t('expense');
       document.getElementById('inv-opt-income').textContent         = t('income');
+      document.getElementById('t-inv-contractor-label').textContent = t('contractor');
       document.getElementById('t-inv-total-label').textContent  = t('totalAmount');
       document.getElementById('t-inv-paid-label').textContent   = t('paidAmount');
       document.getElementById('inv-opt-active').textContent     = t('invActive');
@@ -814,6 +820,31 @@
       try {
         categoriesCache = await apiFetch('/categories');
       } catch(e) { categoriesCache = []; }
+    }
+
+    async function loadContractors() {
+      try {
+        contractorsCache = await apiFetch('/contractors?active=true');
+      } catch(e) { contractorsCache = []; }
+    }
+
+    function fillContractorSelect(selectId, selectedId) {
+      const sel = document.getElementById(selectId);
+      if (!sel) return;
+      sel.innerHTML = `<option value="">— ${t('noContractor')} —</option>`;
+      contractorsCache.forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c.id;
+        opt.textContent = c.name_en || c.name_th || '—';
+        if (c.id === selectedId) opt.selected = true;
+        sel.appendChild(opt);
+      });
+    }
+
+    function contractorName(id) {
+      if (!id) return '—';
+      const c = contractorsCache.find(x => x.id === id);
+      return c ? (c.name_en || c.name_th || '—') : '—';
     }
 
     let currentFindTrxInv = null;
@@ -1087,6 +1118,7 @@
         document.getElementById('inv-total').value     = '';
         document.getElementById('inv-paid').value      = '';
         mountInvCategoryCombo(null);
+        fillContractorSelect('inv-contractor', '');
         fillFolderSelect('inv-folder', filterFolder !== 'all' ? filterFolder : writable[0].id, writable);
         document.getElementById('inv-folder-group').style.display = 'block';
         openModal('modal-inv');
@@ -1179,7 +1211,8 @@
                   data-direction="${r.direction||'expense'}"
                   data-total="${r.total_amount}" data-paid="${r.paid_amount}"
                   data-date="${r.date ? (r.date.value || r.date) : ''}"
-                  data-category="${r.category_id||''}">${t('edit')}</button>
+                  data-category="${r.category_id||''}"
+                  data-contractor="${r.contractor_id||''}">${t('edit')}</button>
                 ${r.status === 'deleted'
                   ? `<span class="deleted-label">DELETED</span>`
                   : `<button class="icon-btn" data-action="delete-inv" data-id="${r.id}" title="${t('markDeleted')}">${ICON_EYE_OFF}</button>`}
@@ -1234,7 +1267,8 @@
       const inv = invoicesById[invId] || {};
       let metaHtml = `
         <div style="font-size:0.78rem;color:#888;margin-bottom:14px">
-          ${t('uploadedAt')}: <strong style="color:#555">${inv.uploaded_at ? formatDate(inv.uploaded_at) : '—'}</strong>
+          ${t('contractor')}: <strong style="color:#555">${contractorName(inv.contractor_id)}</strong>
+          · ${t('uploadedAt')}: <strong style="color:#555">${inv.uploaded_at ? formatDate(inv.uploaded_at) : '—'}</strong>
           · ${t('uploadedBy')}: <strong style="color:#555">${inv.uploaded_by || '—'}</strong>
         </div>
       `;
@@ -1455,6 +1489,7 @@
         document.getElementById('inv-total').value     = btn.dataset.total;
         document.getElementById('inv-paid').value      = btn.dataset.paid;
         mountInvCategoryCombo(btn.dataset.category || '');
+        fillContractorSelect('inv-contractor', btn.dataset.contractor || '');
         document.getElementById('inv-folder-group').style.display = 'none';
         openModal('modal-inv');
         setTimeout(() => document.getElementById('inv-name').focus(), 100);
@@ -1621,7 +1656,8 @@
       const direction   = document.getElementById('inv-direction').value;
       const total       = document.getElementById('inv-total').value;
       const paid        = document.getElementById('inv-paid').value;
-      const category_id = (modalInvCatCombo && modalInvCatCombo.getSelected()) || null;
+      const category_id   = (modalInvCatCombo && modalInvCatCombo.getSelected()) || null;
+      const contractor_id = document.getElementById('inv-contractor').value || '';
       const folder_id_for_check = currentInvMode === 'create' ? document.getElementById('inv-folder').value : 'ok';
 
       const missing = [];
@@ -1629,6 +1665,7 @@
       if (!date)              missing.push('inv-date');
       if (!status)            missing.push('inv-status');
       if (!category_id)       missing.push('inv-category-input');
+      if (!contractor_id)     missing.push('inv-contractor');
       if (!folder_id_for_check) missing.push('inv-folder');
       const totNum = parseFloat(total);
       if (total !== '' && (isNaN(totNum) || totNum < 0)) missing.push('inv-total');
@@ -1639,10 +1676,10 @@
       try {
         if (currentInvMode === 'create') {
           const folder_id = document.getElementById('inv-folder').value;
-          await apiFetch('/invoices', { method: 'POST', body: JSON.stringify({ folder_id, name, date, status, direction, total_amount: total, paid_amount: paid, category_id }) });
+          await apiFetch('/invoices', { method: 'POST', body: JSON.stringify({ folder_id, name, date, status, direction, total_amount: total, paid_amount: paid, category_id, contractor_id }) });
           showToast(t('invoiceCreated'), 'success');
         } else {
-          await apiFetch(`/invoices/${currentInvId}`, { method: 'PUT', body: JSON.stringify({ name, date, status, direction, total_amount: total, paid_amount: paid, category_id }) });
+          await apiFetch(`/invoices/${currentInvId}`, { method: 'PUT', body: JSON.stringify({ name, date, status, direction, total_amount: total, paid_amount: paid, category_id, contractor_id }) });
           showToast(t('saved'), 'success');
         }
         loadInvoices();
@@ -1673,7 +1710,8 @@
       closeModal('modal-trx');
       try {
         if (currentTrxMode === 'create') {
-          await apiFetch('/transactions', { method: 'POST', body: JSON.stringify({ date, amount, direction, category_id, description, invoice_id: currentTrxInvId, folder_id: invFolder, account_id }) });
+          const invContractorId = (invoicesById[currentTrxInvId] || {}).contractor_id || '';
+          await apiFetch('/transactions', { method: 'POST', body: JSON.stringify({ date, amount, direction, category_id, description, invoice_id: currentTrxInvId, folder_id: invFolder, account_id, contractor_id: invContractorId }) });
           showToast(t('saved'), 'success');
         } else {
           await apiFetch(`/transactions/${currentTrxId}`, { method: 'PUT', body: JSON.stringify({ date, amount, direction, category_id, description, account_id }) });
@@ -1734,7 +1772,7 @@
 
     window.onLogin  = async () => {
       updateTexts();
-      await Promise.all([loadCategories(), loadFolders(), loadAccounts(), loadCompanies(), loadTypes()]);
+      await Promise.all([loadCategories(), loadContractors(), loadFolders(), loadAccounts(), loadCompanies(), loadTypes()]);
       renderMainArea();
     };
     window.onLogout = () => {
