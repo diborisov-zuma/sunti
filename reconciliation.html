@@ -189,6 +189,7 @@
 
   <script>
     const statementId = new URLSearchParams(location.search).get('statement_id');
+    const companyIdParam = new URLSearchParams(location.search).get('company_id');
 
     let statement     = null;
     let lines         = [];
@@ -278,25 +279,22 @@
     // ─── Load data ───
 
     async function loadStatement() {
-      if (!statementId) { location.href = 'statements.html'; return; }
+      if (!statementId || !companyIdParam) { location.href = 'statements.html'; return; }
       try {
-        // Загружаем выписку через GET list и находим нужную
-        // (нет отдельного GET /:id, используем lines для company_id)
-        const lineData = await apiFetch(`/bank_statement_lines?statement_id=${statementId}`);
+        // 1. Загружаем statement и строки параллельно
+        const [stList, lineData] = await Promise.all([
+          apiFetch(`/bank_statements?company_id=${companyIdParam}`),
+          apiFetch(`/bank_statement_lines?statement_id=${statementId}`),
+        ]);
+        statement = stList.find(s => s.id === statementId);
         lines = lineData;
-
-        if (lines.length > 0) {
-          const companyId = lines[0].company_id;
-          const stList = await apiFetch(`/bank_statements?company_id=${companyId}`);
-          statement = stList.find(s => s.id === statementId);
-        }
 
         if (!statement) {
           showToast('Statement not found', 'error');
           return;
         }
 
-        // Параллельно загружаем справочники
+        // 2. Справочники
         const [cats, types, folders, accounts] = await Promise.all([
           apiFetch('/categories'),
           apiFetch('/category_types'),
