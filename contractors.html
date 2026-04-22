@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sunti — Контрагенты</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="stylesheet" href="style.css">
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <script src="_i18n.js"></script>
+  <script src="_config.js"></script>
+  <script src="_auth.js"></script>
+  <script src="_header.js"></script>
+  <style>
+    .page-toolbar { display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap; }
+    .page-toolbar h2 { font-size:1.1rem;color:#222;flex:1; }
+    .toolbar-right { display:flex;align-items:center;gap:8px;flex-wrap:wrap; }
+
+    select.filter-select, input.filter-select {
+      border:1px solid #ddd;border-radius:6px;padding:6px 10px;font-size:0.85rem;color:#333;outline:none;background:#fff;
+    }
+    select.filter-select:focus, input.filter-select:focus { border-color:#1a73e8; }
+
+    .ct-wrap { background:#fff;border:1px solid #e8e8e8;border-radius:10px;overflow:hidden; }
+    .ct-table { width:100%;border-collapse:collapse; }
+    .ct-table thead { background:#f8f8f8;border-bottom:1px solid #e8e8e8; }
+    .ct-table th { padding:10px 14px;font-size:0.78rem;font-weight:600;color:#888;text-align:left;text-transform:uppercase;letter-spacing:0.04em; }
+    .ct-table td { padding:11px 14px;font-size:0.88rem;color:#333;border-bottom:1px solid #f0f0f0; }
+    .ct-table tr:last-child td { border-bottom:none; }
+    .ct-table tr:hover td { background:#fafafa; }
+    .ct-table tr.inactive td { opacity:0.5; }
+
+    .empty-state { text-align:center;padding:64px 24px;color:#bbb; }
+    .loading { text-align:center;padding:48px;color:#bbb; }
+
+    .field-group { margin-bottom:12px; }
+    .field-group label { display:block;font-size:0.82rem;color:#666;margin-bottom:4px; }
+    .field-group input, .field-group select, .field-group textarea {
+      width:100%;border:1px solid #ddd;border-radius:6px;padding:8px 12px;font-size:0.9rem;outline:none;box-sizing:border-box;background:#fff;
+    }
+    .field-group input:focus, .field-group select:focus, .field-group textarea:focus { border-color:#1a73e8; }
+    .field-group textarea { resize:vertical;min-height:60px; }
+    .fields-row { display:grid;grid-template-columns:1fr 1fr;gap:12px; }
+    .fields-row-3 { display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px; }
+
+    .badge { display:inline-block;padding:2px 8px;border-radius:10px;font-size:0.72rem;font-weight:600; }
+    .badge-green { background:#e6f4ea;color:#1e8e3e; }
+    .badge-gray { background:#f0f0f0;color:#888; }
+
+    .checkbox-row { display:flex;align-items:center;gap:8px;margin-bottom:12px; }
+    .checkbox-row input[type="checkbox"] { width:auto;margin:0; }
+    .checkbox-row label { margin:0;font-size:0.85rem;color:#333; }
+
+    .icon-btn { background:#fff;border:1px solid #ddd;border-radius:6px;cursor:pointer;padding:5px 7px;display:inline-flex;align-items:center;justify-content:center;color:#666;transition:all 0.15s; }
+    .icon-btn:hover { border-color:#c5221f;color:#c5221f;background:#fef7f6; }
+    .icon-btn svg { width:16px;height:16px;display:block; }
+  </style>
+</head>
+<body>
+  <header id="header"></header>
+
+  <div id="guest-view">
+    <h2 id="t-guest-title"></h2>
+    <p id="t-guest-sub"></p>
+  </div>
+
+  <div id="app-view" style="display:none">
+    <div style="padding:24px;max-width:1400px;margin:0 auto">
+      <div class="page-toolbar">
+        <h2 id="t-page-title"></h2>
+        <div class="toolbar-right">
+          <input type="text" class="filter-select" id="filter-search" placeholder="" style="min-width:180px">
+          <select class="filter-select" id="filter-type">
+            <option value=""></option>
+          </select>
+          <select class="filter-select" id="filter-active">
+            <option value="true"></option>
+            <option value=""></option>
+            <option value="false"></option>
+          </select>
+          <button class="btn btn-primary" id="btn-add" style="display:none"></button>
+        </div>
+      </div>
+
+      <div class="ct-wrap">
+        <table class="ct-table">
+          <thead>
+            <tr>
+              <th id="th-name"></th>
+              <th id="th-type"></th>
+              <th id="th-taxid">Tax ID</th>
+              <th id="th-branch"></th>
+              <th>VAT</th>
+              <th id="th-status"></th>
+              <th style="width:120px"></th>
+            </tr>
+          </thead>
+          <tbody id="ct-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Модалка -->
+  <div class="modal-overlay" id="modal-ct">
+    <div class="modal" style="width:600px;max-width:95vw;max-height:90vh;overflow-y:auto">
+      <h3 id="t-modal-title"></h3>
+
+      <div class="fields-row">
+        <div class="field-group">
+          <label class="required" id="lbl-name-en"></label>
+          <input type="text" id="ct-name-en">
+        </div>
+        <div class="field-group">
+          <label id="lbl-name-th"></label>
+          <input type="text" id="ct-name-th">
+        </div>
+      </div>
+
+      <div class="fields-row-3">
+        <div class="field-group">
+          <label id="lbl-type"></label>
+          <select id="ct-type">
+            <option value="">—</option>
+            <option value="individual"></option>
+            <option value="juristic"></option>
+            <option value="foreign_individual"></option>
+            <option value="foreign_juristic"></option>
+          </select>
+        </div>
+        <div class="field-group">
+          <label id="lbl-tax-id"></label>
+          <input type="text" id="ct-tax-id" maxlength="13">
+        </div>
+        <div class="field-group">
+          <label id="lbl-national-id"></label>
+          <input type="text" id="ct-national-id" maxlength="13">
+        </div>
+      </div>
+
+      <div class="fields-row">
+        <div class="field-group">
+          <label id="lbl-address-en"></label>
+          <textarea id="ct-address-en" rows="2"></textarea>
+        </div>
+        <div class="field-group">
+          <label id="lbl-address-th"></label>
+          <textarea id="ct-address-th" rows="2"></textarea>
+        </div>
+      </div>
+
+      <div class="fields-row-3">
+        <div class="field-group">
+          <label id="lbl-branch"></label>
+          <input type="text" id="ct-branch" placeholder="HQ">
+        </div>
+        <div class="field-group">
+          <label id="lbl-wht-category"></label>
+          <input type="text" id="ct-wht-category">
+        </div>
+        <div class="field-group">
+          <label id="lbl-wht-rate"></label>
+          <input type="number" id="ct-wht-rate" min="0" max="100" step="0.01">
+        </div>
+      </div>
+
+      <div class="checkbox-row">
+        <input type="checkbox" id="ct-vat">
+        <label for="ct-vat" id="lbl-vat"></label>
+      </div>
+
+      <div class="field-group">
+        <label id="lbl-notes"></label>
+        <textarea id="ct-notes" rows="2"></textarea>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn btn-outline" id="btn-cancel"></button>
+        <button class="btn btn-primary" id="btn-save"></button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    const ICON_TRASH = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>';
+
+    let allContractors = [];
+    let currentMode = 'create';
+    let currentId = null;
+    let searchDebounce = null;
+
+    function showToast(msg, type) {
+      const el = document.getElementById('toast');
+      el.textContent = msg;
+      el.className = 'toast show' + (type ? ' ' + type : '');
+      clearTimeout(el._t);
+      el._t = setTimeout(() => el.className = 'toast', 3000);
+    }
+
+    function openModal(id)  { document.getElementById(id).classList.add('open'); }
+    function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+    function ctName(c) {
+      return c.name_en || c.name_th || '—';
+    }
+
+    function typeLabel(type) {
+      const map = { individual: t('typeIndividual'), juristic: t('typeJuristic'),
+                    foreign_individual: t('typeForeignIndividual'), foreign_juristic: t('typeForeignJuristic') };
+      return map[type] || type || '—';
+    }
+
+    function updateTexts() {
+      document.getElementById('t-guest-title').textContent = t('guestTitle');
+      document.getElementById('t-guest-sub').textContent = t('guestSub');
+      document.getElementById('t-page-title').textContent = t('contractors');
+      document.getElementById('filter-search').placeholder = t('search');
+      document.getElementById('btn-add').textContent = t('addContractor');
+      document.getElementById('btn-cancel').textContent = t('cancel');
+      document.getElementById('btn-save').textContent = t('save');
+
+      // Filter selects
+      const ft = document.getElementById('filter-type');
+      ft.options[0].text = t('allTypes');
+      ft.options[1].text = t('typeIndividual');
+      ft.options[2].text = t('typeJuristic');
+      ft.options[3].text = t('typeForeignIndividual');
+      ft.options[4].text = t('typeForeignJuristic');
+
+      const fa = document.getElementById('filter-active');
+      fa.options[0].text = t('active');
+      fa.options[1].text = t('allStatuses');
+      fa.options[2].text = t('inactive');
+
+      // Table headers
+      document.getElementById('th-name').textContent = t('name');
+      document.getElementById('th-type').textContent = t('contractorType');
+      document.getElementById('th-branch').textContent = t('branch');
+      document.getElementById('th-status').textContent = t('statusLabel');
+
+      // Modal labels
+      document.getElementById('lbl-name-en').textContent = t('nameEn');
+      document.getElementById('lbl-name-th').textContent = t('nameTh');
+      document.getElementById('lbl-type').textContent = t('contractorType');
+      document.getElementById('lbl-tax-id').textContent = t('taxId');
+      document.getElementById('lbl-national-id').textContent = t('nationalId');
+      document.getElementById('lbl-address-en').textContent = t('addressEn');
+      document.getElementById('lbl-address-th').textContent = t('addressTh');
+      document.getElementById('lbl-branch').textContent = t('branch');
+      document.getElementById('lbl-wht-category').textContent = t('defaultWhtCategory');
+      document.getElementById('lbl-wht-rate').textContent = t('defaultWhtRate');
+      document.getElementById('lbl-vat').textContent = t('isVatRegistered');
+      document.getElementById('lbl-notes').textContent = t('notes');
+
+      // Modal type options
+      const ct = document.getElementById('ct-type');
+      ct.options[1].text = t('typeIndividual');
+      ct.options[2].text = t('typeJuristic');
+      ct.options[3].text = t('typeForeignIndividual');
+      ct.options[4].text = t('typeForeignJuristic');
+
+      updateHeaderTexts();
+    }
+
+    async function loadContractors() {
+      const tbody = document.getElementById('ct-tbody');
+      tbody.innerHTML = `<tr><td colspan="7" class="loading">${t('loading')}</td></tr>`;
+      try {
+        let url = '/contractors?';
+        const search = document.getElementById('filter-search').value.trim();
+        const type = document.getElementById('filter-type').value;
+        const active = document.getElementById('filter-active').value;
+        if (search) url += `search=${encodeURIComponent(search)}&`;
+        if (type) url += `type=${type}&`;
+        if (active !== '') url += `active=${active}&`;
+        allContractors = await apiFetch(url);
+        renderTable();
+      } catch(e) {
+        tbody.innerHTML = `<tr><td colspan="7" class="empty-state">${e.message}</td></tr>`;
+      }
+    }
+
+    function renderTable() {
+      const tbody = document.getElementById('ct-tbody');
+      if (!allContractors.length) {
+        tbody.innerHTML = `<tr><td colspan="7" class="empty-state">${t('noContractors')}</td></tr>`;
+        return;
+      }
+      tbody.innerHTML = allContractors.map(c => {
+        const active = c.is_active !== false;
+        return `
+        <tr class="${active ? '' : 'inactive'}" data-id="${c.id}">
+          <td><strong>${ctName(c)}</strong>${c.name_th && c.name_en ? `<br><span style="font-size:0.78rem;color:#888">${c.name_th}</span>` : ''}</td>
+          <td style="font-size:0.82rem">${typeLabel(c.type)}</td>
+          <td style="font-size:0.82rem;font-family:monospace">${c.tax_id || c.national_id || '—'}</td>
+          <td style="font-size:0.82rem">${c.branch || '—'}</td>
+          <td>${c.is_vat_registered ? '<span class="badge badge-green">VAT</span>' : '<span style="color:#ccc">—</span>'}</td>
+          <td>${active ? `<span class="badge badge-green">${t('active')}</span>` : `<span class="badge badge-gray">${t('inactive')}</span>`}</td>
+          <td>
+            <div style="display:flex;gap:6px;align-items:center;justify-content:flex-end">
+              <button class="btn btn-outline" style="padding:3px 8px;font-size:0.78rem" data-action="edit" data-id="${c.id}">${t('edit')}</button>
+              <button class="icon-btn" data-action="delete" data-id="${c.id}" title="${t('delete')}">${ICON_TRASH}</button>
+            </div>
+          </td>
+        </tr>`;
+      }).join('');
+    }
+
+    // Filters
+    document.getElementById('filter-search').addEventListener('input', () => {
+      clearTimeout(searchDebounce);
+      searchDebounce = setTimeout(loadContractors, 300);
+    });
+    document.getElementById('filter-type').addEventListener('change', loadContractors);
+    document.getElementById('filter-active').addEventListener('change', loadContractors);
+
+    // Add button
+    document.getElementById('btn-add').addEventListener('click', () => {
+      currentMode = 'create'; currentId = null;
+      document.getElementById('t-modal-title').textContent = t('addContractor');
+      ['ct-name-en','ct-name-th','ct-tax-id','ct-national-id','ct-address-en','ct-address-th','ct-branch','ct-wht-category','ct-wht-rate','ct-notes'].forEach(id => document.getElementById(id).value = '');
+      document.getElementById('ct-type').value = '';
+      document.getElementById('ct-vat').checked = false;
+      document.getElementById('ct-branch').placeholder = 'HQ';
+      openModal('modal-ct');
+    });
+
+    // Actions
+    document.addEventListener('click', async e => {
+      const btn = e.target.closest('button[data-action]');
+      if (!btn) return;
+      const action = btn.dataset.action;
+      const id = btn.dataset.id;
+
+      if (action === 'edit') {
+        const c = allContractors.find(x => x.id === id);
+        if (!c) return;
+        currentMode = 'edit'; currentId = id;
+        document.getElementById('t-modal-title').textContent = t('editContractor');
+        document.getElementById('ct-name-en').value = c.name_en || '';
+        document.getElementById('ct-name-th').value = c.name_th || '';
+        document.getElementById('ct-type').value = c.type || '';
+        document.getElementById('ct-tax-id').value = c.tax_id || '';
+        document.getElementById('ct-national-id').value = c.national_id || '';
+        document.getElementById('ct-address-en').value = c.address_en || '';
+        document.getElementById('ct-address-th').value = c.address_th || '';
+        document.getElementById('ct-branch').value = c.branch || '';
+        document.getElementById('ct-vat').checked = !!c.is_vat_registered;
+        document.getElementById('ct-wht-category').value = c.default_wht_category || '';
+        const whtRate = c.default_wht_rate;
+        document.getElementById('ct-wht-rate').value = whtRate != null ? (typeof whtRate === 'object' ? whtRate.value : whtRate) : '';
+        document.getElementById('ct-notes').value = c.notes || '';
+        openModal('modal-ct');
+      }
+
+      if (action === 'delete') {
+        if (!confirm(t('confirmDelete'))) return;
+        btn.disabled = true;
+        try {
+          await apiFetch(`/contractors/${id}`, { method: 'DELETE' });
+          showToast(t('deleted'), 'success');
+          loadContractors();
+        } catch(err) { showToast(err.message, 'error'); btn.disabled = false; }
+      }
+    });
+
+    // Modal
+    document.getElementById('btn-cancel').addEventListener('click', () => closeModal('modal-ct'));
+
+    document.getElementById('btn-save').addEventListener('click', async () => {
+      const name_en = document.getElementById('ct-name-en').value.trim();
+      const name_th = document.getElementById('ct-name-th').value.trim();
+      if (!name_en && !name_th) {
+        document.getElementById('ct-name-en').classList.add('invalid');
+        showToast(t('fillAllFields'), 'error');
+        return;
+      }
+      document.getElementById('ct-name-en').classList.remove('invalid');
+
+      const body = {
+        name_en, name_th,
+        type: document.getElementById('ct-type').value,
+        tax_id: document.getElementById('ct-tax-id').value.trim(),
+        national_id: document.getElementById('ct-national-id').value.trim(),
+        address_en: document.getElementById('ct-address-en').value.trim(),
+        address_th: document.getElementById('ct-address-th').value.trim(),
+        branch: document.getElementById('ct-branch').value.trim(),
+        is_vat_registered: document.getElementById('ct-vat').checked,
+        default_wht_category: document.getElementById('ct-wht-category').value.trim(),
+        default_wht_rate: document.getElementById('ct-wht-rate').value || null,
+        notes: document.getElementById('ct-notes').value.trim(),
+      };
+
+      closeModal('modal-ct');
+      try {
+        if (currentMode === 'create') {
+          await apiFetch('/contractors', { method: 'POST', body: JSON.stringify(body) });
+        } else {
+          await apiFetch(`/contractors/${currentId}`, { method: 'PUT', body: JSON.stringify(body) });
+        }
+        showToast(t('saved'), 'success');
+        loadContractors();
+      } catch(e) { showToast(e.message, 'error'); }
+    });
+
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape') closeModal('modal-ct');
+    });
+
+    window.onLogin = () => {
+      updateTexts();
+      if (typeof isAdmin !== 'undefined' && isAdmin) {
+        document.getElementById('btn-add').style.display = '';
+      }
+      loadContractors();
+    };
+    window.onLogout = () => { updateTexts(); };
+    window.onLangChange = () => { updateTexts(); renderTable(); };
+
+    renderHeader('contractors');
+    updateTexts();
+  </script>
+</body>
+</html>

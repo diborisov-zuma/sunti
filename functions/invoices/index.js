@@ -96,12 +96,14 @@ exports.invoices = async (req, res) => {
       const trxTable = `\`${PROJECT}.${DATASET}.transactions\``;
       const [rows] = await bigquery.query({
         query: `SELECT i.id, i.folder_id, i.name, i.status, i.direction, i.total_amount, i.paid_amount,
-                       i.category_id, i.uploaded_by, i.uploaded_at, i.date,
+                       i.category_id, i.contractor_id, i.uploaded_by, i.uploaded_at, i.date,
                        c.name as category_name,
+                       ct.name_en as contractor_name_en, ct.name_th as contractor_name_th,
                        (SELECT COUNT(*) FROM ${trxTable} t
                         WHERE t.invoice_id = i.id AND IFNULL(t.status, 'active') != 'deleted') AS trx_count
                 FROM ${table} i
                 LEFT JOIN ${catTable} c ON i.category_id = c.id
+                LEFT JOIN \`${PROJECT}.${DATASET}.contractors\` ct ON i.contractor_id = ct.id
                 ${where}
                 ORDER BY i.uploaded_at DESC
                 LIMIT ${limit} OFFSET ${offset}`,
@@ -131,22 +133,23 @@ exports.invoices = async (req, res) => {
 
     // POST — создать накладную
     if (req.method === 'POST') {
-      const { folder_id, name, status, direction, total_amount, paid_amount, category_id, date } = req.body;
+      const { folder_id, name, status, direction, total_amount, paid_amount, category_id, contractor_id, date } = req.body;
       if (!folder_id || !name) { res.status(400).json({ error: 'folder_id and name are required' }); return; }
       if (parseFloat(total_amount || 0) < 0 || parseFloat(paid_amount || 0) < 0) { res.status(400).json({ error: 'amounts must be non-negative' }); return; }
       const id = uuidv4();
       await bigquery.query({
-        query: `INSERT INTO ${table} (id, folder_id, name, status, direction, total_amount, paid_amount, category_id, date, uploaded_by, uploaded_at)
-                VALUES (@id, @folder_id, @name, @status, @direction, CAST(@total_amount AS NUMERIC), CAST(@paid_amount AS NUMERIC), NULLIF(@category_id, ''), IF(@date = '', NULL, DATE(@date)), @uploaded_by, CURRENT_TIMESTAMP())`,
+        query: `INSERT INTO ${table} (id, folder_id, name, status, direction, total_amount, paid_amount, category_id, contractor_id, date, uploaded_by, uploaded_at)
+                VALUES (@id, @folder_id, @name, @status, @direction, CAST(@total_amount AS NUMERIC), CAST(@paid_amount AS NUMERIC), NULLIF(@category_id, ''), NULLIF(@contractor_id, ''), IF(@date = '', NULL, DATE(@date)), @uploaded_by, CURRENT_TIMESTAMP())`,
         params: {
           id, folder_id, name,
-          status:       status     || 'active',
-          direction:    direction  || 'expense',
-          total_amount: parseFloat(total_amount || 0),
-          paid_amount:  parseFloat(paid_amount  || 0),
-          category_id:  category_id || '',
-          date:         date || '',
-          uploaded_by:  email,
+          status:        status     || 'active',
+          direction:     direction  || 'expense',
+          total_amount:  parseFloat(total_amount || 0),
+          paid_amount:   parseFloat(paid_amount  || 0),
+          category_id:   category_id || '',
+          contractor_id: contractor_id || '',
+          date:          date || '',
+          uploaded_by:   email,
         },
       });
       res.json({ success: true, id });
@@ -156,7 +159,7 @@ exports.invoices = async (req, res) => {
     // PUT — редактировать
     if (req.method === 'PUT') {
       const id = req.url.split('/').filter(Boolean).pop().split('?')[0];
-      const { name, status, direction, total_amount, paid_amount, category_id, date } = req.body;
+      const { name, status, direction, total_amount, paid_amount, category_id, contractor_id, date } = req.body;
       if (!name || !id) { res.status(400).json({ error: 'name and id are required' }); return; }
       if (parseFloat(total_amount || 0) < 0 || parseFloat(paid_amount || 0) < 0) { res.status(400).json({ error: 'amounts must be non-negative' }); return; }
 
@@ -169,18 +172,19 @@ exports.invoices = async (req, res) => {
 
       await bigquery.query({ query: `DELETE FROM ${table} WHERE id = @id`, params: { id } });
       await bigquery.query({
-        query: `INSERT INTO ${table} (id, folder_id, name, status, direction, total_amount, paid_amount, category_id, date, uploaded_by, uploaded_at)
-                VALUES (@id, @folder_id, @name, @status, @direction, CAST(@total_amount AS NUMERIC), CAST(@paid_amount AS NUMERIC), NULLIF(@category_id, ''), IF(@date = '', NULL, DATE(@date)), @uploaded_by, TIMESTAMP(@uploaded_at))`,
+        query: `INSERT INTO ${table} (id, folder_id, name, status, direction, total_amount, paid_amount, category_id, contractor_id, date, uploaded_by, uploaded_at)
+                VALUES (@id, @folder_id, @name, @status, @direction, CAST(@total_amount AS NUMERIC), CAST(@paid_amount AS NUMERIC), NULLIF(@category_id, ''), NULLIF(@contractor_id, ''), IF(@date = '', NULL, DATE(@date)), @uploaded_by, TIMESTAMP(@uploaded_at))`,
         params: {
           id, folder_id: cur.folder_id, name,
-          status:       status     || 'active',
-          direction:    direction  || 'expense',
-          total_amount: parseFloat(total_amount || 0),
-          paid_amount:  parseFloat(paid_amount  || 0),
-          category_id:  category_id || '',
-          date:         date || '',
-          uploaded_by:  cur.uploaded_by,
-          uploaded_at:  cur.uploaded_at,
+          status:        status     || 'active',
+          direction:     direction  || 'expense',
+          total_amount:  parseFloat(total_amount || 0),
+          paid_amount:   parseFloat(paid_amount  || 0),
+          category_id:   category_id || '',
+          contractor_id: contractor_id || '',
+          date:          date || '',
+          uploaded_by:   cur.uploaded_by,
+          uploaded_at:   cur.uploaded_at,
         },
       });
       res.json({ success: true });
@@ -238,7 +242,7 @@ exports.invoices = async (req, res) => {
       } else {
         // Мягкое удаление: инвойс и его транзакции → status='deleted'. Файлы сохраняются.
         const [rows] = await bigquery.query({
-          query: `SELECT folder_id, name, direction, total_amount, paid_amount, category_id, uploaded_by, date,
+          query: `SELECT folder_id, name, direction, total_amount, paid_amount, category_id, contractor_id, uploaded_by, date,
                          FORMAT_TIMESTAMP('%Y-%m-%dT%H:%M:%S', uploaded_at) as uploaded_at
                   FROM ${table} WHERE id = @id`,
           params: { id },
@@ -248,19 +252,20 @@ exports.invoices = async (req, res) => {
 
         await bigquery.query({ query: `DELETE FROM ${table} WHERE id = @id`, params: { id } });
         await bigquery.query({
-          query: `INSERT INTO ${table} (id, folder_id, name, status, direction, total_amount, paid_amount, category_id, date, uploaded_by, uploaded_at)
-                  VALUES (@id, @folder_id, @name, 'deleted', @direction, CAST(@total_amount AS NUMERIC), CAST(@paid_amount AS NUMERIC), NULLIF(@category_id,''), IF(@date = '', NULL, DATE(@date)), @uploaded_by, TIMESTAMP(@uploaded_at))`,
+          query: `INSERT INTO ${table} (id, folder_id, name, status, direction, total_amount, paid_amount, category_id, contractor_id, date, uploaded_by, uploaded_at)
+                  VALUES (@id, @folder_id, @name, 'deleted', @direction, CAST(@total_amount AS NUMERIC), CAST(@paid_amount AS NUMERIC), NULLIF(@category_id,''), NULLIF(@contractor_id,''), IF(@date = '', NULL, DATE(@date)), @uploaded_by, TIMESTAMP(@uploaded_at))`,
           params: {
             id,
-            folder_id:    cur.folder_id,
-            name:         cur.name,
-            direction:    cur.direction    || 'expense',
-            total_amount: cur.total_amount || 0,
-            paid_amount:  cur.paid_amount  || 0,
-            category_id:  cur.category_id || '',
-            date:         cur.date ? (cur.date.value || cur.date) : '',
-            uploaded_by:  cur.uploaded_by,
-            uploaded_at:  cur.uploaded_at,
+            folder_id:     cur.folder_id,
+            name:          cur.name,
+            direction:     cur.direction    || 'expense',
+            total_amount:  cur.total_amount || 0,
+            paid_amount:   cur.paid_amount  || 0,
+            category_id:   cur.category_id || '',
+            contractor_id: cur.contractor_id || '',
+            date:          cur.date ? (cur.date.value || cur.date) : '',
+            uploaded_by:   cur.uploaded_by,
+            uploaded_at:   cur.uploaded_at,
           },
         });
 

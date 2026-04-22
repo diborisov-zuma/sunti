@@ -11,12 +11,13 @@ function renderHeader(activePage) {
       <a href="statements.html" class="nav-link ${activePage === 'statements' ? 'active' : ''}" id="t-nav-statements"></a>
       <a href="reports.html"  class="nav-link ${activePage === 'reports'  ? 'active' : ''}" id="t-nav-reports"></a>
       <div class="nav-dropdown" id="nav-settings" style="display:none">
-        <a class="nav-link ${['folders','companies','users','categories'].includes(activePage) ? 'active' : ''}" id="t-nav-settings">⚙</a>
+        <a class="nav-link ${['folders','companies','users','categories','contractors'].includes(activePage) ? 'active' : ''}" id="t-nav-settings">⚙</a>
         <div class="nav-dropdown-menu">
-          <a href="folders.html"    class="${activePage === 'folders'    ? 'active' : ''}" id="t-nav-folders"></a>
-          <a href="companies.html"  class="${activePage === 'companies'  ? 'active' : ''}" id="t-nav-companies"></a>
-          <a href="users.html"      class="${activePage === 'users'      ? 'active' : ''}" id="t-nav-users"></a>
-          <a href="categories.html" class="${activePage === 'categories' ? 'active' : ''}" id="t-nav-categories"></a>
+          <a href="folders.html"      class="${activePage === 'folders'      ? 'active' : ''}" id="t-nav-folders"></a>
+          <a href="companies.html"    class="${activePage === 'companies'    ? 'active' : ''}" id="t-nav-companies"></a>
+          <a href="contractors.html"  class="${activePage === 'contractors'  ? 'active' : ''}" id="t-nav-contractors"></a>
+          <a href="users.html"        class="${activePage === 'users'        ? 'active' : ''}" id="t-nav-users"></a>
+          <a href="categories.html"   class="${activePage === 'categories'   ? 'active' : ''}" id="t-nav-categories"></a>
         </div>
       </div>
     </nav>
@@ -98,6 +99,7 @@ function updateHeaderTexts() {
   const nc = document.getElementById('t-nav-companies');
   const nu = document.getElementById('t-nav-users');
   const ncat = document.getElementById('t-nav-categories');
+  const nctr = document.getElementById('t-nav-contractors');
   const nsett = document.getElementById('t-nav-settings');
   const settWrap = document.getElementById('nav-settings');
   const lb = document.getElementById('logout-btn');
@@ -108,6 +110,7 @@ function updateHeaderTexts() {
   if (ns)  ns.textContent  = t('navStatements');
   if (nr) nr.textContent = t('navReports');
   if (nc) nc.textContent = t('navCompanies');
+  if (nctr) nctr.textContent = t('navContractors');
   if (nu) nu.textContent = t('navUsers');
   if (ncat) ncat.textContent = t('navCategories');
   if (nsett) nsett.textContent = '⚙ ' + t('navSettings');

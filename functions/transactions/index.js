@@ -99,13 +99,15 @@ exports.transactions = async (req, res) => {
       const [rows] = await bigquery.query({
         query: `SELECT t.id, t.date, t.amount, t.direction, t.account_id,
                        t.counterparty_id, t.category_id, t.invoice_id, t.folder_id,
-                       t.description, t.created_at, t.statement_line_id,
+                       t.contractor_id, t.description, t.created_at, t.statement_line_id,
                        IFNULL(t.status, 'active') AS status,
                        c.name as category_name,
-                       a.name as account_name
+                       a.name as account_name,
+                       ct.name_en as contractor_name_en, ct.name_th as contractor_name_th
                 FROM ${table} t
                 LEFT JOIN ${catTable} c ON t.category_id = c.id
                 LEFT JOIN ${accTable} a ON t.account_id  = a.id
+                LEFT JOIN \`${PROJECT}.${DATASET}.contractors\` ct ON t.contractor_id = ct.id
                 ${where}
                 ORDER BY t.date DESC`,
         params,
@@ -116,7 +118,7 @@ exports.transactions = async (req, res) => {
 
     // POST — создать транзакцию
     if (req.method === 'POST') {
-      const { date, amount, direction, account_id, counterparty_id, category_id, invoice_id, folder_id, description } = req.body;
+      const { date, amount, direction, account_id, counterparty_id, category_id, invoice_id, folder_id, contractor_id, description } = req.body;
       if (!date || !amount || !direction) {
         res.status(400).json({ error: 'date, amount and direction are required' });
         return;
@@ -135,8 +137,8 @@ exports.transactions = async (req, res) => {
       }
       const id = uuidv4();
       await bigquery.query({
-        query: `INSERT INTO ${table} (id, date, amount, direction, account_id, counterparty_id, category_id, invoice_id, folder_id, description, created_at)
-                VALUES (@id, @date, CAST(@amount AS NUMERIC), @direction, NULLIF(@account_id,''), NULLIF(@counterparty_id,''), NULLIF(@category_id,''), NULLIF(@invoice_id,''), NULLIF(@folder_id,''), @description, CURRENT_TIMESTAMP())`,
+        query: `INSERT INTO ${table} (id, date, amount, direction, account_id, counterparty_id, category_id, invoice_id, folder_id, contractor_id, description, created_at)
+                VALUES (@id, @date, CAST(@amount AS NUMERIC), @direction, NULLIF(@account_id,''), NULLIF(@counterparty_id,''), NULLIF(@category_id,''), NULLIF(@invoice_id,''), NULLIF(@folder_id,''), NULLIF(@contractor_id,''), @description, CURRENT_TIMESTAMP())`,
         params: {
           id,
           date,
@@ -147,6 +149,7 @@ exports.transactions = async (req, res) => {
           category_id:     category_id     || '',
           invoice_id:      invoice_id      || '',
           folder_id:       folder_id       || '',
+          contractor_id:   contractor_id   || '',
           description:     description     || '',
         },
       });
@@ -158,7 +161,7 @@ exports.transactions = async (req, res) => {
     // PUT — редактировать транзакцию
     if (req.method === 'PUT') {
       const id = req.url.split('/').filter(Boolean).pop().split('?')[0];
-      const { date, amount, direction, account_id, counterparty_id, category_id, folder_id, invoice_id, description } = req.body;
+      const { date, amount, direction, account_id, counterparty_id, category_id, folder_id, invoice_id, contractor_id, description } = req.body;
       if (!id || !date || !amount) { res.status(400).json({ error: 'id, date and amount are required' }); return; }
       if (parseFloat(amount) < 0) { res.status(400).json({ error: 'amount must be non-negative' }); return; }
       if (invoice_id) {
@@ -175,7 +178,7 @@ exports.transactions = async (req, res) => {
       }
 
       const [rows] = await bigquery.query({
-        query: `SELECT invoice_id, folder_id, FORMAT_TIMESTAMP('%Y-%m-%dT%H:%M:%S', created_at) as created_at FROM ${table} WHERE id = @id`,
+        query: `SELECT invoice_id, folder_id, contractor_id, FORMAT_TIMESTAMP('%Y-%m-%dT%H:%M:%S', created_at) as created_at FROM ${table} WHERE id = @id`,
         params: { id },
       });
       if (!rows.length) { res.status(404).json({ error: 'Not found' }); return; }
@@ -183,8 +186,8 @@ exports.transactions = async (req, res) => {
 
       await bigquery.query({ query: `DELETE FROM ${table} WHERE id = @id`, params: { id } });
       await bigquery.query({
-        query: `INSERT INTO ${table} (id, date, amount, direction, account_id, counterparty_id, category_id, invoice_id, folder_id, description, created_at)
-                VALUES (@id, @date, CAST(@amount AS NUMERIC), @direction, NULLIF(@account_id,''), NULLIF(@counterparty_id,''), NULLIF(@category_id,''), NULLIF(@invoice_id,''), NULLIF(@folder_id,''), @description, TIMESTAMP(@created_at))`,
+        query: `INSERT INTO ${table} (id, date, amount, direction, account_id, counterparty_id, category_id, invoice_id, folder_id, contractor_id, description, created_at)
+                VALUES (@id, @date, CAST(@amount AS NUMERIC), @direction, NULLIF(@account_id,''), NULLIF(@counterparty_id,''), NULLIF(@category_id,''), NULLIF(@invoice_id,''), NULLIF(@folder_id,''), NULLIF(@contractor_id,''), @description, TIMESTAMP(@created_at))`,
         params: {
           id,
           date,
@@ -195,6 +198,7 @@ exports.transactions = async (req, res) => {
           category_id:     category_id     || '',
           invoice_id:      (invoice_id !== undefined ? (invoice_id || '') : (cur.invoice_id || '')),
           folder_id:       folder_id       || cur.folder_id || '',
+          contractor_id:   (contractor_id !== undefined ? (contractor_id || '') : (cur.contractor_id || '')),
           description:     description     || '',
           created_at:      cur.created_at,
         },
@@ -227,7 +231,7 @@ exports.transactions = async (req, res) => {
         // Мягкое удаление — обновляем статус через DELETE+INSERT
         const [rows] = await bigquery.query({
           query: `SELECT date, amount, direction, account_id, counterparty_id, category_id,
-                         invoice_id, folder_id, description,
+                         invoice_id, folder_id, contractor_id, description,
                          FORMAT_TIMESTAMP('%Y-%m-%dT%H:%M:%S', created_at) as created_at
                   FROM ${table} WHERE id = @id`,
           params: { id },
@@ -237,8 +241,8 @@ exports.transactions = async (req, res) => {
 
         await bigquery.query({ query: `DELETE FROM ${table} WHERE id = @id`, params: { id } });
         await bigquery.query({
-          query: `INSERT INTO ${table} (id, date, amount, direction, account_id, counterparty_id, category_id, invoice_id, folder_id, description, status, created_at)
-                  VALUES (@id, @date, CAST(@amount AS NUMERIC), @direction, NULLIF(@account_id,''), NULLIF(@counterparty_id,''), NULLIF(@category_id,''), NULLIF(@invoice_id,''), NULLIF(@folder_id,''), @description, 'deleted', TIMESTAMP(@created_at))`,
+          query: `INSERT INTO ${table} (id, date, amount, direction, account_id, counterparty_id, category_id, invoice_id, folder_id, contractor_id, description, status, created_at)
+                  VALUES (@id, @date, CAST(@amount AS NUMERIC), @direction, NULLIF(@account_id,''), NULLIF(@counterparty_id,''), NULLIF(@category_id,''), NULLIF(@invoice_id,''), NULLIF(@folder_id,''), NULLIF(@contractor_id,''), @description, 'deleted', TIMESTAMP(@created_at))`,
           params: {
             id,
             date:            cur.date,
@@ -249,6 +253,7 @@ exports.transactions = async (req, res) => {
             category_id:     cur.category_id     || '',
             invoice_id:      cur.invoice_id      || '',
             folder_id:       cur.folder_id       || '',
+            contractor_id:   cur.contractor_id   || '',
             description:     cur.description     || '',
             created_at:      cur.created_at,
           },
