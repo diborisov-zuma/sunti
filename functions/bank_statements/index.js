@@ -252,6 +252,43 @@ exports.bank_statements = async (req, res) => {
         const buffer = await downloadFileBuffer(st.file_url);
         const result = parser.parse(buffer);
 
+        // Проверяем пересечение периодов
+        if (result.period_from && result.period_to && st.account_id) {
+          const [overlap] = await bigquery.query({
+            query: `SELECT id, name, period_from, period_to
+                    FROM ${table}
+                    WHERE company_id = @company_id
+                      AND account_id = @account_id
+                      AND id != @id
+                      AND IFNULL(status, 'active') != 'deleted'
+                      AND period_from IS NOT NULL AND period_to IS NOT NULL
+                      AND period_from <= DATE(@new_to)
+                      AND period_to >= DATE(@new_from)
+                    LIMIT 1`,
+            params: {
+              company_id: st.company_id,
+              account_id: st.account_id,
+              id,
+              new_from: result.period_from,
+              new_to: result.period_to,
+            },
+          });
+          if (overlap.length) {
+            const c = overlap[0];
+            const cfrom = c.period_from?.value || c.period_from || '';
+            const cto = c.period_to?.value || c.period_to || '';
+            await bigquery.query({
+              query: `UPDATE ${table} SET import_status = 'failed', import_error = @error WHERE id = @id`,
+              params: { id, error: `Period overlap with "${c.name}" (${cfrom} — ${cto})` },
+            });
+            res.status(409).json({
+              error: `Period ${result.period_from} — ${result.period_to} overlaps with "${c.name}" (${cfrom} — ${cto})`,
+              conflict: { id: c.id, name: c.name, period_from: cfrom, period_to: cto },
+            });
+            return;
+          }
+        }
+
         // Вставляем строки
         await insertLines(id, st.account_id, st.company_id, result.lines, email);
 

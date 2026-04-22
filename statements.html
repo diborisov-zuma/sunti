@@ -162,10 +162,12 @@
       el._t = setTimeout(() => el.className = 'toast', 3000);
     }
 
-    function fillAccountSelect(selectId, selectedId) {
+    function fillAccountSelect(selectId, selectedId, isFilter) {
       const sel = document.getElementById(selectId);
       if (!sel) return;
-      sel.innerHTML = `<option value="">— ${t('allAccounts')} —</option>`;
+      sel.innerHTML = isFilter
+        ? `<option value="">${t('allAccounts')}</option>`
+        : `<option value="">— ${t('selectCompanyFirst')} —</option>`;
       accountsCache.forEach(a => {
         const opt = document.createElement('option');
         opt.value = a.id;
@@ -287,7 +289,7 @@
           document.getElementById('st-file').value = '';
           document.getElementById('st-current-file').textContent = '';
           document.getElementById('st-format').value = 'bangkok_bank';
-          fillAccountSelect('st-account', '');
+          fillAccountSelect('st-account', '', false);
           openModal('modal-st');
         });
       }
@@ -417,7 +419,7 @@
         document.getElementById('st-name').value = btn.dataset.name || '';
         document.getElementById('st-date').value = btn.dataset.date ? btn.dataset.date.split('T')[0] : '';
         document.getElementById('st-format').value = btn.dataset.format || '';
-        fillAccountSelect('st-account', btn.dataset.account || '');
+        fillAccountSelect('st-account', btn.dataset.account || '', false);
         document.getElementById('st-file').value = '';
         document.getElementById('st-current-file').textContent = currentStFileMeta ? `${t('file')}: ${currentStFileMeta.name}` : '';
         openModal('modal-st');

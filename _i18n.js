@@ -233,6 +233,10 @@ const i18n = {
     linesTotal: 'из',
     accountLabel: 'Счёт',
     statementPeriod: 'Период выписки',
+    statementBadge: 'Выписка',
+    statementMatched: 'Платеж сопоставлен с банковской выпиской',
+    statementNotMatched: 'Платеж не сопоставлен с банковской выпиской',
+    periodOverlap: 'Период пересекается с существующей выпиской',
 
     // Модалка пользователя
     sectionMain: 'Основное',
@@ -481,6 +485,10 @@ const i18n = {
     linesTotal: 'of',
     accountLabel: 'Account',
     statementPeriod: 'Statement period',
+    statementBadge: 'Statement',
+    statementMatched: 'Payment matched with bank statement',
+    statementNotMatched: 'Payment not matched with bank statement',
+    periodOverlap: 'Period overlaps with an existing statement',
 
     // User modal
     sectionMain: 'General',
@@ -729,6 +737,10 @@ const i18n = {
     linesTotal: 'จาก',
     accountLabel: 'บัญชี',
     statementPeriod: 'ช่วงเวลาใบแจ้งยอด',
+    statementBadge: 'ใบแจ้งยอด',
+    statementMatched: 'การชำระเงินจับคู่กับใบแจ้งยอดธนาคาร',
+    statementNotMatched: 'การชำระเงินยังไม่จับคู่กับใบแจ้งยอดธนาคาร',
+    periodOverlap: 'ช่วงเวลาซ้อนทับกับใบแจ้งยอดที่มีอยู่',
 
     // โมดอลผู้ใช้
     sectionMain: 'ทั่วไป',

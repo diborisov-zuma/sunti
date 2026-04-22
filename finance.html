@@ -878,6 +878,10 @@
               ${deletedOrMark}
               ${isAdmin ? `<button class="icon-btn" data-action="hard-delete-trx" data-id="${tx.id}" title="${t('hardDelete')}">${ICON_TRASH}</button>` : ''}
               ${tx.invoice_id ? `<span title="${t('linkedToDoc')}" style="color:#1a73e8;font-size:0.95rem">📄</span>` : ''}
+              ${tx.statement_line_id
+                ? `<span title="${t('statementMatched')}" style="display:inline-flex;align-items:center;gap:2px;background:#e6f4ea;color:#1e8e3e;padding:1px 6px;border-radius:8px;font-size:0.68rem;font-weight:600;cursor:default">✓ ${t('statementBadge')}</span>`
+                : `<span title="${t('statementNotMatched')}" style="display:inline-flex;align-items:center;gap:2px;background:#fce8e6;color:#c5221f;padding:1px 6px;border-radius:8px;font-size:0.68rem;font-weight:600;cursor:default">✗ ${t('statementBadge')}</span>`
+              }
               <button class="chat-btn" data-doc-id="${tx.id}" data-doc-type="transaction" data-doc-name="${(tx.description||formatDate(tx.date)).replace(/"/g,'&quot;')}"
                 title="${t('chat')}">💬<span class="chat-badge" style="display:none"></span></button>
             </div>
