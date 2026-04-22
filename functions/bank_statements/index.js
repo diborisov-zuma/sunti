@@ -263,16 +263,16 @@ exports.bank_statements = async (req, res) => {
                       lines_count = @lines_count,
                       period_from = IF(@period_from = '', NULL, DATE(@period_from)),
                       period_to   = IF(@period_to = '', NULL, DATE(@period_to)),
-                      opening_balance = @opening_balance,
-                      closing_balance = @closing_balance
+                      opening_balance = CAST(@opening_balance AS NUMERIC),
+                      closing_balance = CAST(@closing_balance AS NUMERIC)
                   WHERE id = @id`,
           params: {
             id,
             lines_count: result.lines.length,
             period_from: result.period_from || '',
             period_to: result.period_to || '',
-            opening_balance: result.opening_balance,
-            closing_balance: result.closing_balance,
+            opening_balance: result.opening_balance != null ? String(result.opening_balance) : '0',
+            closing_balance: result.closing_balance != null ? String(result.closing_balance) : '0',
           },
         });
 
