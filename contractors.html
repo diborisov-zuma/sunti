@@ -409,12 +409,12 @@
       if (e.key === 'Escape') closeModal('modal-ct');
     });
 
-    window.onLogin = () => {
+    window.onLogin = async () => {
       updateTexts();
-      if (typeof isAdmin !== 'undefined' && isAdmin) {
+      if (isAdmin) {
         document.getElementById('btn-add').style.display = '';
       }
-      loadContractors();
+      await loadContractors();
     };
     window.onLogout = () => { updateTexts(); };
     window.onLangChange = () => { updateTexts(); renderTable(); };
