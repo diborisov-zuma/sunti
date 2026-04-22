@@ -85,12 +85,12 @@ async function insertLines(statementId, accountId, companyId, lines, email) {
     lineNumbers.push(i + 1);
     dates.push(l.date);
     valueDates.push(l.value_date || null);
-    amounts.push(l.amount);
+    amounts.push(String(l.amount));
     directions.push(l.direction);
     descriptions.push(l.description || '');
     counterparties.push(l.counterparty || '');
     references.push(l.reference || '');
-    runningBalances.push(l.running_balance != null ? l.running_balance : null);
+    runningBalances.push(l.running_balance != null ? String(l.running_balance) : '');
     currencies.push(l.currency || 'THB');
     rawDatas.push(JSON.stringify(l.raw_data || {}));
   }
@@ -105,7 +105,7 @@ async function insertLines(statementId, accountId, companyId, lines, email) {
               id, @statement_id, @account_id, @company_id, line_number,
               DATE(date), IF(value_date = '', NULL, DATE(value_date)),
               CAST(amount AS NUMERIC), direction, description,
-              NULLIF(counterparty, ''), NULLIF(reference, ''), running_balance,
+              NULLIF(counterparty, ''), NULLIF(reference, ''), IF(running_balance = '', NULL, CAST(running_balance AS NUMERIC)),
               currency, SAFE.PARSE_JSON(raw_data),
               NULL, 'unmatched', NULL, NULL,
               CURRENT_TIMESTAMP(), 'active'
