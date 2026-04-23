@@ -9,6 +9,7 @@ function renderHeader(activePage) {
       <a href="invoices.html" class="nav-link ${activePage === 'invoices' ? 'active' : ''}" id="t-nav-invoices"></a>
       <a href="finance.html"  class="nav-link ${activePage === 'finance'  ? 'active' : ''}" id="t-nav-finance"></a>
       <a href="statements.html" class="nav-link ${activePage === 'statements' ? 'active' : ''}" id="t-nav-statements"></a>
+      <a href="contracts.html" class="nav-link ${activePage === 'contracts' ? 'active' : ''}" id="t-nav-contracts"></a>
       <a href="reports.html"  class="nav-link ${activePage === 'reports'  ? 'active' : ''}" id="t-nav-reports"></a>
       <div class="nav-dropdown" id="nav-settings" style="display:none">
         <a class="nav-link ${['folders','companies','users','categories','contractors'].includes(activePage) ? 'active' : ''}" id="t-nav-settings">⚙</a>
@@ -108,6 +109,8 @@ function updateHeaderTexts() {
   if (ni) ni.textContent = t('navInvoices');
   if (nfi) nfi.textContent = t('navFinance');
   if (ns)  ns.textContent  = t('navStatements');
+  const nct = document.getElementById('t-nav-contracts');
+  if (nct) nct.textContent = t('navContracts');
   if (nr) nr.textContent = t('navReports');
   if (nc) nc.textContent = t('navCompanies');
   if (nctr) nctr.textContent = t('navContractors');

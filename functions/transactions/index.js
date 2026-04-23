@@ -22,14 +22,28 @@ async function verifyToken(req) {
   return info.email || null;
 }
 
+async function recalcContractPaid(contractId) {
+  if (!contractId) return;
+  const cTable = `\`${PROJECT}.${DATASET}.contracts\``;
+  const iTable = `\`${PROJECT}.${DATASET}.invoices\``;
+  await bigquery.query({
+    query: `UPDATE ${cTable}
+            SET paid_amount = COALESCE((
+              SELECT SUM(paid_amount)
+              FROM ${iTable}
+              WHERE contract_id = @id AND IFNULL(status, 'active') != 'deleted'
+            ), CAST(0 AS NUMERIC))
+            WHERE id = @id`,
+    params: { id: contractId },
+  });
+}
+
 async function recalcInvoicePaid(invoiceId) {
   if (!invoiceId) return;
   const invTable = `\`${PROJECT}.${DATASET}.invoices\``;
   const trxTable = `\`${PROJECT}.${DATASET}.transactions\``;
-  // Читаем direction документа, потом считаем сумму:
-  // tx с тем же direction — прибавляем, с противоположным — вычитаем.
   const [invRows] = await bigquery.query({
-    query: `SELECT direction FROM ${invTable} WHERE id = @id`,
+    query: `SELECT direction, contract_id FROM ${invTable} WHERE id = @id`,
     params: { id: invoiceId },
   });
   if (!invRows.length) return;
@@ -44,6 +58,11 @@ async function recalcInvoicePaid(invoiceId) {
             WHERE id = @id`,
     params: { id: invoiceId, dir },
   });
+
+  // Cascade to contract
+  if (invRows[0].contract_id) {
+    await recalcContractPaid(invRows[0].contract_id);
+  }
 }
 
 exports.transactions = async (req, res) => {

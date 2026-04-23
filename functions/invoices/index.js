@@ -37,6 +37,35 @@ async function verifyToken(req) {
   return info.email || null;
 }
 
+async function recalcContractPaid(contractId) {
+  if (!contractId) return;
+  const cTable = `\`${PROJECT}.${DATASET}.contracts\``;
+  const iTable = `\`${PROJECT}.${DATASET}.${TABLE}\``;
+  await bigquery.query({
+    query: `UPDATE ${cTable}
+            SET paid_amount = COALESCE((
+              SELECT SUM(paid_amount)
+              FROM ${iTable}
+              WHERE contract_id = @id AND IFNULL(status, 'active') != 'deleted'
+            ), CAST(0 AS NUMERIC))
+            WHERE id = @id`,
+    params: { id: contractId },
+  });
+}
+
+async function validateContractLink(contractId, contractorId, folderId) {
+  if (!contractId) return null;
+  const [rows] = await bigquery.query({
+    query: `SELECT contractor_id, folder_id FROM \`${PROJECT}.${DATASET}.contracts\`
+            WHERE id = @id AND IFNULL(status, 'active') != 'deleted'`,
+    params: { id: contractId },
+  });
+  if (!rows.length) return 'Contract not found';
+  if (contractorId && rows[0].contractor_id !== contractorId) return 'Contractor mismatch between invoice and contract';
+  if (folderId && rows[0].folder_id !== folderId) return 'Folder mismatch between invoice and contract';
+  return null;
+}
+
 exports.invoices = async (req, res) => {
   setCors(res);
   if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
@@ -92,18 +121,23 @@ exports.invoices = async (req, res) => {
 
       if (dateFrom) { where += ` AND i.date >= @date_from`; params.date_from = dateFrom; }
       if (dateTo)   { where += ` AND i.date <= @date_to`;   params.date_to   = dateTo; }
+      if (req.query.contract_id) { where += ` AND i.contract_id = @contract_id`; params.contract_id = req.query.contract_id; }
 
       const trxTable = `\`${PROJECT}.${DATASET}.transactions\``;
       const [rows] = await bigquery.query({
-        query: `SELECT i.id, i.folder_id, i.name, i.status, i.direction, i.total_amount, i.paid_amount,
-                       i.category_id, i.contractor_id, i.uploaded_by, i.uploaded_at, i.date,
+        query: `SELECT i.id, i.folder_id, i.name, i.status, i.direction,
+                       i.total_amount, i.paid_amount, i.subtotal, i.vat_rate, i.vat_amount,
+                       i.wht_rate, i.wht_amount,
+                       i.category_id, i.contractor_id, i.contract_id, i.uploaded_by, i.uploaded_at, i.date,
                        c.name as category_name,
                        ct.name_en as contractor_name_en, ct.name_th as contractor_name_th,
+                       con.name as contract_name,
                        (SELECT COUNT(*) FROM ${trxTable} t
                         WHERE t.invoice_id = i.id AND IFNULL(t.status, 'active') != 'deleted') AS trx_count
                 FROM ${table} i
                 LEFT JOIN ${catTable} c ON i.category_id = c.id
                 LEFT JOIN \`${PROJECT}.${DATASET}.contractors\` ct ON i.contractor_id = ct.id
+                LEFT JOIN \`${PROJECT}.${DATASET}.contracts\` con ON i.contract_id = con.id
                 ${where}
                 ORDER BY i.uploaded_at DESC
                 LIMIT ${limit} OFFSET ${offset}`,
@@ -133,25 +167,51 @@ exports.invoices = async (req, res) => {
 
     // POST — создать накладную
     if (req.method === 'POST') {
-      const { folder_id, name, status, direction, total_amount, paid_amount, category_id, contractor_id, date } = req.body;
-      if (!folder_id || !name) { res.status(400).json({ error: 'folder_id and name are required' }); return; }
-      if (parseFloat(total_amount || 0) < 0 || parseFloat(paid_amount || 0) < 0) { res.status(400).json({ error: 'amounts must be non-negative' }); return; }
+      const b = req.body || {};
+      if (!b.folder_id || !b.name) { res.status(400).json({ error: 'folder_id and name are required' }); return; }
+      if (parseFloat(b.total_amount || 0) < 0) { res.status(400).json({ error: 'amounts must be non-negative' }); return; }
+
+      // Validate contract link
+      if (b.contract_id) {
+        const err = await validateContractLink(b.contract_id, b.contractor_id, b.folder_id);
+        if (err) { res.status(400).json({ error: err }); return; }
+      }
+
       const id = uuidv4();
       await bigquery.query({
-        query: `INSERT INTO ${table} (id, folder_id, name, status, direction, total_amount, paid_amount, category_id, contractor_id, date, uploaded_by, uploaded_at)
-                VALUES (@id, @folder_id, @name, @status, @direction, CAST(@total_amount AS NUMERIC), CAST(@paid_amount AS NUMERIC), NULLIF(@category_id, ''), NULLIF(@contractor_id, ''), IF(@date = '', NULL, DATE(@date)), @uploaded_by, CURRENT_TIMESTAMP())`,
+        query: `INSERT INTO ${table}
+                  (id, folder_id, name, status, direction, total_amount, paid_amount,
+                   subtotal, vat_rate, vat_amount, wht_rate, wht_amount,
+                   category_id, contractor_id, contract_id, date, uploaded_by, uploaded_at)
+                VALUES
+                  (@id, @folder_id, @name, @status, @direction,
+                   CAST(@total_amount AS NUMERIC), CAST(@paid_amount AS NUMERIC),
+                   CAST(@subtotal AS NUMERIC), CAST(@vat_rate AS NUMERIC), CAST(@vat_amount AS NUMERIC),
+                   CAST(@wht_rate AS NUMERIC), CAST(@wht_amount AS NUMERIC),
+                   NULLIF(@category_id, ''), NULLIF(@contractor_id, ''), NULLIF(@contract_id, ''),
+                   IF(@date = '', NULL, DATE(@date)), @uploaded_by, CURRENT_TIMESTAMP())`,
         params: {
-          id, folder_id, name,
-          status:        status     || 'active',
-          direction:     direction  || 'expense',
-          total_amount:  parseFloat(total_amount || 0),
-          paid_amount:   parseFloat(paid_amount  || 0),
-          category_id:   category_id || '',
-          contractor_id: contractor_id || '',
-          date:          date || '',
+          id, folder_id: b.folder_id, name: b.name,
+          status:        b.status     || 'active',
+          direction:     b.direction  || 'expense',
+          total_amount:  b.total_amount != null ? String(b.total_amount) : '0',
+          paid_amount:   b.paid_amount != null ? String(b.paid_amount) : '0',
+          subtotal:      b.subtotal != null ? String(b.subtotal) : '0',
+          vat_rate:      b.vat_rate != null ? String(b.vat_rate) : '0',
+          vat_amount:    b.vat_amount != null ? String(b.vat_amount) : '0',
+          wht_rate:      b.wht_rate != null ? String(b.wht_rate) : '0',
+          wht_amount:    b.wht_amount != null ? String(b.wht_amount) : '0',
+          category_id:   b.category_id || '',
+          contractor_id: b.contractor_id || '',
+          contract_id:   b.contract_id || '',
+          date:          b.date || '',
           uploaded_by:   email,
         },
       });
+
+      // Recalc contract if linked
+      if (b.contract_id) await recalcContractPaid(b.contract_id);
+
       res.json({ success: true, id });
       return;
     }
@@ -159,34 +219,62 @@ exports.invoices = async (req, res) => {
     // PUT — редактировать
     if (req.method === 'PUT') {
       const id = req.url.split('/').filter(Boolean).pop().split('?')[0];
-      const { name, status, direction, total_amount, paid_amount, category_id, contractor_id, date } = req.body;
-      if (!name || !id) { res.status(400).json({ error: 'name and id are required' }); return; }
-      if (parseFloat(total_amount || 0) < 0 || parseFloat(paid_amount || 0) < 0) { res.status(400).json({ error: 'amounts must be non-negative' }); return; }
+      const b = req.body || {};
+      if (!b.name || !id) { res.status(400).json({ error: 'name and id are required' }); return; }
+      if (parseFloat(b.total_amount || 0) < 0) { res.status(400).json({ error: 'amounts must be non-negative' }); return; }
 
       const [rows] = await bigquery.query({
-        query: `SELECT folder_id, uploaded_by, FORMAT_TIMESTAMP('%Y-%m-%dT%H:%M:%S', uploaded_at) as uploaded_at FROM ${table} WHERE id = @id`,
+        query: `SELECT folder_id, contract_id, uploaded_by, FORMAT_TIMESTAMP('%Y-%m-%dT%H:%M:%S', uploaded_at) as uploaded_at FROM ${table} WHERE id = @id`,
         params: { id },
       });
       if (!rows.length) { res.status(404).json({ error: 'Not found' }); return; }
       const cur = rows[0];
+      const oldContractId = cur.contract_id || '';
+      const newContractId = b.contract_id !== undefined ? (b.contract_id || '') : oldContractId;
+
+      // Validate contract link
+      if (newContractId) {
+        const err = await validateContractLink(newContractId, b.contractor_id, cur.folder_id);
+        if (err) { res.status(400).json({ error: err }); return; }
+      }
 
       await bigquery.query({ query: `DELETE FROM ${table} WHERE id = @id`, params: { id } });
       await bigquery.query({
-        query: `INSERT INTO ${table} (id, folder_id, name, status, direction, total_amount, paid_amount, category_id, contractor_id, date, uploaded_by, uploaded_at)
-                VALUES (@id, @folder_id, @name, @status, @direction, CAST(@total_amount AS NUMERIC), CAST(@paid_amount AS NUMERIC), NULLIF(@category_id, ''), NULLIF(@contractor_id, ''), IF(@date = '', NULL, DATE(@date)), @uploaded_by, TIMESTAMP(@uploaded_at))`,
+        query: `INSERT INTO ${table}
+                  (id, folder_id, name, status, direction, total_amount, paid_amount,
+                   subtotal, vat_rate, vat_amount, wht_rate, wht_amount,
+                   category_id, contractor_id, contract_id, date, uploaded_by, uploaded_at)
+                VALUES
+                  (@id, @folder_id, @name, @status, @direction,
+                   CAST(@total_amount AS NUMERIC), CAST(@paid_amount AS NUMERIC),
+                   CAST(@subtotal AS NUMERIC), CAST(@vat_rate AS NUMERIC), CAST(@vat_amount AS NUMERIC),
+                   CAST(@wht_rate AS NUMERIC), CAST(@wht_amount AS NUMERIC),
+                   NULLIF(@category_id, ''), NULLIF(@contractor_id, ''), NULLIF(@contract_id, ''),
+                   IF(@date = '', NULL, DATE(@date)), @uploaded_by, TIMESTAMP(@uploaded_at))`,
         params: {
-          id, folder_id: cur.folder_id, name,
-          status:        status     || 'active',
-          direction:     direction  || 'expense',
-          total_amount:  parseFloat(total_amount || 0),
-          paid_amount:   parseFloat(paid_amount  || 0),
-          category_id:   category_id || '',
-          contractor_id: contractor_id || '',
-          date:          date || '',
+          id, folder_id: cur.folder_id, name: b.name,
+          status:        b.status     || 'active',
+          direction:     b.direction  || 'expense',
+          total_amount:  b.total_amount != null ? String(b.total_amount) : '0',
+          paid_amount:   b.paid_amount != null ? String(b.paid_amount) : '0',
+          subtotal:      b.subtotal != null ? String(b.subtotal) : '0',
+          vat_rate:      b.vat_rate != null ? String(b.vat_rate) : '0',
+          vat_amount:    b.vat_amount != null ? String(b.vat_amount) : '0',
+          wht_rate:      b.wht_rate != null ? String(b.wht_rate) : '0',
+          wht_amount:    b.wht_amount != null ? String(b.wht_amount) : '0',
+          category_id:   b.category_id || '',
+          contractor_id: b.contractor_id || '',
+          contract_id:   newContractId,
+          date:          b.date || '',
           uploaded_by:   cur.uploaded_by,
           uploaded_at:   cur.uploaded_at,
         },
       });
+
+      // Recalc old and new contract if changed
+      if (oldContractId) await recalcContractPaid(oldContractId);
+      if (newContractId && newContractId !== oldContractId) await recalcContractPaid(newContractId);
+
       res.json({ success: true });
       return;
     }
@@ -242,7 +330,9 @@ exports.invoices = async (req, res) => {
       } else {
         // Мягкое удаление: инвойс и его транзакции → status='deleted'. Файлы сохраняются.
         const [rows] = await bigquery.query({
-          query: `SELECT folder_id, name, direction, total_amount, paid_amount, category_id, contractor_id, uploaded_by, date,
+          query: `SELECT folder_id, name, direction, total_amount, paid_amount,
+                         subtotal, vat_rate, vat_amount, wht_rate, wht_amount,
+                         category_id, contractor_id, contract_id, uploaded_by, date,
                          FORMAT_TIMESTAMP('%Y-%m-%dT%H:%M:%S', uploaded_at) as uploaded_at
                   FROM ${table} WHERE id = @id`,
           params: { id },
@@ -252,17 +342,32 @@ exports.invoices = async (req, res) => {
 
         await bigquery.query({ query: `DELETE FROM ${table} WHERE id = @id`, params: { id } });
         await bigquery.query({
-          query: `INSERT INTO ${table} (id, folder_id, name, status, direction, total_amount, paid_amount, category_id, contractor_id, date, uploaded_by, uploaded_at)
-                  VALUES (@id, @folder_id, @name, 'deleted', @direction, CAST(@total_amount AS NUMERIC), CAST(@paid_amount AS NUMERIC), NULLIF(@category_id,''), NULLIF(@contractor_id,''), IF(@date = '', NULL, DATE(@date)), @uploaded_by, TIMESTAMP(@uploaded_at))`,
+          query: `INSERT INTO ${table}
+                    (id, folder_id, name, status, direction, total_amount, paid_amount,
+                     subtotal, vat_rate, vat_amount, wht_rate, wht_amount,
+                     category_id, contractor_id, contract_id, date, uploaded_by, uploaded_at)
+                  VALUES
+                    (@id, @folder_id, @name, 'deleted', @direction,
+                     CAST(@total_amount AS NUMERIC), CAST(@paid_amount AS NUMERIC),
+                     CAST(@subtotal AS NUMERIC), CAST(@vat_rate AS NUMERIC), CAST(@vat_amount AS NUMERIC),
+                     CAST(@wht_rate AS NUMERIC), CAST(@wht_amount AS NUMERIC),
+                     NULLIF(@category_id,''), NULLIF(@contractor_id,''), NULLIF(@contract_id,''),
+                     IF(@date = '', NULL, DATE(@date)), @uploaded_by, TIMESTAMP(@uploaded_at))`,
           params: {
             id,
             folder_id:     cur.folder_id,
             name:          cur.name,
             direction:     cur.direction    || 'expense',
-            total_amount:  cur.total_amount || 0,
-            paid_amount:   cur.paid_amount  || 0,
+            total_amount:  cur.total_amount != null ? String(cur.total_amount) : '0',
+            paid_amount:   cur.paid_amount != null ? String(cur.paid_amount) : '0',
+            subtotal:      cur.subtotal != null ? String(cur.subtotal) : '0',
+            vat_rate:      cur.vat_rate != null ? String(cur.vat_rate) : '0',
+            vat_amount:    cur.vat_amount != null ? String(cur.vat_amount) : '0',
+            wht_rate:      cur.wht_rate != null ? String(cur.wht_rate) : '0',
+            wht_amount:    cur.wht_amount != null ? String(cur.wht_amount) : '0',
             category_id:   cur.category_id || '',
             contractor_id: cur.contractor_id || '',
+            contract_id:   cur.contract_id || '',
             date:          cur.date ? (cur.date.value || cur.date) : '',
             uploaded_by:   cur.uploaded_by,
             uploaded_at:   cur.uploaded_at,
@@ -277,6 +382,9 @@ exports.invoices = async (req, res) => {
                     AND IFNULL(status, 'active') != 'deleted'`,
           params: { id },
         });
+
+        // Recalc contract paid if linked
+        if (cur.contract_id) await recalcContractPaid(cur.contract_id);
       }
 
       res.json({ success: true });
