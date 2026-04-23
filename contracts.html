@@ -115,6 +115,7 @@
               <th id="th-invoiced"></th>
               <th id="th-paid"></th>
               <th id="th-outstanding"></th>
+              <th id="th-progress"></th>
               <th id="th-status"></th>
               <th style="width:100px"></th>
             </tr>
@@ -180,9 +181,19 @@
         <label id="lbl-c-terms"></label>
         <input type="text" id="c-terms" placeholder="50/40/10">
       </div>
+      <div class="fields-row">
+        <div class="field-group">
+          <label id="lbl-c-progress"></label>
+          <input type="number" id="c-progress" min="0" max="100" step="1" placeholder="0">
+        </div>
+        <div class="field-group">
+          <label id="lbl-c-notes"></label>
+          <textarea id="c-notes" rows="2"></textarea>
+        </div>
+      </div>
       <div class="field-group">
-        <label id="lbl-c-notes"></label>
-        <textarea id="c-notes" rows="2"></textarea>
+        <label id="lbl-c-progress-notes"></label>
+        <textarea id="c-progress-notes" rows="2"></textarea>
       </div>
       <div class="modal-actions">
         <button class="btn btn-outline" id="btn-c-cancel"></button>
@@ -417,6 +428,7 @@
       document.getElementById('th-invoiced').textContent = t('contractInvoiced');
       document.getElementById('th-paid').textContent = t('paidAmount');
       document.getElementById('th-outstanding').textContent = t('contractOutstanding');
+      document.getElementById('th-progress').textContent = t('portalProgress');
       document.getElementById('th-status').textContent = t('statusLabel');
 
       // Contract modal
@@ -432,7 +444,9 @@
       document.getElementById('lbl-c-vat').textContent = t('vatAmount');
       document.getElementById('lbl-c-total').textContent = t('contractTotal');
       document.getElementById('lbl-c-terms').textContent = t('paymentTerms');
+      document.getElementById('lbl-c-progress').textContent = t('portalProgress') + ' %';
       document.getElementById('lbl-c-notes').textContent = t('notes');
+      document.getElementById('lbl-c-progress-notes').textContent = t('progressNotes');
       document.getElementById('btn-c-cancel').textContent = t('cancel');
       document.getElementById('btn-c-save').textContent = t('save');
 
@@ -534,10 +548,10 @@
     async function loadContracts() {
       const tbody = document.getElementById('ct-tbody');
       if (!filterCompany) {
-        tbody.innerHTML = `<tr><td colspan="11" class="empty-state">${t('selectCompanyFirst')}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="12" class="empty-state">${t('selectCompanyFirst')}</td></tr>`;
         return;
       }
-      tbody.innerHTML = `<tr><td colspan="11" class="loading">${t('loading')}</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="12" class="loading">${t('loading')}</td></tr>`;
       try {
         let url = `/contracts?company_id=${filterCompany}&status=${filterStatus}`;
         if (filterFolder) url += `&folder_id=${filterFolder}`;
@@ -545,7 +559,7 @@
         allContracts = await apiFetch(url);
         renderContracts();
       } catch(e) {
-        tbody.innerHTML = `<tr><td colspan="11" class="empty-state">${e.message}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="12" class="empty-state">${e.message}</td></tr>`;
       }
     }
 
@@ -554,7 +568,7 @@
     function renderContracts() {
       const tbody = document.getElementById('ct-tbody');
       if (!allContracts.length) {
-        tbody.innerHTML = `<tr><td colspan="11" class="empty-state">${t('noContracts')}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="12" class="empty-state">${t('noContracts')}</td></tr>`;
         return;
       }
       tbody.innerHTML = '';
@@ -575,6 +589,7 @@
           <td>${amtCell(c.invoiced_total, dir)}</td>
           <td>${amtCell(c.paid_amount, dir)}</td>
           <td>${amtCell(outstanding, dir)}</td>
+          <td style="text-align:center"><strong>${numVal(c.progress_pct)}%</strong></td>
           <td>${statusBadge(c.status)}</td>
           <td>
             <div style="display:flex;gap:4px;align-items:center;justify-content:flex-end">
@@ -590,7 +605,7 @@
         detailTr.className = 'detail-row';
         detailTr.style.display = isExp ? '' : 'none';
         detailTr.id = `contract-detail-${c.id}`;
-        detailTr.innerHTML = `<td colspan="11"><div class="detail-inner" id="contract-inner-${c.id}">${isExp ? '<div class="loading">'+t('loading')+'</div>' : ''}</div></td>`;
+        detailTr.innerHTML = `<td colspan="12"><div class="detail-inner" id="contract-inner-${c.id}">${isExp ? '<div class="loading">'+t('loading')+'</div>' : ''}</div></td>`;
         tbody.appendChild(detailTr);
 
         if (isExp) loadContractDetail(c.id);
@@ -644,7 +659,15 @@
       const contract = allContracts.find(c => c.id === contractId);
 
       // Contract files
-      let html = renderFileList(cFiles, 'contract', contractId, contractId);
+      let html = '';
+      // Progress notes
+      if (contract?.progress_notes) {
+        html += `<div style="margin-bottom:12px;padding:10px 14px;background:#fff;border:1px solid #e8e8e8;border-radius:8px">
+          <div style="font-size:0.75rem;color:#888;text-transform:uppercase;margin-bottom:4px">${t('progressNotes')}</div>
+          <div style="font-size:0.85rem;color:#333;white-space:pre-wrap">${contract.progress_notes}</div>
+        </div>`;
+      }
+      html += renderFileList(cFiles, 'contract', contractId, contractId);
 
       html += `<div style="display:flex;gap:8px;margin:10px 0">
         <button class="btn btn-primary" style="font-size:0.78rem;padding:4px 12px" data-action="create-inv" data-contract-id="${contractId}">${t('createInvoiceFromContract')}</button>
@@ -783,6 +806,8 @@
         document.getElementById('c-total').value = numVal(c.total_amount) || '';
         document.getElementById('c-terms').value = c.payment_terms || '';
         document.getElementById('c-notes').value = c.notes || '';
+        document.getElementById('c-progress').value = numVal(c.progress_pct) || '';
+        document.getElementById('c-progress-notes').value = c.progress_notes || '';
         openModal('modal-contract');
       }
 
@@ -1025,7 +1050,7 @@
       currentContractMode = 'create'; currentContractId = null;
       document.getElementById('t-modal-contract-title').textContent = t('createContract');
       fillModalFolders(''); fillModalContractors('');
-      ['c-name','c-extref','c-subtotal','c-vat','c-total','c-terms','c-notes'].forEach(id => document.getElementById(id).value = '');
+      ['c-name','c-extref','c-subtotal','c-vat','c-total','c-terms','c-notes','c-progress','c-progress-notes'].forEach(id => document.getElementById(id).value = '');
       document.getElementById('c-date').value = new Date().toISOString().split('T')[0];
       document.getElementById('c-direction').value = 'expense';
       openModal('modal-contract');
@@ -1059,6 +1084,8 @@
         total_amount: total,
         payment_terms: document.getElementById('c-terms').value.trim(),
         notes: document.getElementById('c-notes').value.trim(),
+        progress_pct: document.getElementById('c-progress').value || '0',
+        progress_notes: document.getElementById('c-progress-notes').value.trim(),
         status: currentContractMode === 'edit' ? (allContracts.find(c => c.id === currentContractId)?.status || 'active') : 'active',
       };
 

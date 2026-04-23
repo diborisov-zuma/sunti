@@ -264,6 +264,7 @@ const i18n = {
     amountPayable: 'К оплате',
     completed: 'Завершён',
     cancelled: 'Отменён',
+    progressNotes: 'Комментарий по работам',
 
     // Портал клиентов
     navPortal: 'Портал',
@@ -591,6 +592,7 @@ const i18n = {
     amountPayable: 'Amount payable',
     completed: 'Completed',
     cancelled: 'Cancelled',
+    progressNotes: 'Work progress notes',
 
     // Client portal
     navPortal: 'Portal',
@@ -918,6 +920,7 @@ const i18n = {
     amountPayable: 'ยอดที่ต้องชำระ',
     completed: 'เสร็จสิ้น',
     cancelled: 'ยกเลิก',
+    progressNotes: 'ความคืบหน้าของงาน',
 
     // พอร์ทัลลูกค้า
     navPortal: 'พอร์ทัล',
