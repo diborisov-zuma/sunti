@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sunti — Portal</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="stylesheet" href="style.css">
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <script src="_i18n.js"></script>
+  <script src="_config.js"></script>
+  <style>
+    .portal-header { background:#fff;border-bottom:1px solid #e8e8e8;padding:0 24px;height:56px;display:flex;align-items:center;gap:16px;position:sticky;top:0;z-index:100; }
+    .portal-header .logo { font-size:1.1rem;font-weight:600;color:#222;text-decoration:none; }
+    .portal-header .nav { display:flex;align-items:center;gap:4px;flex:1;padding-left:24px; }
+    .portal-header .nav-link { padding:6px 14px;border-radius:6px;font-size:0.88rem;color:#555;text-decoration:none;cursor:default; }
+    .portal-header .nav-link.active { background:#e8f0fe;color:#1a73e8;font-weight:500; }
+    .portal-header .header-right { display:flex;align-items:center;gap:12px; }
+
+    .page-wrap { padding:24px;max-width:1400px;margin:0 auto; }
+    .page-toolbar { display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap; }
+    .page-toolbar h2 { font-size:1.1rem;color:#222;flex:1; }
+
+    select.filter-select { border:1px solid #ddd;border-radius:6px;padding:6px 10px;font-size:0.85rem;color:#333;outline:none;background:#fff; }
+
+    .ct-wrap { background:#fff;border:1px solid #e8e8e8;border-radius:10px;overflow:hidden; }
+    .ct-table { width:100%;border-collapse:collapse; }
+    .ct-table thead { background:#f8f8f8;border-bottom:1px solid #e8e8e8; }
+    .ct-table th { padding:10px 14px;font-size:0.78rem;font-weight:600;color:#888;text-align:left;text-transform:uppercase; }
+    .ct-table td { padding:11px 14px;font-size:0.88rem;color:#333;border-bottom:1px solid #f0f0f0; }
+    .ct-table tr:last-child td { border-bottom:none; }
+    .ct-table tr:hover td { background:#fafafa; }
+    .ct-table tr.expanded td { background:#f0f4ff; }
+
+    .detail-row td { padding:0!important;border-bottom:1px solid #e8e8e8!important; }
+    .detail-inner { padding:16px 16px 16px 44px;background:#fafcff; }
+
+    .inv-mini-table, .trx-mini-table { width:100%;border-collapse:collapse;margin-top:8px; }
+    .inv-mini-table th, .trx-mini-table th { padding:6px 10px;font-size:0.72rem;font-weight:600;color:#888;text-align:left;text-transform:uppercase;border-bottom:1px solid #e8e8e8; }
+    .inv-mini-table td, .trx-mini-table td { padding:8px 10px;font-size:0.84rem;color:#333;border-bottom:1px solid #f0f0f0; }
+
+    .empty-state { text-align:center;padding:48px 24px;color:#bbb; }
+    .loading { text-align:center;padding:32px;color:#bbb; }
+    .expand-btn { background:none;border:none;cursor:pointer;font-size:0.7rem;color:#888;padding:4px; }
+
+    .amount-col { font-weight:500;font-variant-numeric:tabular-nums; }
+    .amount-col.expense { color:#c5221f; }
+    .amount-col.income { color:#1e8e3e; }
+
+    .badge { display:inline-block;padding:2px 8px;border-radius:10px;font-size:0.72rem;font-weight:600; }
+    .badge-green { background:#e6f4ea;color:#1e8e3e; }
+    .badge-gray { background:#f0f0f0;color:#888; }
+    .badge-red { background:#fce8e6;color:#c5221f; }
+
+    .progress-bar-wrap { width:100px;height:8px;background:#e8e8e8;border-radius:4px;overflow:hidden;display:inline-block;vertical-align:middle; }
+    .progress-bar-fill { height:100%;background:#1e8e3e;border-radius:4px;transition:width 0.3s; }
+
+    .section-title { font-size:0.78rem;font-weight:600;color:#888;text-transform:uppercase;margin:12px 0 6px; }
+    .file-row { display:flex;align-items:center;gap:8px;padding:4px 0;font-size:0.82rem; }
+
+    #guest-view { text-align:center;padding:100px 24px; }
+    #guest-view h2 { font-size:1.4rem;color:#333;margin-bottom:8px; }
+    #guest-view p { color:#999;margin-bottom:32px; }
+  </style>
+</head>
+<body>
+
+  <!-- Портальная шапка (не _header.js) -->
+  <div class="portal-header" id="portal-header" style="display:none">
+    <a class="logo" href="portal.html">Sunti</a>
+    <div class="nav">
+      <span class="nav-link active" id="portal-nav-contracts"></span>
+    </div>
+    <div class="header-right">
+      <div class="lang-switcher">
+        <button class="lang-btn" data-lang="ru" onclick="setLang('ru')">RU</button>
+        <button class="lang-btn" data-lang="en" onclick="setLang('en')">EN</button>
+        <button class="lang-btn" data-lang="th" onclick="setLang('th')">TH</button>
+      </div>
+      <div id="portal-user-info" style="display:flex;align-items:center;gap:8px">
+        <span id="portal-user-name" style="font-size:0.85rem;color:#333"></span>
+        <button class="btn btn-outline" onclick="portalLogout()" id="portal-logout-btn"></button>
+      </div>
+    </div>
+  </div>
+
+  <div id="guest-view">
+    <h2 id="t-portal-welcome"></h2>
+    <p id="t-portal-login-hint"></p>
+    <div id="portal-signin">
+      <div id="g_id_onload"
+        data-client_id="6445860840-9bfshkstrc2vra49qi847ie9od38614t.apps.googleusercontent.com"
+        data-callback="handlePortalCredential"
+        data-auto_prompt="false">
+      </div>
+      <div class="g_id_signin"
+        data-type="standard" data-size="large" data-theme="outline"
+        data-text="signin_with" data-shape="rectangular">
+      </div>
+    </div>
+  </div>
+
+  <div id="app-view" style="display:none">
+    <div class="page-wrap">
+      <div class="page-toolbar">
+        <h2 id="t-page-title"></h2>
+        <select class="filter-select" id="filter-folder"></select>
+      </div>
+      <div class="ct-wrap">
+        <table class="ct-table" id="contracts-table">
+          <thead id="contracts-thead"></thead>
+          <tbody id="ct-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    let portalUser = null;
+    let portalSections = {};
+    let portalFolders = [];
+    let accessLevel = 'full';
+    let allContracts = [];
+    let expandedContracts = {};
+    let expandedInvoices = {};
+    let contractInvoices = {};
+    let invoiceTrx = {};
+    let contractFiles = {};
+    let selectedFolder = '';
+
+    function fmt(v) {
+      const n = typeof v === 'object' ? parseFloat(v?.value || v) : parseFloat(v);
+      if (isNaN(n)) return '—';
+      return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+    function formatDate(val) {
+      if (!val) return '—';
+      const d = new Date(val.value || val);
+      if (isNaN(d)) return '—';
+      return `${String(d.getUTCDate()).padStart(2,'0')}.${String(d.getUTCMonth()+1).padStart(2,'0')}.${d.getUTCFullYear()}`;
+    }
+    function showToast(msg, type) {
+      const el = document.getElementById('toast');
+      el.textContent = msg; el.className = 'toast show' + (type ? ' ' + type : '');
+      clearTimeout(el._t); el._t = setTimeout(() => el.className = 'toast', 3000);
+    }
+    function numVal(v) { return typeof v === 'object' ? parseFloat(v?.value || 0) : parseFloat(v || 0); }
+    function pct(v) { const n = numVal(v); return isNaN(n) ? 0 : Math.round(n * 100); }
+
+    function statusBadge(s) {
+      if (s === 'active')    return `<span class="badge badge-green">${t('active')}</span>`;
+      if (s === 'completed') return `<span class="badge badge-gray">${t('completed')}</span>`;
+      if (s === 'cancelled') return `<span class="badge badge-red">${t('cancelled')}</span>`;
+      return `<span class="badge badge-gray">${s || '—'}</span>`;
+    }
+
+    function amtCell(val, dir) {
+      if (accessLevel === 'no_amounts') return '';
+      const n = numVal(val);
+      const cls = dir === 'expense' ? 'expense' : 'income';
+      const sign = dir === 'expense' ? '-' : '';
+      return `<span class="amount-col ${cls}">${sign}${fmt(n)}</span>`;
+    }
+
+    function progressBar(paidPct) {
+      const p = pct(paidPct);
+      return `<div class="progress-bar-wrap"><div class="progress-bar-fill" style="width:${Math.min(p, 100)}%"></div></div> <span style="font-size:0.78rem;color:#666">${p}%</span>`;
+    }
+
+    function updateTexts() {
+      document.getElementById('t-portal-welcome').textContent = t('portalWelcome');
+      document.getElementById('t-portal-login-hint').textContent = t('guestSub');
+      document.getElementById('portal-nav-contracts').textContent = t('portalContracts');
+      document.getElementById('portal-logout-btn').textContent = t('logout');
+      document.getElementById('t-page-title').textContent = t('portalContracts');
+      document.querySelectorAll('.lang-btn').forEach(b => b.classList.toggle('active', b.dataset.lang === currentLang));
+    }
+
+    // ─── Auth ───
+
+    let _portalAccessToken = null;
+
+    async function handlePortalCredential(response) {
+      // Exchange ID token for access token via Google
+      // For portal, we use the ID token's email to look up portal_users
+      // We need an access token for API calls — use the same GSI flow
+      _portalAccessToken = response.credential;
+      // Decode JWT to get email
+      const payload = JSON.parse(atob(response.credential.split('.')[1]));
+      await portalLogin(payload.email, response.credential);
+    }
+
+    async function portalLogin(email, idToken) {
+      try {
+        // For portal auth we need an access token. Let's request one.
+        const tokenClient = google.accounts.oauth2.initTokenClient({
+          client_id: '6445860840-9bfshkstrc2vra49qi847ie9od38614t.apps.googleusercontent.com',
+          scope: 'email profile',
+          callback: async (tokenResponse) => {
+            _portalAccessToken = tokenResponse.access_token;
+            try {
+              const me = await portalFetch('/portal_contracts/me');
+              portalUser = me.user;
+              portalSections = me.sections;
+              portalFolders = me.folders;
+              accessLevel = portalSections.contracts || 'full';
+
+              document.getElementById('guest-view').style.display = 'none';
+              document.getElementById('app-view').style.display = 'block';
+              document.getElementById('portal-header').style.display = 'flex';
+              document.getElementById('portal-user-name').textContent = portalUser.name || portalUser.email;
+
+              fillFolderSelect();
+              updateTexts();
+            } catch(e) {
+              showToast(e.message, 'error');
+            }
+          },
+        });
+        tokenClient.requestAccessToken();
+      } catch(e) {
+        showToast(e.message, 'error');
+      }
+    }
+
+    function portalLogout() {
+      _portalAccessToken = null;
+      portalUser = null;
+      document.getElementById('guest-view').style.display = 'block';
+      document.getElementById('app-view').style.display = 'none';
+      document.getElementById('portal-header').style.display = 'none';
+    }
+
+    async function portalFetch(path, options = {}) {
+      const res = await fetch(`${API_URL}${path}`, {
+        ...options,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${_portalAccessToken}`,
+          ...(options.headers || {}),
+        },
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: res.statusText }));
+        throw new Error(err.error || res.statusText);
+      }
+      return res.json();
+    }
+
+    // ─── Data ───
+
+    function fillFolderSelect() {
+      const sel = document.getElementById('filter-folder');
+      sel.innerHTML = `<option value="">${t('portalSelectProject')}</option>`;
+      portalFolders.forEach(f => {
+        const opt = document.createElement('option');
+        opt.value = f.id; opt.textContent = f.name;
+        sel.appendChild(opt);
+      });
+    }
+
+    document.getElementById('filter-folder').addEventListener('change', e => {
+      selectedFolder = e.target.value;
+      if (selectedFolder) loadContracts();
+      else document.getElementById('ct-tbody').innerHTML = `<tr><td colspan="10" class="empty-state">${t('portalSelectProject')}</td></tr>`;
+    });
+
+    async function loadContracts() {
+      const tbody = document.getElementById('ct-tbody');
+      const thead = document.getElementById('contracts-thead');
+      tbody.innerHTML = `<tr><td colspan="10" class="loading">${t('loading')}</td></tr>`;
+
+      // Set headers based on access level
+      const amtHeaders = accessLevel === 'full'
+        ? `<th>${t('contractTotal')}</th><th>${t('contractInvoiced')}</th><th>${t('paidAmount')}</th><th>${t('contractOutstanding')}</th>`
+        : `<th>${t('portalProgress')}</th>`;
+      const colCount = accessLevel === 'full' ? 9 : 6;
+      thead.innerHTML = `<tr>
+        <th style="width:30px"></th><th>${t('date')}</th><th>${t('name')}</th>
+        <th>${t('contractor')}</th><th>${t('folder')}</th>
+        ${amtHeaders}
+        <th>${t('statusLabel')}</th>
+      </tr>`;
+
+      try {
+        const data = await portalFetch(`/portal_contracts?folder_id=${selectedFolder}`);
+        allContracts = data.rows;
+        contractFiles = data.files || {};
+        accessLevel = data.access_level || accessLevel;
+        renderContracts(colCount);
+      } catch(e) {
+        tbody.innerHTML = `<tr><td colspan="${colCount}" class="empty-state">${e.message}</td></tr>`;
+      }
+    }
+
+    function renderContracts(colCount) {
+      const tbody = document.getElementById('ct-tbody');
+      if (!allContracts.length) {
+        tbody.innerHTML = `<tr><td colspan="${colCount}" class="empty-state">${t('noContracts')}</td></tr>`;
+        return;
+      }
+      tbody.innerHTML = '';
+      allContracts.forEach(c => {
+        const isExp = expandedContracts[c.id];
+        const dir = c.direction || 'expense';
+        const tr = document.createElement('tr');
+        if (isExp) tr.className = 'expanded';
+
+        let amtCells = '';
+        if (accessLevel === 'full') {
+          const outstanding = numVal(c.total_amount) - numVal(c.invoiced_total);
+          amtCells = `
+            <td>${amtCell(c.total_amount, dir)}</td>
+            <td>${amtCell(c.invoiced_total, dir)}</td>
+            <td>${amtCell(c.paid_amount, dir)}</td>
+            <td>${amtCell(outstanding, dir)}</td>`;
+        } else {
+          amtCells = `<td>${progressBar(c.paid_pct)}</td>`;
+        }
+
+        tr.innerHTML = `
+          <td><button class="expand-btn${isExp?' open':''}" data-expand-contract="${c.id}">${isExp?'▼':'▶'}</button></td>
+          <td>${formatDate(c.date)}</td>
+          <td><strong>${c.name || '—'}</strong>${c.external_ref ? `<br><span style="font-size:0.75rem;color:#999">${c.external_ref}</span>` : ''}</td>
+          <td style="font-size:0.82rem">${c.contractor_name_en || c.contractor_name_th || '—'}</td>
+          <td style="font-size:0.82rem">${c.folder_name || '—'}</td>
+          ${amtCells}
+          <td>${statusBadge(c.status)}</td>
+        `;
+        tbody.appendChild(tr);
+
+        const detailTr = document.createElement('tr');
+        detailTr.className = 'detail-row';
+        detailTr.style.display = isExp ? '' : 'none';
+        detailTr.innerHTML = `<td colspan="${colCount}"><div class="detail-inner" id="portal-contract-${c.id}">${isExp?'<div class="loading">'+t('loading')+'</div>':''}</div></td>`;
+        tbody.appendChild(detailTr);
+
+        if (isExp) loadContractDetail(c.id, colCount);
+      });
+    }
+
+    async function loadContractDetail(contractId, colCount) {
+      const inner = document.getElementById(`portal-contract-${contractId}`);
+      if (!inner) return;
+      try {
+        const data = await portalFetch(`/portal_contracts/${contractId}/invoices`);
+        renderContractDetail(contractId, data.rows || data, colCount);
+      } catch(e) { inner.innerHTML = `<div style="color:#c33">${e.message}</div>`; }
+    }
+
+    function renderContractDetail(contractId, invs, colCount) {
+      const inner = document.getElementById(`portal-contract-${contractId}`);
+      if (!inner) return;
+      const files = contractFiles[contractId] || [];
+
+      // Files
+      let html = '';
+      if (files.length) {
+        html += `<div class="section-title">${t('file')}</div>`;
+        files.forEach(f => {
+          const size = f.file_size > 1048576 ? (f.file_size/1048576).toFixed(1)+' MB' : Math.round((f.file_size||0)/1024)+' KB';
+          html += `<div class="file-row">
+            <span style="flex:1">${f.file_name || '—'} <span style="color:#999">(${size})</span></span>
+            <button class="btn btn-outline" style="padding:1px 8px;font-size:0.72rem" data-action="download" data-file-id="${f.id}">${t('download')}</button>
+          </div>`;
+        });
+      }
+
+      // Invoices
+      if (!invs.length) {
+        html += `<div style="color:#bbb;font-size:0.85rem;padding:8px 0">${t('noInvoices')}</div>`;
+      } else {
+        const amtHeaders = accessLevel === 'full'
+          ? `<th>${t('subtotal')}</th><th>VAT</th><th>WHT</th><th>${t('totalAmount')}</th><th>${t('paidAmount')}</th>`
+          : `<th>${t('portalProgress')}</th>`;
+        html += `<table class="inv-mini-table"><thead><tr>
+          <th style="width:24px"></th><th>${t('date')}</th><th>${t('name')}</th>
+          ${amtHeaders}<th>${t('statusLabel')}</th>
+        </tr></thead><tbody>`;
+        invs.forEach(inv => {
+          const invExp = expandedInvoices[inv.id];
+          const dir = inv.direction || 'expense';
+          let amtCells = '';
+          if (accessLevel === 'full') {
+            amtCells = `
+              <td>${amtCell(inv.subtotal, dir)}</td>
+              <td style="font-size:0.78rem">${fmt(numVal(inv.vat_amount))}</td>
+              <td style="font-size:0.78rem">${fmt(numVal(inv.wht_amount))}</td>
+              <td>${amtCell(inv.total_amount, dir)}</td>
+              <td>${amtCell(inv.paid_amount, dir)}</td>`;
+          } else {
+            amtCells = `<td>${progressBar(inv.paid_pct)}</td>`;
+          }
+          html += `<tr class="${invExp ? 'expanded' : ''}">
+            <td><button class="expand-btn${invExp?' open':''}" data-expand-invoice="${inv.id}" data-contract-id="${contractId}">${invExp?'▼':'▶'}</button></td>
+            <td>${formatDate(inv.date)}</td>
+            <td>${inv.name || '—'}</td>
+            ${amtCells}
+            <td>${statusBadge(inv.status)}</td>
+          </tr>`;
+          html += `<tr class="detail-row" style="display:${invExp?'':'none'}" id="portal-inv-${inv.id}">
+            <td colspan="10"><div style="padding:10px 10px 10px 30px;background:#f4f7fb" id="portal-inv-inner-${inv.id}">${invExp?'<div class="loading">'+t('loading')+'</div>':''}</div></td>
+          </tr>`;
+        });
+        html += '</tbody></table>';
+      }
+      inner.innerHTML = html;
+
+      invs.forEach(inv => {
+        if (expandedInvoices[inv.id]) loadInvoiceTrx(inv.id);
+      });
+    }
+
+    async function loadInvoiceTrx(invoiceId) {
+      const inner = document.getElementById(`portal-inv-inner-${invoiceId}`);
+      if (!inner) return;
+      try {
+        const data = await portalFetch(`/portal_contracts/0/transactions?invoice_id=${invoiceId}`);
+        renderTrx(invoiceId, data.rows || data);
+      } catch(e) { inner.innerHTML = `<div style="color:#c33">${e.message}</div>`; }
+    }
+
+    function renderTrx(invoiceId, trxs) {
+      const inner = document.getElementById(`portal-inv-inner-${invoiceId}`);
+      if (!inner) return;
+      if (!trxs.length) { inner.innerHTML = `<div style="color:#bbb;font-size:0.82rem">${t('noTransactions')}</div>`; return; }
+
+      let html = `<table class="trx-mini-table"><thead><tr>
+        <th>${t('date')}</th>
+        ${accessLevel === 'full' ? `<th>${t('amount')}</th>` : ''}
+        <th>${t('category')}</th><th>${t('description')}</th>
+      </tr></thead><tbody>`;
+      trxs.forEach(tx => {
+        const sign = tx.direction === 'expense' ? '-' : '';
+        const cls = tx.direction === 'expense' ? 'expense' : 'income';
+        html += `<tr>
+          <td>${formatDate(tx.date)}</td>
+          ${accessLevel === 'full' ? `<td><span class="amount-col ${cls}">${sign}${fmt(tx.amount)}</span></td>` : ''}
+          <td style="font-size:0.78rem">${tx.category_name || '—'}</td>
+          <td style="font-size:0.78rem;color:#666">${tx.description || '—'}</td>
+        </tr>`;
+      });
+      html += '</tbody></table>';
+      inner.innerHTML = html;
+    }
+
+    // ─── Actions ───
+
+    document.addEventListener('click', async e => {
+      const expC = e.target.closest('[data-expand-contract]');
+      if (expC) { const id = expC.dataset.expandContract; expandedContracts[id] = !expandedContracts[id]; renderContracts(accessLevel === 'full' ? 9 : 6); return; }
+
+      const expI = e.target.closest('[data-expand-invoice]');
+      if (expI) {
+        const id = expI.dataset.expandInvoice;
+        expandedInvoices[id] = !expandedInvoices[id];
+        const cId = expI.dataset.contractId;
+        const invs = contractInvoices[cId];
+        if (invs) renderContractDetail(cId, invs, accessLevel === 'full' ? 9 : 6);
+        else loadContractDetail(cId, accessLevel === 'full' ? 9 : 6);
+        return;
+      }
+
+      const dlBtn = e.target.closest('[data-action="download"]');
+      if (dlBtn) {
+        try {
+          const r = await portalFetch(`/portal_contracts/files/${dlBtn.dataset.fileId}/download`);
+          if (r.url) window.open(r.url, '_blank');
+        } catch(err) { showToast(err.message, 'error'); }
+      }
+    });
+
+    // ─── Init ───
+    window.onLangChange = () => {
+      updateTexts();
+      if (selectedFolder && allContracts.length) renderContracts(accessLevel === 'full' ? 9 : 6);
+    };
+
+    updateTexts();
+  </script>
+</body>
+</html>

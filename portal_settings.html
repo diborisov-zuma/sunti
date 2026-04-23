@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sunti — Портал</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="stylesheet" href="style.css">
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <script src="_i18n.js"></script>
+  <script src="_config.js"></script>
+  <script src="_auth.js"></script>
+  <script src="_header.js"></script>
+  <style>
+    .page-wrap { padding:24px;max-width:1100px;margin:0 auto; }
+    .ct-wrap { background:#fff;border:1px solid #e8e8e8;border-radius:10px;overflow:hidden;margin-bottom:16px; }
+    .ct-table { width:100%;border-collapse:collapse; }
+    .ct-table thead { background:#f8f8f8;border-bottom:1px solid #e8e8e8; }
+    .ct-table th { padding:10px 14px;font-size:0.78rem;font-weight:600;color:#888;text-align:left;text-transform:uppercase; }
+    .ct-table td { padding:11px 14px;font-size:0.88rem;color:#333;border-bottom:1px solid #f0f0f0; }
+    .ct-table tr:last-child td { border-bottom:none; }
+    .ct-table tr:hover td { background:#fafafa; }
+    .ct-table tr.expanded td { background:#f0f4ff; }
+    .detail-row td { padding:0!important; }
+    .detail-inner { padding:16px 16px 16px 44px;background:#fafcff; }
+    .empty-state { text-align:center;padding:48px 24px;color:#bbb; }
+    .loading { text-align:center;padding:32px;color:#bbb; }
+    .field-group { margin-bottom:12px; }
+    .field-group label { display:block;font-size:0.82rem;color:#666;margin-bottom:4px; }
+    .field-group input { width:100%;border:1px solid #ddd;border-radius:6px;padding:8px 12px;font-size:0.9rem;outline:none;box-sizing:border-box; }
+    .field-group input:focus { border-color:#1a73e8; }
+    .checkbox-row { display:flex;align-items:center;gap:8px;margin-bottom:6px; }
+    .checkbox-row input[type="checkbox"] { width:auto;margin:0; }
+    .section-title { font-size:0.78rem;font-weight:600;color:#888;text-transform:uppercase;margin:12px 0 8px; }
+    .badge { display:inline-block;padding:2px 8px;border-radius:10px;font-size:0.72rem;font-weight:600; }
+    .badge-green { background:#e6f4ea;color:#1e8e3e; }
+    .badge-gray { background:#f0f0f0;color:#888; }
+    .expand-btn { background:none;border:none;cursor:pointer;font-size:0.7rem;color:#888;padding:4px; }
+    .icon-btn { background:#fff;border:1px solid #ddd;border-radius:6px;cursor:pointer;padding:5px 7px;display:inline-flex;align-items:center;justify-content:center;color:#666;transition:all 0.15s; }
+    .icon-btn:hover { border-color:#c5221f;color:#c5221f; }
+    .icon-btn svg { width:16px;height:16px;display:block; }
+  </style>
+</head>
+<body>
+  <header id="header"></header>
+  <div id="guest-view"><h2 id="t-guest-title"></h2><p id="t-guest-sub"></p></div>
+
+  <div id="app-view" style="display:none">
+    <div class="page-wrap">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+        <h2 style="flex:1;font-size:1.1rem" id="t-page-title"></h2>
+        <button class="btn btn-primary" id="btn-add"></button>
+      </div>
+
+      <div class="ct-wrap">
+        <table class="ct-table">
+          <thead><tr>
+            <th style="width:30px"></th>
+            <th>Email</th>
+            <th id="th-name"></th>
+            <th id="th-folders"></th>
+            <th id="th-sections"></th>
+            <th id="th-status"></th>
+            <th style="width:100px"></th>
+          </tr></thead>
+          <tbody id="pu-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Модалка: клиент -->
+  <div class="modal-overlay" id="modal-user">
+    <div class="modal" style="width:480px;max-width:95vw">
+      <h3 id="t-modal-title"></h3>
+      <div class="field-group">
+        <label class="required">Email</label>
+        <input type="email" id="pu-email">
+      </div>
+      <div class="field-group">
+        <label id="lbl-pu-name"></label>
+        <input type="text" id="pu-name">
+      </div>
+      <div class="checkbox-row">
+        <input type="checkbox" id="pu-active" checked>
+        <label for="pu-active" id="lbl-pu-active"></label>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-outline" id="btn-cancel"></button>
+        <button class="btn btn-primary" id="btn-save"></button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    const ICON_TRASH = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>';
+
+    let allUsers = [];
+    let foldersCache = [];
+    let expanded = {};
+    let currentMode = 'create';
+    let currentId = null;
+
+    function showToast(msg, type) {
+      const el = document.getElementById('toast');
+      el.textContent = msg; el.className = 'toast show' + (type ? ' ' + type : '');
+      clearTimeout(el._t); el._t = setTimeout(() => el.className = 'toast', 3000);
+    }
+    function openModal(id) { document.getElementById(id).classList.add('open'); }
+    function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+    function updateTexts() {
+      document.getElementById('t-guest-title').textContent = t('guestTitle');
+      document.getElementById('t-guest-sub').textContent = t('guestSub');
+      document.getElementById('t-page-title').textContent = t('portalUsers');
+      document.getElementById('btn-add').textContent = t('addPortalUser');
+      document.getElementById('th-name').textContent = t('name');
+      document.getElementById('th-folders').textContent = t('portalFolders');
+      document.getElementById('th-sections').textContent = t('portalSections');
+      document.getElementById('th-status').textContent = t('statusLabel');
+      document.getElementById('lbl-pu-name').textContent = t('name');
+      document.getElementById('lbl-pu-active').textContent = t('isActiveLabel');
+      document.getElementById('btn-cancel').textContent = t('cancel');
+      document.getElementById('btn-save').textContent = t('save');
+      updateHeaderTexts();
+    }
+
+    async function loadFolders() {
+      try { foldersCache = await apiFetch('/folders'); } catch(e) { foldersCache = []; }
+    }
+
+    async function loadUsers() {
+      const tbody = document.getElementById('pu-tbody');
+      tbody.innerHTML = `<tr><td colspan="7" class="loading">${t('loading')}</td></tr>`;
+      try {
+        allUsers = await apiFetch('/portal_users');
+        renderUsers();
+      } catch(e) { tbody.innerHTML = `<tr><td colspan="7" class="empty-state">${e.message}</td></tr>`; }
+    }
+
+    function renderUsers() {
+      const tbody = document.getElementById('pu-tbody');
+      if (!allUsers.length) { tbody.innerHTML = `<tr><td colspan="7" class="empty-state">${t('noPortalUsers')}</td></tr>`; return; }
+      tbody.innerHTML = '';
+      allUsers.forEach(u => {
+        const isExp = expanded[u.id];
+        const active = u.is_active !== false;
+        const tr = document.createElement('tr');
+        if (isExp) tr.className = 'expanded';
+        tr.innerHTML = `
+          <td><button class="expand-btn${isExp?' open':''}" data-expand="${u.id}">${isExp?'▼':'▶'}</button></td>
+          <td>${u.email}</td>
+          <td>${u.name || '—'}</td>
+          <td style="font-size:0.82rem">${u.folder_count || 0} ${t('folders').toLowerCase()}</td>
+          <td style="font-size:0.82rem">${u.section_count || 0}</td>
+          <td>${active ? '<span class="badge badge-green">'+t('active')+'</span>' : '<span class="badge badge-gray">'+t('inactive')+'</span>'}</td>
+          <td>
+            <div style="display:flex;gap:4px;justify-content:flex-end">
+              <button class="btn btn-outline" style="padding:2px 8px;font-size:0.75rem" data-action="edit" data-id="${u.id}">${t('edit')}</button>
+              <button class="icon-btn" data-action="delete" data-id="${u.id}" title="${t('delete')}">${ICON_TRASH}</button>
+            </div>
+          </td>
+        `;
+        tbody.appendChild(tr);
+
+        const detailTr = document.createElement('tr');
+        detailTr.className = 'detail-row';
+        detailTr.style.display = isExp ? '' : 'none';
+        detailTr.innerHTML = `<td colspan="7"><div class="detail-inner" id="access-${u.id}">${isExp?'<div class="loading">'+t('loading')+'</div>':''}</div></td>`;
+        tbody.appendChild(detailTr);
+
+        if (isExp) loadAccess(u.id);
+      });
+    }
+
+    async function loadAccess(userId) {
+      const inner = document.getElementById(`access-${userId}`);
+      if (!inner) return;
+      try {
+        const data = await apiFetch(`/portal_users/${userId}/access`);
+        renderAccess(userId, data);
+      } catch(e) { inner.innerHTML = `<div style="color:#c33">${e.message}</div>`; }
+    }
+
+    function renderAccess(userId, data) {
+      const inner = document.getElementById(`access-${userId}`);
+      if (!inner) return;
+      const assignedFolderIds = new Set(data.folders.map(f => f.folder_id));
+      const contractsSection = data.sections.find(s => s.section === 'contracts');
+
+      let html = `<div class="section-title">${t('portalFolders')}</div>`;
+      foldersCache.forEach(f => {
+        html += `<div class="checkbox-row">
+          <input type="checkbox" data-folder-cb="${f.id}" ${assignedFolderIds.has(f.id) ? 'checked' : ''}>
+          <label style="font-size:0.85rem">${f.name}</label>
+        </div>`;
+      });
+
+      html += `<div class="section-title" style="margin-top:16px">${t('portalSections')}</div>`;
+      html += `<div class="checkbox-row">
+        <input type="checkbox" id="sec-contracts-${userId}" ${contractsSection ? 'checked' : ''}>
+        <label for="sec-contracts-${userId}" style="font-size:0.85rem">${t('portalContracts')}</label>
+        <select id="sec-contracts-level-${userId}" style="border:1px solid #ddd;border-radius:4px;padding:2px 8px;font-size:0.82rem;margin-left:8px">
+          <option value="full" ${contractsSection?.access_level === 'full' ? 'selected' : ''}>${t('accessFull')}</option>
+          <option value="no_amounts" ${contractsSection?.access_level === 'no_amounts' ? 'selected' : ''}>${t('accessNoAmounts')}</option>
+        </select>
+      </div>`;
+
+      html += `<div style="margin-top:14px">
+        <button class="btn btn-primary" style="font-size:0.78rem;padding:4px 14px" data-action="save-access" data-user-id="${userId}">${t('save')}</button>
+      </div>`;
+
+      inner.innerHTML = html;
+    }
+
+    document.addEventListener('click', async e => {
+      const exp = e.target.closest('[data-expand]');
+      if (exp) { const id = exp.dataset.expand; expanded[id] = !expanded[id]; renderUsers(); return; }
+
+      const btn = e.target.closest('[data-action]');
+      if (!btn) return;
+      const action = btn.dataset.action;
+
+      if (action === 'edit') {
+        const u = allUsers.find(x => x.id === btn.dataset.id);
+        if (!u) return;
+        currentMode = 'edit'; currentId = u.id;
+        document.getElementById('t-modal-title').textContent = t('editPortalUser');
+        document.getElementById('pu-email').value = u.email;
+        document.getElementById('pu-name').value = u.name || '';
+        document.getElementById('pu-active').checked = u.is_active !== false;
+        openModal('modal-user');
+      }
+
+      if (action === 'delete') {
+        if (!confirm(t('confirmDelete'))) return;
+        btn.disabled = true;
+        try {
+          await apiFetch(`/portal_users/${btn.dataset.id}`, { method: 'DELETE' });
+          showToast(t('deleted'), 'success'); loadUsers();
+        } catch(err) { showToast(err.message, 'error'); btn.disabled = false; }
+      }
+
+      if (action === 'save-access') {
+        const userId = btn.dataset.userId;
+        btn.disabled = true;
+        try {
+          // Folders
+          const folderIds = [];
+          document.querySelectorAll(`#access-${userId} [data-folder-cb]`).forEach(cb => {
+            if (cb.checked) folderIds.push(cb.dataset.folderCb);
+          });
+          await apiFetch(`/portal_users/${userId}/folders`, {
+            method: 'POST', body: JSON.stringify({ folder_ids: folderIds }),
+          });
+
+          // Sections
+          const sections = [];
+          const contractsCb = document.getElementById(`sec-contracts-${userId}`);
+          if (contractsCb && contractsCb.checked) {
+            const level = document.getElementById(`sec-contracts-level-${userId}`).value;
+            sections.push({ section: 'contracts', access_level: level });
+          }
+          await apiFetch(`/portal_users/${userId}/sections`, {
+            method: 'POST', body: JSON.stringify({ sections }),
+          });
+
+          showToast(t('saved'), 'success');
+          loadUsers();
+        } catch(err) { showToast(err.message, 'error'); btn.disabled = false; }
+      }
+    });
+
+    document.getElementById('btn-add').addEventListener('click', () => {
+      currentMode = 'create'; currentId = null;
+      document.getElementById('t-modal-title').textContent = t('addPortalUser');
+      document.getElementById('pu-email').value = '';
+      document.getElementById('pu-name').value = '';
+      document.getElementById('pu-active').checked = true;
+      openModal('modal-user');
+    });
+
+    document.getElementById('btn-cancel').addEventListener('click', () => closeModal('modal-user'));
+    document.getElementById('btn-save').addEventListener('click', async () => {
+      const email = document.getElementById('pu-email').value.trim();
+      if (!email) { document.getElementById('pu-email').classList.add('invalid'); showToast(t('fillAllFields'), 'error'); return; }
+      document.getElementById('pu-email').classList.remove('invalid');
+      const body = { email, name: document.getElementById('pu-name').value.trim(), is_active: document.getElementById('pu-active').checked };
+      closeModal('modal-user');
+      try {
+        if (currentMode === 'create') {
+          await apiFetch('/portal_users', { method: 'POST', body: JSON.stringify(body) });
+        } else {
+          await apiFetch(`/portal_users/${currentId}`, { method: 'PUT', body: JSON.stringify(body) });
+        }
+        showToast(t('saved'), 'success'); loadUsers();
+      } catch(err) { showToast(err.message, 'error'); }
+    });
+
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal('modal-user'); });
+
+    window.onLogin = async () => { updateTexts(); await loadFolders(); loadUsers(); };
+    window.onLogout = () => { updateTexts(); };
+    window.onLangChange = () => { updateTexts(); renderUsers(); };
+
+    renderHeader('portal');
+    updateTexts();
+  </script>
+</body>
+</html>
