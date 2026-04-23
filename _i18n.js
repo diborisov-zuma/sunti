@@ -52,7 +52,7 @@ const i18n = {
 
     // Навигация
     navFolders: 'Проекты',
-    navInvoices: 'Документы',
+    navInvoices: 'Накладные',
     navFinance: 'Финансы',
     navStatements: 'Выписки',
     statements: 'Банковские выписки',
