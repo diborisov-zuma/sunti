@@ -1,0 +1,1101 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sunti — Контракты</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="stylesheet" href="style.css">
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <script src="_i18n.js"></script>
+  <script src="_config.js"></script>
+  <script src="_auth.js"></script>
+  <script src="_header.js"></script>
+  <style>
+    .page-wrap { padding:24px;max-width:1400px;margin:0 auto; }
+    .page-toolbar { display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap; }
+    .page-toolbar h2 { font-size:1.1rem;color:#222;flex:1; }
+    .toolbar-right { display:flex;align-items:center;gap:8px;flex-wrap:wrap; }
+
+    select.filter-select, input.filter-select, input.filter-date {
+      border:1px solid #ddd;border-radius:6px;padding:6px 10px;font-size:0.85rem;color:#333;outline:none;background:#fff;
+    }
+
+    .ct-wrap { background:#fff;border:1px solid #e8e8e8;border-radius:10px;overflow:hidden; }
+    .ct-table { width:100%;border-collapse:collapse; }
+    .ct-table thead { background:#f8f8f8;border-bottom:1px solid #e8e8e8; }
+    .ct-table th { padding:10px 14px;font-size:0.78rem;font-weight:600;color:#888;text-align:left;text-transform:uppercase;letter-spacing:0.04em; }
+    .ct-table td { padding:11px 14px;font-size:0.88rem;color:#333;border-bottom:1px solid #f0f0f0; }
+    .ct-table tr:last-child td { border-bottom:none; }
+    .ct-table tr:hover td { background:#fafafa; }
+    .ct-table tr.expanded td { background:#f0f4ff; }
+
+    .empty-state { text-align:center;padding:64px 24px;color:#bbb; }
+    .loading { text-align:center;padding:48px;color:#bbb; }
+
+    .expand-btn { background:none;border:none;cursor:pointer;font-size:0.7rem;color:#888;padding:4px; }
+
+    .detail-row td { padding:0 !important;border-bottom:1px solid #e8e8e8 !important; }
+    .detail-inner { padding:16px 16px 16px 44px;background:#fafcff; }
+
+    .inv-mini-table { width:100%;border-collapse:collapse;margin-top:8px; }
+    .inv-mini-table th { padding:6px 10px;font-size:0.72rem;font-weight:600;color:#888;text-align:left;text-transform:uppercase;border-bottom:1px solid #e8e8e8; }
+    .inv-mini-table td { padding:8px 10px;font-size:0.84rem;color:#333;border-bottom:1px solid #f0f0f0; }
+    .inv-mini-table tr:last-child td { border-bottom:none; }
+    .inv-mini-table tr:hover td { background:#f0f4ff; }
+    .inv-mini-table tr.inv-expanded td { background:#e8f0fe; }
+
+    .trx-detail { padding:12px 12px 12px 36px;background:#f4f7fb;border-bottom:1px solid #e8e8e8; }
+    .trx-mini-table { width:100%;border-collapse:collapse;margin-top:6px; }
+    .trx-mini-table th { padding:4px 8px;font-size:0.7rem;font-weight:600;color:#888;text-align:left; }
+    .trx-mini-table td { padding:6px 8px;font-size:0.82rem;color:#333; }
+
+    .badge { display:inline-block;padding:2px 8px;border-radius:10px;font-size:0.72rem;font-weight:600; }
+    .badge-green { background:#e6f4ea;color:#1e8e3e; }
+    .badge-yellow { background:#fef7e0;color:#e37400; }
+    .badge-red { background:#fce8e6;color:#c5221f; }
+    .badge-gray { background:#f0f0f0;color:#888; }
+
+    .amount-col { font-weight:500;font-variant-numeric:tabular-nums; }
+    .amount-col.expense { color:#c5221f; }
+    .amount-col.income { color:#1e8e3e; }
+
+    .field-group { margin-bottom:12px; }
+    .field-group label { display:block;font-size:0.82rem;color:#666;margin-bottom:4px; }
+    .field-group input, .field-group select, .field-group textarea {
+      width:100%;border:1px solid #ddd;border-radius:6px;padding:8px 12px;font-size:0.9rem;outline:none;box-sizing:border-box;background:#fff;
+    }
+    .field-group input:focus, .field-group select:focus, .field-group textarea:focus { border-color:#1a73e8; }
+    .field-group textarea { resize:vertical;min-height:50px; }
+    .fields-row { display:grid;grid-template-columns:1fr 1fr;gap:12px; }
+    .fields-row-3 { display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px; }
+
+    .section-title { font-size:0.78rem;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:0.04em;margin:12px 0 6px; }
+    .icon-btn { background:#fff;border:1px solid #ddd;border-radius:6px;cursor:pointer;padding:5px 7px;display:inline-flex;align-items:center;justify-content:center;color:#666;transition:all 0.15s; }
+    .icon-btn:hover { border-color:#c5221f;color:#c5221f;background:#fef7f6; }
+    .icon-btn svg { width:16px;height:16px;display:block; }
+  </style>
+</head>
+<body>
+  <header id="header"></header>
+
+  <div id="guest-view">
+    <h2 id="t-guest-title"></h2>
+    <p id="t-guest-sub"></p>
+  </div>
+
+  <div id="app-view" style="display:none">
+    <div class="page-wrap">
+      <div class="page-toolbar">
+        <h2 id="t-page-title"></h2>
+        <div class="toolbar-right">
+          <select class="filter-select" id="filter-company"><option value="">—</option></select>
+          <select class="filter-select" id="filter-folder"><option value="">—</option></select>
+          <select class="filter-select" id="filter-contractor"><option value="">—</option></select>
+          <select class="filter-select" id="filter-status">
+            <option value="active"></option>
+            <option value="completed"></option>
+            <option value="cancelled"></option>
+            <option value="all"></option>
+          </select>
+          <button class="btn btn-primary" id="btn-create"></button>
+        </div>
+      </div>
+
+      <div class="ct-wrap">
+        <table class="ct-table">
+          <thead>
+            <tr>
+              <th style="width:30px"></th>
+              <th id="th-date"></th>
+              <th id="th-name"></th>
+              <th id="th-contractor"></th>
+              <th id="th-folder"></th>
+              <th id="th-total"></th>
+              <th id="th-invoiced"></th>
+              <th id="th-paid"></th>
+              <th id="th-outstanding"></th>
+              <th id="th-status"></th>
+              <th style="width:100px"></th>
+            </tr>
+          </thead>
+          <tbody id="ct-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Модалка: контракт -->
+  <div class="modal-overlay" id="modal-contract">
+    <div class="modal" style="width:600px;max-width:95vw;max-height:90vh;overflow-y:auto">
+      <h3 id="t-modal-contract-title"></h3>
+      <div class="fields-row">
+        <div class="field-group">
+          <label class="required" id="lbl-c-folder"></label>
+          <select id="c-folder"></select>
+        </div>
+        <div class="field-group">
+          <label class="required" id="lbl-c-contractor"></label>
+          <select id="c-contractor"></select>
+        </div>
+      </div>
+      <div class="fields-row">
+        <div class="field-group">
+          <label class="required" id="lbl-c-name"></label>
+          <input type="text" id="c-name">
+        </div>
+        <div class="field-group">
+          <label id="lbl-c-extref"></label>
+          <input type="text" id="c-extref">
+        </div>
+      </div>
+      <div class="fields-row">
+        <div class="field-group">
+          <label id="lbl-c-date"></label>
+          <input type="date" id="c-date">
+        </div>
+        <div class="field-group">
+          <label id="lbl-c-direction"></label>
+          <select id="c-direction">
+            <option value="expense" id="c-opt-expense"></option>
+            <option value="income" id="c-opt-income"></option>
+          </select>
+        </div>
+      </div>
+      <div class="fields-row-3">
+        <div class="field-group">
+          <label id="lbl-c-subtotal"></label>
+          <input type="number" id="c-subtotal" min="0" step="0.01">
+        </div>
+        <div class="field-group">
+          <label id="lbl-c-vat"></label>
+          <input type="number" id="c-vat" min="0" step="0.01">
+        </div>
+        <div class="field-group">
+          <label class="required" id="lbl-c-total"></label>
+          <input type="number" id="c-total" min="0" step="0.01">
+        </div>
+      </div>
+      <div class="field-group">
+        <label id="lbl-c-terms"></label>
+        <input type="text" id="c-terms" placeholder="50/40/10">
+      </div>
+      <div class="field-group">
+        <label id="lbl-c-notes"></label>
+        <textarea id="c-notes" rows="2"></textarea>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-outline" id="btn-c-cancel"></button>
+        <button class="btn btn-primary" id="btn-c-save"></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Модалка: инвойс (создание из контракта) -->
+  <div class="modal-overlay" id="modal-invoice">
+    <div class="modal" style="width:560px;max-width:95vw;max-height:90vh;overflow-y:auto">
+      <h3 id="t-modal-inv-title"></h3>
+      <div class="fields-row">
+        <div class="field-group">
+          <label class="required" id="lbl-i-name"></label>
+          <input type="text" id="i-name">
+        </div>
+        <div class="field-group">
+          <label class="required" id="lbl-i-date"></label>
+          <input type="date" id="i-date">
+        </div>
+      </div>
+      <div class="fields-row">
+        <div class="field-group">
+          <label id="lbl-i-direction"></label>
+          <select id="i-direction">
+            <option value="expense"></option>
+            <option value="income"></option>
+          </select>
+        </div>
+        <div class="field-group">
+          <label id="lbl-i-category"></label>
+          <select id="i-category"></select>
+        </div>
+      </div>
+      <div class="fields-row-3">
+        <div class="field-group">
+          <label id="lbl-i-subtotal"></label>
+          <input type="number" id="i-subtotal" min="0" step="0.01">
+        </div>
+        <div class="field-group">
+          <label id="lbl-i-vat-rate"></label>
+          <select id="i-vat-rate">
+            <option value="0">0%</option>
+            <option value="7">7%</option>
+          </select>
+        </div>
+        <div class="field-group">
+          <label id="lbl-i-vat-amount"></label>
+          <input type="number" id="i-vat-amount" min="0" step="0.01">
+        </div>
+      </div>
+      <div class="fields-row-3">
+        <div class="field-group">
+          <label id="lbl-i-wht-rate"></label>
+          <select id="i-wht-rate">
+            <option value="0">0%</option>
+            <option value="1">1%</option>
+            <option value="2">2%</option>
+            <option value="3">3%</option>
+            <option value="5">5%</option>
+            <option value="15">15%</option>
+          </select>
+        </div>
+        <div class="field-group">
+          <label id="lbl-i-wht-amount"></label>
+          <input type="number" id="i-wht-amount" min="0" step="0.01">
+        </div>
+        <div class="field-group">
+          <label class="required" id="lbl-i-total"></label>
+          <input type="number" id="i-total" min="0" step="0.01">
+        </div>
+      </div>
+      <div style="font-size:0.85rem;color:#666;margin-bottom:12px">
+        <span id="lbl-i-payable"></span>: <strong id="i-payable-val">—</strong>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-outline" id="btn-i-cancel"></button>
+        <button class="btn btn-primary" id="btn-i-save"></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Модалка: транзакция -->
+  <div class="modal-overlay" id="modal-trx">
+    <div class="modal" style="width:480px;max-width:95vw">
+      <h3 id="t-modal-trx-title"></h3>
+      <div class="fields-row">
+        <div class="field-group">
+          <label class="required" id="lbl-tx-date"></label>
+          <input type="date" id="tx-date">
+        </div>
+        <div class="field-group">
+          <label id="lbl-tx-direction"></label>
+          <select id="tx-direction">
+            <option value="expense"></option>
+            <option value="income"></option>
+          </select>
+        </div>
+      </div>
+      <div class="fields-row">
+        <div class="field-group">
+          <label id="lbl-tx-amount"></label>
+          <input type="number" id="tx-amount" min="0" step="0.01">
+        </div>
+        <div class="field-group">
+          <label class="required" id="lbl-tx-account"></label>
+          <select id="tx-account"></select>
+        </div>
+      </div>
+      <div class="fields-row">
+        <div class="field-group">
+          <label class="required" id="lbl-tx-category"></label>
+          <select id="tx-category"></select>
+        </div>
+        <div class="field-group">
+          <label id="lbl-tx-desc"></label>
+          <input type="text" id="tx-desc">
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-outline" id="btn-tx-cancel"></button>
+        <button class="btn btn-primary" id="btn-tx-save"></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Модалка: привязать инвойс -->
+  <div class="modal-overlay" id="modal-link-inv">
+    <div class="modal" style="width:560px;max-width:95vw;max-height:80vh;display:flex;flex-direction:column">
+      <h3 id="t-link-inv-title"></h3>
+      <div id="link-inv-list" style="flex:1;overflow-y:auto;max-height:400px"></div>
+      <div class="modal-actions" style="margin-top:12px">
+        <button class="btn btn-outline" id="btn-link-inv-cancel"></button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    const ICON_TRASH = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>';
+
+    let allContracts     = [];
+    let companiesCache   = [];
+    let foldersCache     = [];
+    let contractorsCache = [];
+    let categoriesCache  = [];
+    let typesCache       = [];
+    let accountsCache    = [];
+    let filterCompany    = '';
+    let filterFolder     = '';
+    let filterContractor = '';
+    let filterStatus     = 'active';
+    let expandedContracts = {};
+    let expandedInvoices  = {};
+    let contractInvoices  = {}; // contractId → [invoices]
+    let invoiceTrx        = {}; // invoiceId → [transactions]
+
+    let currentContractMode = 'create';
+    let currentContractId = null;
+    let currentInvContractId = null; // contract for new invoice
+    let currentTrxInvoiceId = null;
+    let currentTrxMode = 'create';
+    let currentTrxId = null;
+
+    function fmt(v) {
+      const n = typeof v === 'object' ? parseFloat(v?.value || v) : parseFloat(v);
+      if (isNaN(n)) return '—';
+      return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+    function formatDate(val) {
+      if (!val) return '—';
+      const d = new Date(val.value || val);
+      if (isNaN(d)) return '—';
+      return `${String(d.getUTCDate()).padStart(2,'0')}.${String(d.getUTCMonth()+1).padStart(2,'0')}.${d.getUTCFullYear()}`;
+    }
+    function showToast(msg, type) {
+      const el = document.getElementById('toast');
+      el.textContent = msg; el.className = 'toast show' + (type ? ' ' + type : '');
+      clearTimeout(el._t); el._t = setTimeout(() => el.className = 'toast', 3000);
+    }
+    function openModal(id)  { document.getElementById(id).classList.add('open'); }
+    function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+    function numVal(v) { return typeof v === 'object' ? parseFloat(v?.value || 0) : parseFloat(v || 0); }
+    function contractorName(c) { return c?.contractor_name_en || c?.contractor_name_th || '—'; }
+    function statusBadge(s) {
+      if (s === 'active')    return `<span class="badge badge-green">${t('active')}</span>`;
+      if (s === 'completed') return `<span class="badge badge-gray">${t('completed')}</span>`;
+      if (s === 'cancelled') return `<span class="badge badge-red">${t('cancelled')}</span>`;
+      return `<span class="badge badge-gray">${s || '—'}</span>`;
+    }
+    function amtCell(val, dir) {
+      const n = numVal(val);
+      const cls = dir === 'expense' ? 'expense' : 'income';
+      const sign = dir === 'expense' ? '-' : '';
+      return `<span class="amount-col ${cls}">${sign}${fmt(n)}</span>`;
+    }
+
+    function updateTexts() {
+      document.getElementById('t-guest-title').textContent = t('guestTitle');
+      document.getElementById('t-guest-sub').textContent = t('guestSub');
+      document.getElementById('t-page-title').textContent = t('contracts');
+      document.getElementById('btn-create').textContent = t('createContract');
+
+      const fs = document.getElementById('filter-status');
+      fs.options[0].text = t('active'); fs.options[1].text = t('completed');
+      fs.options[2].text = t('cancelled'); fs.options[3].text = t('allStatuses');
+
+      document.getElementById('th-date').textContent = t('date');
+      document.getElementById('th-name').textContent = t('name');
+      document.getElementById('th-contractor').textContent = t('contractor');
+      document.getElementById('th-folder').textContent = t('folder');
+      document.getElementById('th-total').textContent = t('contractTotal');
+      document.getElementById('th-invoiced').textContent = t('contractInvoiced');
+      document.getElementById('th-paid').textContent = t('paidAmount');
+      document.getElementById('th-outstanding').textContent = t('contractOutstanding');
+      document.getElementById('th-status').textContent = t('statusLabel');
+
+      // Contract modal
+      document.getElementById('lbl-c-folder').textContent = t('folder');
+      document.getElementById('lbl-c-contractor').textContent = t('contractor');
+      document.getElementById('lbl-c-name').textContent = t('name');
+      document.getElementById('lbl-c-extref').textContent = t('externalRef');
+      document.getElementById('lbl-c-date').textContent = t('date');
+      document.getElementById('lbl-c-direction').textContent = t('direction');
+      document.getElementById('c-opt-expense').textContent = t('expense');
+      document.getElementById('c-opt-income').textContent = t('income');
+      document.getElementById('lbl-c-subtotal').textContent = t('subtotal');
+      document.getElementById('lbl-c-vat').textContent = t('vatAmount');
+      document.getElementById('lbl-c-total').textContent = t('contractTotal');
+      document.getElementById('lbl-c-terms').textContent = t('paymentTerms');
+      document.getElementById('lbl-c-notes').textContent = t('notes');
+      document.getElementById('btn-c-cancel').textContent = t('cancel');
+      document.getElementById('btn-c-save').textContent = t('save');
+
+      // Invoice modal
+      document.getElementById('lbl-i-name').textContent = t('name');
+      document.getElementById('lbl-i-date').textContent = t('date');
+      document.getElementById('lbl-i-direction').textContent = t('direction');
+      document.getElementById('lbl-i-category').textContent = t('category');
+      document.getElementById('lbl-i-subtotal').textContent = t('subtotal');
+      document.getElementById('lbl-i-vat-rate').textContent = t('vatRate');
+      document.getElementById('lbl-i-vat-amount').textContent = t('vatAmount');
+      document.getElementById('lbl-i-wht-rate').textContent = t('whtRate');
+      document.getElementById('lbl-i-wht-amount').textContent = t('whtAmount');
+      document.getElementById('lbl-i-total').textContent = t('totalAmount');
+      document.getElementById('lbl-i-payable').textContent = t('amountPayable');
+      document.getElementById('btn-i-cancel').textContent = t('cancel');
+      document.getElementById('btn-i-save').textContent = t('save');
+      document.getElementById('i-direction').options[0].textContent = t('expense');
+      document.getElementById('i-direction').options[1].textContent = t('income');
+
+      // Trx modal
+      document.getElementById('lbl-tx-date').textContent = t('date');
+      document.getElementById('lbl-tx-direction').textContent = t('direction');
+      document.getElementById('lbl-tx-amount').textContent = t('amount');
+      document.getElementById('lbl-tx-account').textContent = t('account');
+      document.getElementById('lbl-tx-category').textContent = t('category');
+      document.getElementById('lbl-tx-desc').textContent = t('description');
+      document.getElementById('btn-tx-cancel').textContent = t('cancel');
+      document.getElementById('btn-tx-save').textContent = t('save');
+      document.getElementById('tx-direction').options[0].textContent = t('expense');
+      document.getElementById('tx-direction').options[1].textContent = t('income');
+
+      document.getElementById('btn-link-inv-cancel').textContent = t('cancel');
+
+      updateHeaderTexts();
+    }
+
+    // ─── Data loading ───
+
+    async function loadRefs() {
+      const [companies, folders, contractors, categories, types, accounts] = await Promise.all([
+        apiFetch('/companies').catch(() => []),
+        apiFetch('/folders').catch(() => []),
+        apiFetch('/contractors?active=true').catch(() => []),
+        apiFetch('/categories').catch(() => []),
+        apiFetch('/category_types').catch(() => []),
+        apiFetch('/company_accounts').catch(() => []),
+      ]);
+      companiesCache = companies; foldersCache = folders;
+      contractorsCache = contractors; categoriesCache = categories;
+      typesCache = types; accountsCache = accounts;
+      fillCompanyFilter();
+    }
+
+    function fillCompanyFilter() {
+      const sel = document.getElementById('filter-company');
+      sel.innerHTML = `<option value="">${t('selectCompanyFirst')}</option>`;
+      companiesCache.forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c.id; opt.textContent = c.name;
+        sel.appendChild(opt);
+      });
+    }
+
+    function fillFolderFilter() {
+      const sel = document.getElementById('filter-folder');
+      sel.innerHTML = `<option value="">${t('allFolders')}</option>`;
+      const list = filterCompany ? foldersCache.filter(f => f.company_id === filterCompany) : foldersCache;
+      list.forEach(f => {
+        const opt = document.createElement('option');
+        opt.value = f.id; opt.textContent = f.name;
+        sel.appendChild(opt);
+      });
+    }
+
+    function fillContractorFilter() {
+      const sel = document.getElementById('filter-contractor');
+      sel.innerHTML = `<option value="">${t('allCategories').replace(t('allCategories'), t('noContractor'))}</option>`;
+      sel.innerHTML = `<option value="">— ${t('contractor')} —</option>`;
+      contractorsCache.forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c.id; opt.textContent = c.name_en || c.name_th || '—';
+        sel.appendChild(opt);
+      });
+    }
+
+    document.getElementById('filter-company').addEventListener('change', e => {
+      filterCompany = e.target.value; filterFolder = ''; filterContractor = '';
+      fillFolderFilter(); fillContractorFilter(); loadContracts();
+    });
+    document.getElementById('filter-folder').addEventListener('change', e => { filterFolder = e.target.value; loadContracts(); });
+    document.getElementById('filter-contractor').addEventListener('change', e => { filterContractor = e.target.value; loadContracts(); });
+    document.getElementById('filter-status').addEventListener('change', e => { filterStatus = e.target.value; loadContracts(); });
+
+    async function loadContracts() {
+      const tbody = document.getElementById('ct-tbody');
+      if (!filterCompany) {
+        tbody.innerHTML = `<tr><td colspan="11" class="empty-state">${t('selectCompanyFirst')}</td></tr>`;
+        return;
+      }
+      tbody.innerHTML = `<tr><td colspan="11" class="loading">${t('loading')}</td></tr>`;
+      try {
+        let url = `/contracts?company_id=${filterCompany}&status=${filterStatus}`;
+        if (filterFolder) url += `&folder_id=${filterFolder}`;
+        if (filterContractor) url += `&contractor_id=${filterContractor}`;
+        allContracts = await apiFetch(url);
+        renderContracts();
+      } catch(e) {
+        tbody.innerHTML = `<tr><td colspan="11" class="empty-state">${e.message}</td></tr>`;
+      }
+    }
+
+    // ─── Render contracts ───
+
+    function renderContracts() {
+      const tbody = document.getElementById('ct-tbody');
+      if (!allContracts.length) {
+        tbody.innerHTML = `<tr><td colspan="11" class="empty-state">${t('noContracts')}</td></tr>`;
+        return;
+      }
+      tbody.innerHTML = '';
+      allContracts.forEach(c => {
+        const isExp = expandedContracts[c.id];
+        const dir = c.direction || 'expense';
+        const outstanding = numVal(c.total_amount) - numVal(c.invoiced_total);
+
+        const tr = document.createElement('tr');
+        if (isExp) tr.className = 'expanded';
+        tr.innerHTML = `
+          <td><button class="expand-btn${isExp?' open':''}" data-expand-contract="${c.id}">${isExp?'▼':'▶'}</button></td>
+          <td>${formatDate(c.date)}</td>
+          <td><strong>${c.name || '—'}</strong>${c.external_ref ? `<br><span style="font-size:0.75rem;color:#999">${c.external_ref}</span>` : ''}</td>
+          <td style="font-size:0.82rem">${contractorName(c)}</td>
+          <td style="font-size:0.82rem">${c.folder_name || '—'}</td>
+          <td>${amtCell(c.total_amount, dir)}</td>
+          <td>${amtCell(c.invoiced_total, dir)}</td>
+          <td>${amtCell(c.paid_amount, dir)}</td>
+          <td>${amtCell(outstanding, dir)}</td>
+          <td>${statusBadge(c.status)}</td>
+          <td>
+            <div style="display:flex;gap:4px;align-items:center;justify-content:flex-end">
+              <button class="btn btn-outline" style="padding:2px 8px;font-size:0.75rem" data-action="edit-contract" data-id="${c.id}">${t('edit')}</button>
+              <button class="icon-btn" data-action="delete-contract" data-id="${c.id}" title="${t('delete')}">${ICON_TRASH}</button>
+            </div>
+          </td>
+        `;
+        tbody.appendChild(tr);
+
+        // Detail row
+        const detailTr = document.createElement('tr');
+        detailTr.className = 'detail-row';
+        detailTr.style.display = isExp ? '' : 'none';
+        detailTr.id = `contract-detail-${c.id}`;
+        detailTr.innerHTML = `<td colspan="11"><div class="detail-inner" id="contract-inner-${c.id}">${isExp ? '<div class="loading">'+t('loading')+'</div>' : ''}</div></td>`;
+        tbody.appendChild(detailTr);
+
+        if (isExp) loadContractDetail(c.id);
+      });
+    }
+
+    // ─── Contract detail (invoices) ───
+
+    async function loadContractDetail(contractId) {
+      const inner = document.getElementById(`contract-inner-${contractId}`);
+      if (!inner) return;
+      try {
+        const invs = await apiFetch(`/contracts/${contractId}/invoices`);
+        contractInvoices[contractId] = invs;
+        renderContractDetail(contractId, invs);
+      } catch(e) {
+        inner.innerHTML = `<div style="color:#c33">${e.message}</div>`;
+      }
+    }
+
+    function renderContractDetail(contractId, invs) {
+      const inner = document.getElementById(`contract-inner-${contractId}`);
+      if (!inner) return;
+      const contract = allContracts.find(c => c.id === contractId);
+
+      let html = `<div style="display:flex;gap:8px;margin-bottom:10px">
+        <button class="btn btn-primary" style="font-size:0.78rem;padding:4px 12px" data-action="create-inv" data-contract-id="${contractId}">${t('createInvoiceFromContract')}</button>
+        <button class="btn btn-outline" style="font-size:0.78rem;padding:4px 12px" data-action="link-inv" data-contract-id="${contractId}">${t('linkInvoice')}</button>
+      </div>`;
+
+      if (!invs.length) {
+        html += `<div style="color:#bbb;font-size:0.85rem;padding:8px 0">${t('noInvoices')}</div>`;
+      } else {
+        html += `<table class="inv-mini-table"><thead><tr>
+          <th style="width:24px"></th><th>${t('date')}</th><th>${t('name')}</th>
+          <th>${t('subtotal')}</th><th>VAT</th><th>WHT</th>
+          <th>${t('totalAmount')}</th><th>${t('paidAmount')}</th><th>${t('statusLabel')}</th><th style="width:60px"></th>
+        </tr></thead><tbody>`;
+        invs.forEach(inv => {
+          const invExp = expandedInvoices[inv.id];
+          const dir = inv.direction || 'expense';
+          html += `<tr class="${invExp ? 'inv-expanded' : ''}" data-inv-id="${inv.id}">
+            <td><button class="expand-btn${invExp?' open':''}" data-expand-invoice="${inv.id}" data-contract-id="${contractId}">${invExp?'▼':'▶'}</button></td>
+            <td>${formatDate(inv.date)}</td>
+            <td>${inv.name || '—'}</td>
+            <td>${amtCell(inv.subtotal, dir)}</td>
+            <td style="font-size:0.78rem">${fmt(numVal(inv.vat_amount))}</td>
+            <td style="font-size:0.78rem">${fmt(numVal(inv.wht_amount))}</td>
+            <td>${amtCell(inv.total_amount, dir)}</td>
+            <td>${amtCell(inv.paid_amount, dir)}</td>
+            <td>${statusBadge(inv.status)}</td>
+            <td><button class="btn btn-outline" style="padding:1px 6px;font-size:0.72rem" data-action="unlink-inv" data-inv-id="${inv.id}" data-contract-id="${contractId}">${t('unlinkInvoice')}</button></td>
+          </tr>`;
+          // Invoice detail row (transactions)
+          html += `<tr class="detail-row" style="display:${invExp ? '' : 'none'}" id="inv-detail-${inv.id}">
+            <td colspan="10"><div class="trx-detail" id="inv-inner-${inv.id}">${invExp ? '<div class="loading">'+t('loading')+'</div>' : ''}</div></td>
+          </tr>`;
+        });
+        html += '</tbody></table>';
+      }
+      inner.innerHTML = html;
+
+      // Load expanded invoice details
+      invs.forEach(inv => {
+        if (expandedInvoices[inv.id]) loadInvoiceTrx(inv.id, contractId);
+      });
+    }
+
+    // ─── Invoice detail (transactions) ───
+
+    async function loadInvoiceTrx(invoiceId, contractId) {
+      const inner = document.getElementById(`inv-inner-${invoiceId}`);
+      if (!inner) return;
+      try {
+        const trxs = await apiFetch(`/transactions?invoice_id=${invoiceId}`);
+        invoiceTrx[invoiceId] = trxs;
+        renderInvoiceTrx(invoiceId, trxs, contractId);
+      } catch(e) {
+        inner.innerHTML = `<div style="color:#c33">${e.message}</div>`;
+      }
+    }
+
+    function renderInvoiceTrx(invoiceId, trxs, contractId) {
+      const inner = document.getElementById(`inv-inner-${invoiceId}`);
+      if (!inner) return;
+
+      let html = `<div style="display:flex;gap:8px;margin-bottom:6px">
+        <button class="btn btn-primary" style="font-size:0.72rem;padding:3px 10px" data-action="add-trx" data-inv-id="${invoiceId}" data-contract-id="${contractId}">${t('addTransaction')}</button>
+      </div>`;
+
+      if (!trxs.length) {
+        html += `<div style="color:#bbb;font-size:0.82rem">${t('noTransactions')}</div>`;
+      } else {
+        html += `<table class="trx-mini-table"><thead><tr>
+          <th>${t('date')}</th><th>${t('amount')}</th><th>${t('category')}</th>
+          <th>${t('description')}</th>
+        </tr></thead><tbody>`;
+        trxs.forEach(tx => {
+          const sign = tx.direction === 'expense' ? '-' : '';
+          const cls = tx.direction === 'expense' ? 'expense' : 'income';
+          html += `<tr>
+            <td>${formatDate(tx.date)}</td>
+            <td><span class="amount-col ${cls}">${sign}${fmt(tx.amount)}</span></td>
+            <td style="font-size:0.78rem">${tx.category_name || '—'}</td>
+            <td style="font-size:0.78rem;color:#666">${tx.description || '—'}</td>
+          </tr>`;
+        });
+        html += '</tbody></table>';
+      }
+      inner.innerHTML = html;
+    }
+
+    // ─── Actions ───
+
+    document.addEventListener('click', async e => {
+      // Expand contract
+      const expC = e.target.closest('[data-expand-contract]');
+      if (expC) {
+        const id = expC.dataset.expandContract;
+        expandedContracts[id] = !expandedContracts[id];
+        renderContracts();
+        return;
+      }
+
+      // Expand invoice
+      const expI = e.target.closest('[data-expand-invoice]');
+      if (expI) {
+        const id = expI.dataset.expandInvoice;
+        expandedInvoices[id] = !expandedInvoices[id];
+        const contractId = expI.dataset.contractId;
+        renderContractDetail(contractId, contractInvoices[contractId] || []);
+        if (expandedInvoices[id]) loadInvoiceTrx(id, contractId);
+        return;
+      }
+
+      const btn = e.target.closest('[data-action]');
+      if (!btn) return;
+      const action = btn.dataset.action;
+
+      if (action === 'edit-contract') {
+        const c = allContracts.find(x => x.id === btn.dataset.id);
+        if (!c) return;
+        currentContractMode = 'edit'; currentContractId = c.id;
+        document.getElementById('t-modal-contract-title').textContent = t('editContract');
+        fillModalFolders(c.folder_id); fillModalContractors(c.contractor_id);
+        document.getElementById('c-name').value = c.name || '';
+        document.getElementById('c-extref').value = c.external_ref || '';
+        document.getElementById('c-date').value = c.date ? (c.date.value || c.date).split('T')[0] : '';
+        document.getElementById('c-direction').value = c.direction || 'expense';
+        document.getElementById('c-subtotal').value = numVal(c.subtotal) || '';
+        document.getElementById('c-vat').value = numVal(c.vat_amount) || '';
+        document.getElementById('c-total').value = numVal(c.total_amount) || '';
+        document.getElementById('c-terms').value = c.payment_terms || '';
+        document.getElementById('c-notes').value = c.notes || '';
+        openModal('modal-contract');
+      }
+
+      if (action === 'delete-contract') {
+        if (!confirm(t('confirmDelete'))) return;
+        btn.disabled = true;
+        try {
+          await apiFetch(`/contracts/${btn.dataset.id}`, { method: 'DELETE' });
+          showToast(t('deleted'), 'success'); loadContracts();
+        } catch(err) { showToast(err.message, 'error'); btn.disabled = false; }
+      }
+
+      if (action === 'create-inv') {
+        const contractId = btn.dataset.contractId;
+        const contract = allContracts.find(c => c.id === contractId);
+        if (!contract) return;
+        currentInvContractId = contractId;
+        document.getElementById('t-modal-inv-title').textContent = t('createInvoiceFromContract');
+        document.getElementById('i-name').value = '';
+        document.getElementById('i-date').value = new Date().toISOString().split('T')[0];
+        document.getElementById('i-direction').value = contract.direction || 'expense';
+        fillCategorySelect('i-category', '');
+        document.getElementById('i-subtotal').value = '';
+        document.getElementById('i-vat-rate').value = '7';
+        document.getElementById('i-vat-amount').value = '';
+        document.getElementById('i-wht-rate').value = '0';
+        document.getElementById('i-wht-amount').value = '';
+        document.getElementById('i-total').value = '';
+        document.getElementById('i-payable-val').textContent = '—';
+        openModal('modal-invoice');
+      }
+
+      if (action === 'link-inv') {
+        currentInvContractId = btn.dataset.contractId;
+        openLinkInvModal(currentInvContractId);
+      }
+
+      if (action === 'unlink-inv') {
+        const invId = btn.dataset.invId;
+        const contractId = btn.dataset.contractId;
+        btn.disabled = true;
+        try {
+          // Get current invoice data to preserve fields
+          const invs = contractInvoices[contractId] || [];
+          const inv = invs.find(i => i.id === invId);
+          if (!inv) return;
+          await apiFetch(`/invoices/${invId}`, { method: 'PUT', body: JSON.stringify({
+            name: inv.name, status: inv.status, direction: inv.direction,
+            total_amount: String(numVal(inv.total_amount)), paid_amount: String(numVal(inv.paid_amount)),
+            subtotal: String(numVal(inv.subtotal)), vat_rate: String(numVal(inv.vat_rate)),
+            vat_amount: String(numVal(inv.vat_amount)), wht_rate: String(numVal(inv.wht_rate)),
+            wht_amount: String(numVal(inv.wht_amount)),
+            category_id: inv.category_id || '', contractor_id: inv.contractor_id || '',
+            contract_id: '', date: inv.date ? (inv.date.value || inv.date) : '',
+          })});
+          showToast(t('saved'), 'success');
+          loadContractDetail(contractId);
+          loadContracts(); // refresh totals
+        } catch(err) { showToast(err.message, 'error'); btn.disabled = false; }
+      }
+
+      if (action === 'pick-link-inv') {
+        const invId = btn.dataset.invId;
+        const contractId = currentInvContractId;
+        btn.disabled = true;
+        try {
+          const contract = allContracts.find(c => c.id === contractId);
+          // Update invoice: set contract_id
+          await apiFetch(`/invoices/${invId}`, { method: 'PUT', body: JSON.stringify({
+            name: btn.dataset.name, status: btn.dataset.status || 'active',
+            direction: btn.dataset.direction || 'expense',
+            total_amount: btn.dataset.total || '0', paid_amount: btn.dataset.paid || '0',
+            subtotal: btn.dataset.subtotal || '0', vat_rate: btn.dataset.vatRate || '0',
+            vat_amount: btn.dataset.vatAmount || '0', wht_rate: btn.dataset.whtRate || '0',
+            wht_amount: btn.dataset.whtAmount || '0',
+            category_id: btn.dataset.category || '', contractor_id: contract?.contractor_id || '',
+            contract_id: contractId, date: btn.dataset.date || '',
+          })});
+          closeModal('modal-link-inv');
+          showToast(t('saved'), 'success');
+          loadContractDetail(contractId);
+          loadContracts();
+        } catch(err) { showToast(err.message, 'error'); btn.disabled = false; }
+      }
+
+      if (action === 'add-trx') {
+        const invoiceId = btn.dataset.invId;
+        const contractId = btn.dataset.contractId;
+        const contract = allContracts.find(c => c.id === contractId);
+        const invs = contractInvoices[contractId] || [];
+        const inv = invs.find(i => i.id === invoiceId);
+        currentTrxMode = 'create'; currentTrxId = null; currentTrxInvoiceId = invoiceId;
+        document.getElementById('t-modal-trx-title').textContent = t('addTransaction');
+        document.getElementById('tx-date').value = new Date().toISOString().split('T')[0];
+        document.getElementById('tx-direction').value = inv?.direction || 'expense';
+        document.getElementById('tx-amount').value = '';
+        document.getElementById('tx-desc').value = '';
+        fillAccountSelect(contract?.folder_id);
+        fillCategorySelect('tx-category', '');
+        openModal('modal-trx');
+      }
+    });
+
+    // ─── Link invoice modal ───
+
+    async function openLinkInvModal(contractId) {
+      const contract = allContracts.find(c => c.id === contractId);
+      if (!contract) return;
+      const list = document.getElementById('link-inv-list');
+      document.getElementById('t-link-inv-title').textContent = t('linkInvoice');
+      list.innerHTML = `<div class="loading">${t('loading')}</div>`;
+      openModal('modal-link-inv');
+      try {
+        const invs = await apiFetch(`/invoices?folder_id=${contract.folder_id}&limit=500`);
+        const unlinked = (invs.rows || invs).filter(i =>
+          !i.contract_id && i.contractor_id === contract.contractor_id && i.status !== 'deleted'
+        );
+        if (!unlinked.length) {
+          list.innerHTML = `<div style="padding:20px;text-align:center;color:#bbb">${t('noInvoices')}</div>`;
+          return;
+        }
+        list.innerHTML = unlinked.map(i => `
+          <div style="padding:8px 12px;border-bottom:1px solid #f0f0f0;display:flex;justify-content:space-between;align-items:center">
+            <div>
+              <strong>${i.name}</strong> <span style="color:#888;font-size:0.82rem">${formatDate(i.date)}</span>
+              <br><span style="font-size:0.82rem;color:#666">${fmt(numVal(i.total_amount))}</span>
+            </div>
+            <button class="btn btn-primary" style="font-size:0.75rem;padding:3px 10px" data-action="pick-link-inv"
+              data-inv-id="${i.id}" data-name="${(i.name||'').replace(/"/g,'&quot;')}"
+              data-status="${i.status||'active'}" data-direction="${i.direction||'expense'}"
+              data-total="${numVal(i.total_amount)}" data-paid="${numVal(i.paid_amount)}"
+              data-subtotal="${numVal(i.subtotal)}" data-vat-rate="${numVal(i.vat_rate)}"
+              data-vat-amount="${numVal(i.vat_amount)}" data-wht-rate="${numVal(i.wht_rate)}"
+              data-wht-amount="${numVal(i.wht_amount)}" data-category="${i.category_id||''}"
+              data-date="${i.date?(i.date.value||i.date):''}">${t('linkInvoice')}</button>
+          </div>
+        `).join('');
+      } catch(e) { list.innerHTML = `<div style="color:#c33;padding:16px">${e.message}</div>`; }
+    }
+
+    // ─── Modal helpers ───
+
+    function fillModalFolders(selectedId) {
+      const sel = document.getElementById('c-folder');
+      const list = filterCompany ? foldersCache.filter(f => f.company_id === filterCompany) : foldersCache;
+      sel.innerHTML = `<option value="">—</option>`;
+      list.forEach(f => {
+        if (f.status === 'archive') return;
+        const opt = document.createElement('option');
+        opt.value = f.id; opt.textContent = f.name;
+        if (f.id === selectedId) opt.selected = true;
+        sel.appendChild(opt);
+      });
+    }
+
+    function fillModalContractors(selectedId) {
+      const sel = document.getElementById('c-contractor');
+      sel.innerHTML = `<option value="">—</option>`;
+      contractorsCache.forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c.id; opt.textContent = c.name_en || c.name_th || '—';
+        if (c.id === selectedId) opt.selected = true;
+        sel.appendChild(opt);
+      });
+    }
+
+    function fillCategorySelect(selectId, selectedId) {
+      const sel = document.getElementById(selectId);
+      sel.innerHTML = `<option value="">— ${t('noCategory')} —</option>`;
+      categoriesCache.forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c.id;
+        opt.textContent = c['name_' + currentLang] || c.name || '—';
+        if (c.id === selectedId) opt.selected = true;
+        sel.appendChild(opt);
+      });
+    }
+
+    function fillAccountSelect(folderId) {
+      const sel = document.getElementById('tx-account');
+      // Find company from folder
+      const folder = foldersCache.find(f => f.id === folderId);
+      const companyId = folder?.company_id || filterCompany;
+      const list = companyId ? accountsCache.filter(a => a.company_id === companyId) : accountsCache;
+      sel.innerHTML = `<option value="">—</option>`;
+      list.forEach(a => {
+        const opt = document.createElement('option');
+        opt.value = a.id; opt.textContent = a.name + (a.bank_name ? ' · ' + a.bank_name : '');
+        sel.appendChild(opt);
+      });
+    }
+
+    // ─── Create contract ───
+
+    document.getElementById('btn-create').addEventListener('click', () => {
+      if (!filterCompany) { showToast(t('selectCompanyFirst'), 'error'); return; }
+      currentContractMode = 'create'; currentContractId = null;
+      document.getElementById('t-modal-contract-title').textContent = t('createContract');
+      fillModalFolders(''); fillModalContractors('');
+      ['c-name','c-extref','c-subtotal','c-vat','c-total','c-terms','c-notes'].forEach(id => document.getElementById(id).value = '');
+      document.getElementById('c-date').value = new Date().toISOString().split('T')[0];
+      document.getElementById('c-direction').value = 'expense';
+      openModal('modal-contract');
+    });
+
+    document.getElementById('btn-c-cancel').addEventListener('click', () => closeModal('modal-contract'));
+    document.getElementById('btn-c-save').addEventListener('click', async () => {
+      const folder_id = document.getElementById('c-folder').value;
+      const contractor_id = document.getElementById('c-contractor').value;
+      const name = document.getElementById('c-name').value.trim();
+      const total = document.getElementById('c-total').value;
+
+      document.querySelectorAll('#modal-contract .invalid').forEach(el => el.classList.remove('invalid'));
+      const missing = [];
+      if (!folder_id) missing.push('c-folder');
+      if (!contractor_id) missing.push('c-contractor');
+      if (!name) missing.push('c-name');
+      if (!total) missing.push('c-total');
+      if (missing.length) {
+        missing.forEach(id => document.getElementById(id).classList.add('invalid'));
+        showToast(t('fillAllFields'), 'error'); return;
+      }
+
+      const body = {
+        folder_id, contractor_id, name,
+        external_ref: document.getElementById('c-extref').value.trim(),
+        date: document.getElementById('c-date').value,
+        direction: document.getElementById('c-direction').value,
+        subtotal: document.getElementById('c-subtotal').value || '0',
+        vat_amount: document.getElementById('c-vat').value || '0',
+        total_amount: total,
+        payment_terms: document.getElementById('c-terms').value.trim(),
+        notes: document.getElementById('c-notes').value.trim(),
+        status: currentContractMode === 'edit' ? (allContracts.find(c => c.id === currentContractId)?.status || 'active') : 'active',
+      };
+
+      closeModal('modal-contract');
+      try {
+        if (currentContractMode === 'create') {
+          await apiFetch('/contracts', { method: 'POST', body: JSON.stringify(body) });
+        } else {
+          await apiFetch(`/contracts/${currentContractId}`, { method: 'PUT', body: JSON.stringify(body) });
+        }
+        showToast(t('saved'), 'success'); loadContracts();
+      } catch(e) { showToast(e.message, 'error'); }
+    });
+
+    // ─── Create invoice from contract ───
+
+    document.getElementById('btn-i-cancel').addEventListener('click', () => closeModal('modal-invoice'));
+
+    // Auto-calc amount_payable display
+    function updatePayable() {
+      const total = parseFloat(document.getElementById('i-total').value) || 0;
+      const wht = parseFloat(document.getElementById('i-wht-amount').value) || 0;
+      document.getElementById('i-payable-val').textContent = fmt(total - wht);
+    }
+    document.getElementById('i-total').addEventListener('input', updatePayable);
+    document.getElementById('i-wht-amount').addEventListener('input', updatePayable);
+
+    document.getElementById('btn-i-save').addEventListener('click', async () => {
+      const name = document.getElementById('i-name').value.trim();
+      const date = document.getElementById('i-date').value;
+      const total = document.getElementById('i-total').value;
+
+      document.querySelectorAll('#modal-invoice .invalid').forEach(el => el.classList.remove('invalid'));
+      const missing = [];
+      if (!name) missing.push('i-name');
+      if (!date) missing.push('i-date');
+      if (!total) missing.push('i-total');
+      if (missing.length) {
+        missing.forEach(id => document.getElementById(id).classList.add('invalid'));
+        showToast(t('fillAllFields'), 'error'); return;
+      }
+
+      const contract = allContracts.find(c => c.id === currentInvContractId);
+      if (!contract) return;
+
+      const body = {
+        folder_id: contract.folder_id,
+        contractor_id: contract.contractor_id,
+        contract_id: contract.id,
+        name, date,
+        direction: document.getElementById('i-direction').value,
+        category_id: document.getElementById('i-category').value || '',
+        subtotal: document.getElementById('i-subtotal').value || '0',
+        vat_rate: document.getElementById('i-vat-rate').value || '0',
+        vat_amount: document.getElementById('i-vat-amount').value || '0',
+        wht_rate: document.getElementById('i-wht-rate').value || '0',
+        wht_amount: document.getElementById('i-wht-amount').value || '0',
+        total_amount: total,
+        status: 'active',
+      };
+
+      closeModal('modal-invoice');
+      try {
+        await apiFetch('/invoices', { method: 'POST', body: JSON.stringify(body) });
+        showToast(t('saved'), 'success');
+        loadContractDetail(currentInvContractId);
+        loadContracts();
+      } catch(e) { showToast(e.message, 'error'); }
+    });
+
+    // ─── Create transaction ───
+
+    document.getElementById('btn-tx-cancel').addEventListener('click', () => closeModal('modal-trx'));
+    document.getElementById('btn-tx-save').addEventListener('click', async () => {
+      const date = document.getElementById('tx-date').value;
+      const amount = document.getElementById('tx-amount').value;
+      const account_id = document.getElementById('tx-account').value;
+      const category_id = document.getElementById('tx-category').value;
+
+      document.querySelectorAll('#modal-trx .invalid').forEach(el => el.classList.remove('invalid'));
+      const missing = [];
+      if (!date) missing.push('tx-date');
+      if (!account_id) missing.push('tx-account');
+      if (!category_id) missing.push('tx-category');
+      if (missing.length) {
+        missing.forEach(id => document.getElementById(id).classList.add('invalid'));
+        showToast(t('fillAllFields'), 'error'); return;
+      }
+
+      // Get invoice to find folder + contractor
+      const invId = currentTrxInvoiceId;
+      let folderId = '', contractorId = '';
+      for (const [cId, invs] of Object.entries(contractInvoices)) {
+        const inv = invs.find(i => i.id === invId);
+        if (inv) { folderId = inv.folder_id; contractorId = inv.contractor_id; break; }
+      }
+
+      closeModal('modal-trx');
+      try {
+        await apiFetch('/transactions', { method: 'POST', body: JSON.stringify({
+          date, amount, direction: document.getElementById('tx-direction').value,
+          category_id, description: document.getElementById('tx-desc').value,
+          invoice_id: invId, folder_id: folderId, account_id, contractor_id: contractorId,
+        })});
+        showToast(t('saved'), 'success');
+        // Reload the contract that contains this invoice
+        for (const [cId, invs] of Object.entries(contractInvoices)) {
+          if (invs.find(i => i.id === invId)) {
+            loadContractDetail(cId);
+            loadContracts(); // refresh paid totals
+            break;
+          }
+        }
+      } catch(e) { showToast(e.message, 'error'); }
+    });
+
+    document.getElementById('btn-link-inv-cancel').addEventListener('click', () => closeModal('modal-link-inv'));
+
+    // ─── Keyboard ───
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape') {
+        closeModal('modal-contract');
+        closeModal('modal-invoice');
+        closeModal('modal-trx');
+        closeModal('modal-link-inv');
+      }
+    });
+
+    // ─── Init ───
+    window.onLogin = async () => {
+      updateTexts();
+      await loadRefs();
+      fillFolderFilter(); fillContractorFilter();
+    };
+    window.onLogout = () => { updateTexts(); };
+    window.onLangChange = () => { updateTexts(); renderContracts(); };
+
+    renderHeader('contracts');
+    updateTexts();
+  </script>
+</body>
+</html>
