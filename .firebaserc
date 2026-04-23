@@ -1,5 +1,18 @@
 {
   "projects": {
     "default": "project-9718e7d4-4cd7-4f52-8d6"
-  }
+  },
+  "targets": {
+    "project-9718e7d4-4cd7-4f52-8d6": {
+      "hosting": {
+        "cabinet": [
+          "project-9718e7d4-4cd7-4f52-8d6"
+        ],
+        "customer": [
+          "sunti-customer"
+        ]
+      }
+    }
+  },
+  "etags": {}
 }
