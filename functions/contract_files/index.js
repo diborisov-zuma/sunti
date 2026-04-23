@@ -7,7 +7,7 @@ const storage  = new Storage();
 const PROJECT  = 'project-9718e7d4-4cd7-4f52-8d6';
 const DATASET  = 'sunti';
 const TABLE    = 'contract_files';
-const BUCKET   = 'sunti-private';
+const BUCKET   = 'sunti-site';
 const SIGN_TTL_MS = 10 * 60 * 1000;
 
 function setCors(res) {
