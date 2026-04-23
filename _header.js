@@ -12,13 +12,14 @@ function renderHeader(activePage) {
       <a href="statements.html" class="nav-link ${activePage === 'statements' ? 'active' : ''}" id="t-nav-statements"></a>
       <a href="reports.html"  class="nav-link ${activePage === 'reports'  ? 'active' : ''}" id="t-nav-reports"></a>
       <div class="nav-dropdown" id="nav-settings" style="display:none">
-        <a class="nav-link ${['folders','companies','users','categories','contractors'].includes(activePage) ? 'active' : ''}" id="t-nav-settings">⚙</a>
+        <a class="nav-link ${['folders','companies','users','categories','contractors','portal'].includes(activePage) ? 'active' : ''}" id="t-nav-settings">⚙</a>
         <div class="nav-dropdown-menu">
           <a href="folders.html"      class="${activePage === 'folders'      ? 'active' : ''}" id="t-nav-folders"></a>
           <a href="companies.html"    class="${activePage === 'companies'    ? 'active' : ''}" id="t-nav-companies"></a>
           <a href="contractors.html"  class="${activePage === 'contractors'  ? 'active' : ''}" id="t-nav-contractors"></a>
           <a href="users.html"        class="${activePage === 'users'        ? 'active' : ''}" id="t-nav-users"></a>
           <a href="categories.html"   class="${activePage === 'categories'   ? 'active' : ''}" id="t-nav-categories"></a>
+          <a href="portal_settings.html" class="${activePage === 'portal' ? 'active' : ''}" id="t-nav-portal"></a>
         </div>
       </div>
     </nav>
@@ -116,6 +117,8 @@ function updateHeaderTexts() {
   if (nctr) nctr.textContent = t('navContractors');
   if (nu) nu.textContent = t('navUsers');
   if (ncat) ncat.textContent = t('navCategories');
+  const nportal = document.getElementById('t-nav-portal');
+  if (nportal) nportal.textContent = t('navPortal');
   if (nsett) nsett.textContent = '⚙ ' + t('navSettings');
   if (settWrap) settWrap.style.display = (typeof isAdmin !== 'undefined' && isAdmin) ? 'inline-flex' : 'none';
   if (lb) lb.textContent = t('logout');
