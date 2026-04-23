@@ -291,19 +291,57 @@
           <ul id="inv-category-list"></ul>
         </span>
       </div>
-      <div class="field-group">
-        <label id="t-inv-contractor-label" class="required"></label>
-        <select id="inv-contractor"></select>
-      </div>
       <div class="fields-row">
+        <div class="field-group">
+          <label id="t-inv-contractor-label" class="required"></label>
+          <select id="inv-contractor"></select>
+        </div>
+        <div class="field-group">
+          <label id="t-inv-contract-label"></label>
+          <select id="inv-contract"></select>
+        </div>
+      </div>
+      <div class="fields-row" style="grid-template-columns:1fr 1fr 1fr;gap:12px">
+        <div class="field-group">
+          <label id="t-inv-subtotal-label"></label>
+          <input type="number" id="inv-subtotal" min="0" step="0.01" placeholder="0.00">
+        </div>
+        <div class="field-group">
+          <label id="t-inv-vat-rate-label"></label>
+          <select id="inv-vat-rate">
+            <option value="0">0%</option>
+            <option value="7">7%</option>
+          </select>
+        </div>
+        <div class="field-group">
+          <label id="t-inv-vat-amount-label"></label>
+          <input type="number" id="inv-vat-amount" min="0" step="0.01" placeholder="0.00">
+        </div>
+      </div>
+      <div class="fields-row" style="grid-template-columns:1fr 1fr 1fr;gap:12px">
+        <div class="field-group">
+          <label id="t-inv-wht-rate-label"></label>
+          <select id="inv-wht-rate">
+            <option value="0">0%</option>
+            <option value="1">1%</option>
+            <option value="2">2%</option>
+            <option value="3">3%</option>
+            <option value="5">5%</option>
+            <option value="15">15%</option>
+          </select>
+        </div>
+        <div class="field-group">
+          <label id="t-inv-wht-amount-label"></label>
+          <input type="number" id="inv-wht-amount" min="0" step="0.01" placeholder="0.00">
+        </div>
         <div class="field-group">
           <label id="t-inv-total-label"></label>
           <input type="number" id="inv-total" min="0" step="0.01" placeholder="0.00">
         </div>
-        <div class="field-group">
-          <label id="t-inv-paid-label"></label>
-          <input type="number" id="inv-paid" min="0" step="0.01" placeholder="0.00" readonly style="background:#f5f5f5;color:#888">
-        </div>
+      </div>
+      <div style="font-size:0.85rem;color:#666;margin-bottom:12px">
+        <span id="t-inv-payable-label"></span>: <strong id="inv-payable-val">—</strong>
+        &nbsp;·&nbsp; <span id="t-inv-paid-label2"></span>: <strong id="inv-paid-val" style="color:#888">—</strong>
       </div>
       <div class="modal-actions">
         <button class="btn btn-outline" id="btn-inv-cancel"></button>
@@ -785,8 +823,15 @@
       document.getElementById('inv-opt-expense').textContent        = t('expense');
       document.getElementById('inv-opt-income').textContent         = t('income');
       document.getElementById('t-inv-contractor-label').textContent = t('contractor');
+      document.getElementById('t-inv-contract-label').textContent = t('contract');
+      document.getElementById('t-inv-subtotal-label').textContent = t('subtotal');
+      document.getElementById('t-inv-vat-rate-label').textContent = t('vatRate');
+      document.getElementById('t-inv-vat-amount-label').textContent = t('vatAmount');
+      document.getElementById('t-inv-wht-rate-label').textContent = t('whtRate');
+      document.getElementById('t-inv-wht-amount-label').textContent = t('whtAmount');
       document.getElementById('t-inv-total-label').textContent  = t('totalAmount');
-      document.getElementById('t-inv-paid-label').textContent   = t('paidAmount');
+      document.getElementById('t-inv-payable-label').textContent = t('amountPayable');
+      document.getElementById('t-inv-paid-label2').textContent   = t('paidAmount');
       document.getElementById('inv-opt-active').textContent     = t('invActive');
       document.getElementById('inv-opt-to_pay').textContent     = t('invToPay');
       document.getElementById('inv-opt-partial').textContent    = t('invPartial');
@@ -845,6 +890,37 @@
       if (!id) return '—';
       const c = contractorsCache.find(x => x.id === id);
       return c ? (c.name_en || c.name_th || '—') : '—';
+    }
+
+    let contractsCache = [];
+
+    async function loadContracts() {
+      try { contractsCache = await apiFetch('/contracts?company_id=' + filterCompany + '&status=active'); }
+      catch(e) { contractsCache = []; }
+    }
+
+    function fillContractSelect(selectedId, contractorId, folderId) {
+      const sel = document.getElementById('inv-contract');
+      if (!sel) return;
+      sel.innerHTML = `<option value="">— ${t('noContract')} —</option>`;
+      const filtered = contractsCache.filter(c =>
+        (!contractorId || c.contractor_id === contractorId) &&
+        (!folderId || c.folder_id === folderId)
+      );
+      filtered.forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c.id;
+        opt.textContent = c.name || '—';
+        if (c.id === selectedId) opt.selected = true;
+        sel.appendChild(opt);
+      });
+    }
+
+    function updateInvPayable() {
+      const total = parseFloat(document.getElementById('inv-total').value) || 0;
+      const wht = parseFloat(document.getElementById('inv-wht-amount').value) || 0;
+      const fmt2 = (n) => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      document.getElementById('inv-payable-val').textContent = fmt2(total - wht);
     }
 
     let currentFindTrxInv = null;
@@ -1096,6 +1172,7 @@
         updateAccountFilter();
         updateFolderFilter();
         updateFilterLockState();
+        loadContracts();
         currentPage = 1; expandedInv = {}; loadInvoices();
       });
       document.getElementById('filter-folder').value = filterFolder;
@@ -1116,9 +1193,16 @@
         document.getElementById('inv-status').value    = 'active';
         document.getElementById('inv-direction').value = 'expense';
         document.getElementById('inv-total').value     = '';
-        document.getElementById('inv-paid').value      = '';
+        document.getElementById('inv-subtotal').value  = '';
+        document.getElementById('inv-vat-rate').value  = '0';
+        document.getElementById('inv-vat-amount').value = '';
+        document.getElementById('inv-wht-rate').value  = '0';
+        document.getElementById('inv-wht-amount').value = '';
+        document.getElementById('inv-payable-val').textContent = '—';
+        document.getElementById('inv-paid-val').textContent = '—';
         mountInvCategoryCombo(null);
         fillContractorSelect('inv-contractor', '');
+        fillContractSelect('', '', '');
         fillFolderSelect('inv-folder', filterFolder !== 'all' ? filterFolder : writable[0].id, writable);
         document.getElementById('inv-folder-group').style.display = 'block';
         openModal('modal-inv');
@@ -1212,7 +1296,11 @@
                   data-total="${r.total_amount}" data-paid="${r.paid_amount}"
                   data-date="${r.date ? (r.date.value || r.date) : ''}"
                   data-category="${r.category_id||''}"
-                  data-contractor="${r.contractor_id||''}">${t('edit')}</button>
+                  data-contractor="${r.contractor_id||''}"
+                  data-contract="${r.contract_id||''}"
+                  data-subtotal="${r.subtotal||0}" data-vat-rate="${r.vat_rate||0}"
+                  data-vat-amount="${r.vat_amount||0}" data-wht-rate="${r.wht_rate||0}"
+                  data-wht-amount="${r.wht_amount||0}">${t('edit')}</button>
                 ${r.status === 'deleted'
                   ? `<span class="deleted-label">DELETED</span>`
                   : `<button class="icon-btn" data-action="delete-inv" data-id="${r.id}" title="${t('markDeleted')}">${ICON_EYE_OFF}</button>`}
@@ -1487,9 +1575,19 @@
         document.getElementById('inv-status').value    = btn.dataset.status;
         document.getElementById('inv-direction').value = btn.dataset.direction || 'expense';
         document.getElementById('inv-total').value     = btn.dataset.total;
-        document.getElementById('inv-paid').value      = btn.dataset.paid;
+        document.getElementById('inv-subtotal').value  = btn.dataset.subtotal || '';
+        document.getElementById('inv-vat-rate').value  = btn.dataset.vatRate || '0';
+        document.getElementById('inv-vat-amount').value = btn.dataset.vatAmount || '';
+        document.getElementById('inv-wht-rate').value  = btn.dataset.whtRate || '0';
+        document.getElementById('inv-wht-amount').value = btn.dataset.whtAmount || '';
+        const paid = parseFloat(btn.dataset.paid) || 0;
+        const total = parseFloat(btn.dataset.total) || 0;
+        const wht = parseFloat(btn.dataset.whtAmount) || 0;
+        document.getElementById('inv-payable-val').textContent = (total - wht).toLocaleString('en-US', {minimumFractionDigits:2,maximumFractionDigits:2});
+        document.getElementById('inv-paid-val').textContent = paid.toLocaleString('en-US', {minimumFractionDigits:2,maximumFractionDigits:2});
         mountInvCategoryCombo(btn.dataset.category || '');
         fillContractorSelect('inv-contractor', btn.dataset.contractor || '');
+        fillContractSelect(btn.dataset.contract || '', btn.dataset.contractor || '', invoicesById[btn.dataset.id]?.folder_id || '');
         document.getElementById('inv-folder-group').style.display = 'none';
         openModal('modal-inv');
         setTimeout(() => document.getElementById('inv-name').focus(), 100);
@@ -1654,10 +1752,15 @@
       const date        = document.getElementById('inv-date').value;
       const status      = document.getElementById('inv-status').value;
       const direction   = document.getElementById('inv-direction').value;
-      const total       = document.getElementById('inv-total').value;
-      const paid        = document.getElementById('inv-paid').value;
+      const total         = document.getElementById('inv-total').value;
       const category_id   = (modalInvCatCombo && modalInvCatCombo.getSelected()) || null;
       const contractor_id = document.getElementById('inv-contractor').value || '';
+      const contract_id   = document.getElementById('inv-contract').value || '';
+      const subtotal      = document.getElementById('inv-subtotal').value || '0';
+      const vat_rate      = document.getElementById('inv-vat-rate').value || '0';
+      const vat_amount    = document.getElementById('inv-vat-amount').value || '0';
+      const wht_rate      = document.getElementById('inv-wht-rate').value || '0';
+      const wht_amount    = document.getElementById('inv-wht-amount').value || '0';
       const folder_id_for_check = currentInvMode === 'create' ? document.getElementById('inv-folder').value : 'ok';
 
       const missing = [];
@@ -1676,14 +1779,25 @@
       try {
         if (currentInvMode === 'create') {
           const folder_id = document.getElementById('inv-folder').value;
-          await apiFetch('/invoices', { method: 'POST', body: JSON.stringify({ folder_id, name, date, status, direction, total_amount: total, paid_amount: paid, category_id, contractor_id }) });
+          await apiFetch('/invoices', { method: 'POST', body: JSON.stringify({ folder_id, name, date, status, direction, total_amount: total, category_id, contractor_id, contract_id, subtotal, vat_rate, vat_amount, wht_rate, wht_amount }) });
           showToast(t('invoiceCreated'), 'success');
         } else {
-          await apiFetch(`/invoices/${currentInvId}`, { method: 'PUT', body: JSON.stringify({ name, date, status, direction, total_amount: total, paid_amount: paid, category_id, contractor_id }) });
+          await apiFetch(`/invoices/${currentInvId}`, { method: 'PUT', body: JSON.stringify({ name, date, status, direction, total_amount: total, category_id, contractor_id, contract_id, subtotal, vat_rate, vat_amount, wht_rate, wht_amount }) });
           showToast(t('saved'), 'success');
         }
         loadInvoices();
       } catch(e) { console.error(e); showToast(e.message, 'error'); }
+    });
+
+    // Amount payable auto-calc
+    document.getElementById('inv-total').addEventListener('input', updateInvPayable);
+    document.getElementById('inv-wht-amount').addEventListener('input', updateInvPayable);
+
+    // Re-filter contract dropdown when contractor or folder changes
+    document.getElementById('inv-contractor').addEventListener('change', () => {
+      const cid = document.getElementById('inv-contractor').value;
+      const fid = currentInvMode === 'create' ? document.getElementById('inv-folder').value : (invoicesById[currentInvId]?.folder_id || '');
+      fillContractSelect('', cid, fid);
     });
 
     // СОХРАНИТЬ ТРАНЗАКЦИЮ
@@ -1772,7 +1886,7 @@
 
     window.onLogin  = async () => {
       updateTexts();
-      await Promise.all([loadCategories(), loadContractors(), loadFolders(), loadAccounts(), loadCompanies(), loadTypes()]);
+      await Promise.all([loadCategories(), loadContractors(), loadContracts(), loadFolders(), loadAccounts(), loadCompanies(), loadTypes()]);
       renderMainArea();
     };
     window.onLogout = () => {
