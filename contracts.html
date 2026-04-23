@@ -321,6 +321,21 @@
     </div>
   </div>
 
+  <!-- Модалка: загрузить файл (универсальная) -->
+  <div class="modal-overlay" id="modal-file">
+    <div class="modal" style="width:420px;max-width:95vw">
+      <h3 id="t-file-title"></h3>
+      <div class="field-group">
+        <label id="lbl-file-input"></label>
+        <input type="file" id="file-input" style="padding:6px">
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-outline" id="btn-file-cancel"></button>
+        <button class="btn btn-primary" id="btn-file-save"></button>
+      </div>
+    </div>
+  </div>
+
   <div class="toast" id="toast"></div>
 
   <script>
@@ -339,8 +354,10 @@
     let filterStatus     = 'active';
     let expandedContracts = {};
     let expandedInvoices  = {};
+    let expandedTrx       = {};
     let contractInvoices  = {}; // contractId → [invoices]
     let invoiceTrx        = {}; // invoiceId → [transactions]
+    let fileUploadCtx     = null; // { type:'contract'|'invoice'|'transaction', id, folderId, contractId }
 
     let currentContractMode = 'create';
     let currentContractId = null;
@@ -449,6 +466,10 @@
       document.getElementById('tx-direction').options[1].textContent = t('income');
 
       document.getElementById('btn-link-inv-cancel').textContent = t('cancel');
+      document.getElementById('t-file-title').textContent = t('addFile');
+      document.getElementById('lbl-file-input').textContent = t('file');
+      document.getElementById('btn-file-cancel').textContent = t('cancel');
+      document.getElementById('btn-file-save').textContent = t('save');
 
       updateHeaderTexts();
     }
@@ -582,20 +603,50 @@
       const inner = document.getElementById(`contract-inner-${contractId}`);
       if (!inner) return;
       try {
-        const invs = await apiFetch(`/contracts/${contractId}/invoices`);
+        const [invs, cFiles] = await Promise.all([
+          apiFetch(`/contracts/${contractId}/invoices`),
+          apiFetch(`/contract_files?contract_id=${contractId}`),
+        ]);
         contractInvoices[contractId] = invs;
-        renderContractDetail(contractId, invs);
+        renderContractDetail(contractId, invs, cFiles);
       } catch(e) {
         inner.innerHTML = `<div style="color:#c33">${e.message}</div>`;
       }
     }
 
-    function renderContractDetail(contractId, invs) {
+    function renderFileList(files, entityType, entityId, contractId) {
+      let html = `<div class="section-title" style="display:flex;justify-content:space-between;align-items:center">
+        <span>${t('file')}</span>
+        <button class="btn btn-outline" style="padding:2px 8px;font-size:0.72rem"
+          data-action="add-file" data-entity-type="${entityType}" data-entity-id="${entityId}" data-contract-id="${contractId || ''}">${t('addFile')}</button>
+      </div>`;
+      if (!files || !files.length) {
+        html += `<div style="color:#ccc;font-size:0.82rem;margin-bottom:10px">—</div>`;
+      } else {
+        files.forEach(f => {
+          const size = f.file_size > 1048576 ? (f.file_size/1048576).toFixed(1)+' MB' : Math.round((f.file_size||0)/1024)+' KB';
+          html += `<div style="display:flex;align-items:center;gap:8px;padding:4px 0;font-size:0.82rem;margin-bottom:2px">
+            <span style="flex:1;color:#333">${f.file_name || '—'} <span style="color:#999">(${size})</span></span>
+            <button class="btn btn-outline" style="padding:1px 6px;font-size:0.72rem"
+              data-action="download-file" data-entity-type="${entityType}" data-file-id="${f.id}">${t('download')}</button>
+            <button class="btn btn-outline" style="padding:1px 6px;font-size:0.72rem;color:#c5221f;border-color:#c5221f"
+              data-action="delete-file" data-entity-type="${entityType}" data-file-id="${f.id}"
+              data-entity-id="${entityId}" data-contract-id="${contractId || ''}">×</button>
+          </div>`;
+        });
+      }
+      return html;
+    }
+
+    function renderContractDetail(contractId, invs, cFiles) {
       const inner = document.getElementById(`contract-inner-${contractId}`);
       if (!inner) return;
       const contract = allContracts.find(c => c.id === contractId);
 
-      let html = `<div style="display:flex;gap:8px;margin-bottom:10px">
+      // Contract files
+      let html = renderFileList(cFiles, 'contract', contractId, contractId);
+
+      html += `<div style="display:flex;gap:8px;margin:10px 0">
         <button class="btn btn-primary" style="font-size:0.78rem;padding:4px 12px" data-action="create-inv" data-contract-id="${contractId}">${t('createInvoiceFromContract')}</button>
         <button class="btn btn-outline" style="font-size:0.78rem;padding:4px 12px" data-action="link-inv" data-contract-id="${contractId}">${t('linkInvoice')}</button>
       </div>`;
@@ -644,19 +695,25 @@
       const inner = document.getElementById(`inv-inner-${invoiceId}`);
       if (!inner) return;
       try {
-        const trxs = await apiFetch(`/transactions?invoice_id=${invoiceId}`);
+        const [trxs, invFiles] = await Promise.all([
+          apiFetch(`/transactions?invoice_id=${invoiceId}`),
+          apiFetch(`/invoice_files?invoice_id=${invoiceId}`),
+        ]);
         invoiceTrx[invoiceId] = trxs;
-        renderInvoiceTrx(invoiceId, trxs, contractId);
+        renderInvoiceTrx(invoiceId, trxs, contractId, invFiles);
       } catch(e) {
         inner.innerHTML = `<div style="color:#c33">${e.message}</div>`;
       }
     }
 
-    function renderInvoiceTrx(invoiceId, trxs, contractId) {
+    function renderInvoiceTrx(invoiceId, trxs, contractId, invFiles) {
       const inner = document.getElementById(`inv-inner-${invoiceId}`);
       if (!inner) return;
 
-      let html = `<div style="display:flex;gap:8px;margin-bottom:6px">
+      // Invoice files
+      let html = renderFileList(invFiles, 'invoice', invoiceId, contractId);
+
+      html += `<div style="display:flex;gap:8px;margin:8px 0">
         <button class="btn btn-primary" style="font-size:0.72rem;padding:3px 10px" data-action="add-trx" data-inv-id="${invoiceId}" data-contract-id="${contractId}">${t('addTransaction')}</button>
       </div>`;
 
@@ -665,7 +722,7 @@
       } else {
         html += `<table class="trx-mini-table"><thead><tr>
           <th>${t('date')}</th><th>${t('amount')}</th><th>${t('category')}</th>
-          <th>${t('description')}</th>
+          <th>${t('description')}</th><th style="width:80px"></th>
         </tr></thead><tbody>`;
         trxs.forEach(tx => {
           const sign = tx.direction === 'expense' ? '-' : '';
@@ -675,6 +732,8 @@
             <td><span class="amount-col ${cls}">${sign}${fmt(tx.amount)}</span></td>
             <td style="font-size:0.78rem">${tx.category_name || '—'}</td>
             <td style="font-size:0.78rem;color:#666">${tx.description || '—'}</td>
+            <td><button class="btn btn-outline" style="padding:1px 6px;font-size:0.68rem"
+              data-action="add-file" data-entity-type="transaction" data-entity-id="${tx.id}" data-contract-id="${contractId}" data-folder-id="${tx.folder_id || ''}">${t('addFile')}</button></td>
           </tr>`;
         });
         html += '</tbody></table>';
@@ -824,6 +883,49 @@
         fillAccountSelect(contract?.folder_id);
         fillCategorySelect('tx-category', '');
         openModal('modal-trx');
+      }
+
+      // ─── File actions ───
+
+      if (action === 'add-file') {
+        const entityType = btn.dataset.entityType;
+        const entityId = btn.dataset.entityId;
+        const contractId = btn.dataset.contractId;
+        const contract = allContracts.find(c => c.id === contractId);
+        fileUploadCtx = { type: entityType, id: entityId, folderId: contract?.folder_id || btn.dataset.folderId || '', contractId };
+        document.getElementById('file-input').value = '';
+        openModal('modal-file');
+      }
+
+      if (action === 'download-file') {
+        const entityType = btn.dataset.entityType;
+        const fileId = btn.dataset.fileId;
+        const endpoint = entityType === 'contract' ? 'contract_files' : entityType === 'invoice' ? 'invoice_files' : 'transaction_files';
+        try {
+          const r = await apiFetch(`/${endpoint}/${fileId}/signed-download-url`);
+          if (r.url) window.open(r.url, '_blank');
+        } catch(err) { showToast(err.message, 'error'); }
+      }
+
+      if (action === 'delete-file') {
+        if (!confirm(t('confirmDelete'))) return;
+        btn.disabled = true;
+        const entityType = btn.dataset.entityType;
+        const fileId = btn.dataset.fileId;
+        const contractId = btn.dataset.contractId;
+        const entityId = btn.dataset.entityId;
+        const endpoint = entityType === 'contract' ? 'contract_files' : entityType === 'invoice' ? 'invoice_files' : 'transaction_files';
+        try {
+          await apiFetch(`/${endpoint}/${fileId}`, { method: 'DELETE' });
+          showToast(t('deleted'), 'success');
+          if (entityType === 'contract') loadContractDetail(contractId);
+          else if (entityType === 'invoice') {
+            // Find which contract owns this invoice
+            for (const [cId, invs] of Object.entries(contractInvoices)) {
+              if (invs.find(i => i.id === entityId)) { loadInvoiceTrx(entityId, cId); break; }
+            }
+          }
+        } catch(err) { showToast(err.message, 'error'); btn.disabled = false; }
       }
     });
 
@@ -1075,6 +1177,56 @@
 
     document.getElementById('btn-link-inv-cancel').addEventListener('click', () => closeModal('modal-link-inv'));
 
+    // ─── File upload ───
+    document.getElementById('btn-file-cancel').addEventListener('click', () => closeModal('modal-file'));
+    document.getElementById('btn-file-save').addEventListener('click', async () => {
+      const file = document.getElementById('file-input').files[0];
+      if (!file || !fileUploadCtx) { showToast(t('selectFile'), 'error'); return; }
+      closeModal('modal-file');
+      showToast(t('uploading'));
+      const ctx = fileUploadCtx;
+      try {
+        const contentType = file.type || 'application/octet-stream';
+        let endpoint, signBody, regBody;
+        if (ctx.type === 'contract') {
+          endpoint = 'contract_files';
+          signBody = { contract_id: ctx.id, folder_id: ctx.folderId, file_name: file.name, content_type: contentType };
+          regBody = (url) => ({ contract_id: ctx.id, file_name: file.name, file_url: url, file_size: file.size });
+        } else if (ctx.type === 'invoice') {
+          endpoint = 'invoice_files';
+          signBody = { invoice_id: ctx.id, folder_id: ctx.folderId, file_name: file.name, content_type: contentType };
+          regBody = (url) => ({ invoice_id: ctx.id, file_name: file.name, file_url: url, file_size: file.size });
+        } else {
+          endpoint = 'transaction_files';
+          signBody = { transaction_id: ctx.id, folder_id: ctx.folderId, file_name: file.name, content_type: contentType };
+          regBody = (url) => ({ transaction_id: ctx.id, file_name: file.name, file_url: url, file_size: file.size });
+        }
+
+        const { upload_url, file_url } = await apiFetch(`/${endpoint}/signed-upload-url`, {
+          method: 'POST', body: JSON.stringify(signBody),
+        });
+        await new Promise((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          xhr.open('PUT', upload_url);
+          xhr.setRequestHeader('Content-Type', contentType);
+          xhr.onload = () => xhr.status === 200 ? resolve() : reject(new Error('Upload failed'));
+          xhr.onerror = () => reject(new Error('Upload error'));
+          xhr.send(file);
+        });
+        await apiFetch(`/${endpoint}`, { method: 'POST', body: JSON.stringify(regBody(file_url)) });
+        showToast(t('uploaded'), 'success');
+
+        // Reload relevant detail
+        if (ctx.type === 'contract') {
+          loadContractDetail(ctx.id);
+        } else if (ctx.type === 'invoice') {
+          for (const [cId, invs] of Object.entries(contractInvoices)) {
+            if (invs.find(i => i.id === ctx.id)) { loadInvoiceTrx(ctx.id, cId); break; }
+          }
+        }
+      } catch(e) { showToast(e.message, 'error'); }
+    });
+
     // ─── Keyboard ───
     document.addEventListener('keydown', e => {
       if (e.key === 'Escape') {
@@ -1082,6 +1234,7 @@
         closeModal('modal-invoice');
         closeModal('modal-trx');
         closeModal('modal-link-inv');
+        closeModal('modal-file');
       }
     });
 
