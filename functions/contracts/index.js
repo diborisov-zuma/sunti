@@ -45,11 +45,11 @@ async function recalcContractPaid(contractId) {
   const invTable = `\`${PROJECT}.${DATASET}.invoices\``;
   await bigquery.query({
     query: `UPDATE ${table}
-            SET paid_amount = COALESCE((
+            SET paid_amount = CAST(COALESCE((
               SELECT SUM(paid_amount)
               FROM ${invTable}
               WHERE contract_id = @id AND IFNULL(status, 'active') != 'deleted'
-            ), CAST(0 AS NUMERIC))
+            ), 0) AS NUMERIC)
             WHERE id = @id`,
     params: { id: contractId },
   });
