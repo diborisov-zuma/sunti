@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sunti — Документация</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="stylesheet" href="style.css">
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <script src="_i18n.js"></script>
+  <script src="_config.js"></script>
+  <script src="_auth.js"></script>
+  <script src="_header.js"></script>
+  <style>
+    .doc-layout { display:flex;height:calc(100vh - 56px);overflow:hidden; }
+    .doc-sidebar { width:220px;flex-shrink:0;background:#fff;border-right:1px solid #e8e8e8;display:flex;flex-direction:column;overflow:hidden; }
+    .doc-sidebar-header { padding:14px 16px 10px;border-bottom:1px solid #f0f0f0;display:flex;align-items:center;justify-content:space-between; }
+    .doc-sidebar-title { font-size:0.78rem;font-weight:600;color:#888;text-transform:uppercase; }
+    .doc-main { flex:1;overflow-y:auto;padding:24px; }
+
+    .cat-item { padding:8px 16px;cursor:pointer;font-size:0.88rem;color:#333;border-radius:6px;margin:1px 6px;transition:background 0.1s; }
+    .cat-item:hover { background:#f4f4f4; }
+    .cat-item.active { background:#e8f0fe;color:#1a73e8;font-weight:500; }
+
+    .doc-card { background:#fff;border:1px solid #e8e8e8;border-radius:10px;padding:14px 18px;margin-bottom:10px;transition:border-color 0.15s; }
+    .doc-card:hover { border-color:#1a73e8; }
+    .doc-card-header { display:flex;justify-content:space-between;align-items:center;gap:12px; }
+    .doc-card-name { font-size:0.95rem;font-weight:500;color:#222;flex:1; }
+    .doc-card-version { font-size:0.78rem;color:#1a73e8;font-weight:600; }
+    .doc-card-meta { font-size:0.78rem;color:#999;margin-top:4px; }
+    .doc-card-desc { font-size:0.84rem;color:#666;margin-top:6px; }
+
+    .version-list { margin-top:10px;padding-top:8px;border-top:1px solid #f0f0f0; }
+    .version-row { display:flex;align-items:center;gap:10px;padding:4px 0;font-size:0.82rem; }
+    .version-row .v-num { font-weight:600;color:#1a73e8;min-width:28px; }
+    .version-row .v-date { color:#888;min-width:80px; }
+    .version-row .v-file { color:#333;flex:1; }
+    .version-row .v-notes { color:#666;font-style:italic;flex:2; }
+
+    .empty-state { text-align:center;padding:64px 24px;color:#bbb; }
+    .loading { text-align:center;padding:48px;color:#bbb; }
+
+    .field-group { margin-bottom:12px; }
+    .field-group label { display:block;font-size:0.82rem;color:#666;margin-bottom:4px; }
+    .field-group input, .field-group select, .field-group textarea {
+      width:100%;border:1px solid #ddd;border-radius:6px;padding:8px 12px;font-size:0.9rem;outline:none;box-sizing:border-box;background:#fff;
+    }
+    .field-group input:focus, .field-group select:focus, .field-group textarea:focus { border-color:#1a73e8; }
+    .fields-row { display:grid;grid-template-columns:1fr 1fr;gap:12px; }
+    .badge-current { background:#e6f4ea;color:#1e8e3e;padding:1px 6px;border-radius:8px;font-size:0.68rem;font-weight:600; }
+  </style>
+</head>
+<body>
+  <header id="header"></header>
+
+  <div id="guest-view"><h2 id="t-guest-title"></h2><p id="t-guest-sub"></p></div>
+
+  <div id="app-view" style="display:none">
+    <div class="doc-layout">
+      <div class="doc-sidebar">
+        <div class="doc-sidebar-header">
+          <span class="doc-sidebar-title" id="t-categories-title"></span>
+        </div>
+        <div style="padding:8px">
+          <select class="filter-select" id="filter-folder" style="width:100%;font-size:0.82rem">
+            <option value="">—</option>
+          </select>
+        </div>
+        <div id="cat-list" style="flex:1;overflow-y:auto;padding:4px 0"></div>
+        <div style="padding:8px" id="cat-admin-btns" style="display:none">
+          <button class="btn btn-outline" style="width:100%;font-size:0.78rem" id="btn-add-cat"></button>
+        </div>
+      </div>
+      <div class="doc-main" id="doc-main">
+        <div class="empty-state" id="t-select-project"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Модалка: документ -->
+  <div class="modal-overlay" id="modal-doc">
+    <div class="modal" style="width:500px;max-width:95vw">
+      <h3 id="t-modal-doc-title"></h3>
+      <div class="field-group">
+        <label class="required" id="lbl-doc-name"></label>
+        <input type="text" id="doc-name">
+      </div>
+      <div class="fields-row">
+        <div class="field-group">
+          <label id="lbl-doc-category"></label>
+          <select id="doc-category"></select>
+        </div>
+        <div class="field-group">
+          <label id="lbl-doc-order"></label>
+          <input type="number" id="doc-order" min="0" value="0">
+        </div>
+      </div>
+      <div class="field-group">
+        <label id="lbl-doc-desc"></label>
+        <textarea id="doc-desc" rows="2"></textarea>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-outline" id="btn-doc-cancel"></button>
+        <button class="btn btn-primary" id="btn-doc-save"></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Модалка: загрузить версию -->
+  <div class="modal-overlay" id="modal-version">
+    <div class="modal" style="width:460px;max-width:95vw">
+      <h3 id="t-modal-ver-title"></h3>
+      <div class="field-group">
+        <label id="lbl-ver-file"></label>
+        <input type="file" id="ver-file" style="padding:6px">
+      </div>
+      <div class="field-group">
+        <label id="lbl-ver-notes"></label>
+        <input type="text" id="ver-notes" placeholder="">
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-outline" id="btn-ver-cancel"></button>
+        <button class="btn btn-primary" id="btn-ver-save"></button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    let allDocs = [];
+    let categories = [];
+    let foldersCache = [];
+    let selectedFolder = '';
+    let selectedCategory = '';
+    let accessLevel = 'none';
+    let expandedDocs = {};
+    let docVersions = {};
+    let currentDocMode = 'create';
+    let currentDocId = null;
+    let currentVerDocId = null;
+
+    function fmt(v) { const n=parseFloat(v); return isNaN(n)?'—':n; }
+    function formatDate(val) {
+      if (!val) return '—';
+      const d = new Date(val.value || val);
+      if (isNaN(d)) return '—';
+      return `${String(d.getUTCDate()).padStart(2,'0')}.${String(d.getUTCMonth()+1).padStart(2,'0')}.${d.getUTCFullYear()}`;
+    }
+    function showToast(msg, type) {
+      const el = document.getElementById('toast');
+      el.textContent = msg; el.className = 'toast show' + (type ? ' ' + type : '');
+      clearTimeout(el._t); el._t = setTimeout(() => el.className = 'toast', 3000);
+    }
+    function openModal(id) { document.getElementById(id).classList.add('open'); }
+    function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+    function catLabel(c) { return c['name_' + currentLang] || c.name || c.name_en || '—'; }
+
+    function updateTexts() {
+      document.getElementById('t-guest-title').textContent = t('guestTitle');
+      document.getElementById('t-guest-sub').textContent = t('guestSub');
+      document.getElementById('t-categories-title').textContent = t('docCategories');
+      document.getElementById('t-select-project').textContent = t('portalSelectProject');
+      document.getElementById('btn-add-cat').textContent = t('addDocCategory');
+      document.getElementById('t-modal-doc-title').textContent = t('addDocument');
+      document.getElementById('lbl-doc-name').textContent = t('documentName');
+      document.getElementById('lbl-doc-category').textContent = t('category');
+      document.getElementById('lbl-doc-order').textContent = t('orderLabel');
+      document.getElementById('lbl-doc-desc').textContent = t('description');
+      document.getElementById('btn-doc-cancel').textContent = t('cancel');
+      document.getElementById('btn-doc-save').textContent = t('save');
+      document.getElementById('t-modal-ver-title').textContent = t('uploadVersion');
+      document.getElementById('lbl-ver-file').textContent = t('file');
+      document.getElementById('lbl-ver-notes').textContent = t('versionNotes');
+      document.getElementById('btn-ver-cancel').textContent = t('cancel');
+      document.getElementById('btn-ver-save').textContent = t('save');
+      updateHeaderTexts();
+    }
+
+    async function loadRefs() {
+      try { foldersCache = await apiFetch('/folders'); } catch(e) { foldersCache = []; }
+      try { categories = await apiFetch('/project_doc_categories'); } catch(e) { categories = []; }
+      fillFolderSelect();
+    }
+
+    function fillFolderSelect() {
+      const sel = document.getElementById('filter-folder');
+      sel.innerHTML = `<option value="">${t('portalSelectProject')}</option>`;
+      foldersCache.forEach(f => {
+        if (f.status === 'archive') return;
+        const opt = document.createElement('option');
+        opt.value = f.id; opt.textContent = f.name;
+        sel.appendChild(opt);
+      });
+    }
+
+    document.getElementById('filter-folder').addEventListener('change', e => {
+      selectedFolder = e.target.value;
+      selectedCategory = '';
+      if (selectedFolder) loadDocs();
+      else document.getElementById('doc-main').innerHTML = `<div class="empty-state">${t('portalSelectProject')}</div>`;
+    });
+
+    async function loadDocs() {
+      const main = document.getElementById('doc-main');
+      main.innerHTML = `<div class="loading">${t('loading')}</div>`;
+      try {
+        const data = await apiFetch(`/project_docs?folder_id=${selectedFolder}`);
+        allDocs = data.rows || [];
+        accessLevel = data.access_level || 'none';
+        renderCategories();
+        renderDocs();
+      } catch(e) { main.innerHTML = `<div class="empty-state">${e.message}</div>`; }
+    }
+
+    function renderCategories() {
+      const list = document.getElementById('cat-list');
+      // Get unique categories from docs + all categories
+      const usedCatIds = new Set(allDocs.map(d => d.category_id).filter(Boolean));
+      const allCats = categories.filter(c => usedCatIds.has(c.id) || true);
+
+      list.innerHTML = `<div class="cat-item ${!selectedCategory ? 'active' : ''}" data-cat-id="">${t('allCategories')}</div>`;
+      allCats.forEach(c => {
+        list.innerHTML += `<div class="cat-item ${selectedCategory === c.id ? 'active' : ''}" data-cat-id="${c.id}">${catLabel(c)}</div>`;
+      });
+
+      // Show admin buttons
+      const adminBtns = document.getElementById('cat-admin-btns');
+      if (adminBtns) adminBtns.style.display = (accessLevel === 'editor') ? '' : 'none';
+    }
+
+    document.getElementById('cat-list').addEventListener('click', e => {
+      const item = e.target.closest('.cat-item');
+      if (!item) return;
+      selectedCategory = item.dataset.catId;
+      renderCategories();
+      renderDocs();
+    });
+
+    function renderDocs() {
+      const main = document.getElementById('doc-main');
+      let filtered = allDocs;
+      if (selectedCategory) filtered = filtered.filter(d => d.category_id === selectedCategory);
+
+      let html = '';
+      if (accessLevel === 'editor') {
+        html += `<div style="margin-bottom:16px">
+          <button class="btn btn-primary" id="btn-add-doc">${t('addDocument')}</button>
+        </div>`;
+      }
+
+      if (!filtered.length) {
+        html += `<div class="empty-state">${t('noDocuments')}</div>`;
+        main.innerHTML = html;
+        bindAddDoc();
+        return;
+      }
+
+      filtered.forEach(d => {
+        const isExp = expandedDocs[d.id];
+        const catName = d.category_name_en || d.category_name || '';
+        html += `<div class="doc-card" data-doc-id="${d.id}">
+          <div class="doc-card-header">
+            <div class="doc-card-name">${d.name || '—'}</div>
+            <div style="display:flex;gap:6px;align-items:center">
+              <span class="doc-card-version">v${d.current_version || 0}</span>
+              ${d.latest_version_id ? `<button class="btn btn-outline" style="padding:2px 8px;font-size:0.75rem" data-action="download" data-ver-id="${d.latest_version_id}">${t('download')}</button>` : ''}
+              ${accessLevel === 'editor' ? `
+                <button class="btn btn-outline" style="padding:2px 8px;font-size:0.75rem" data-action="upload-ver" data-doc-id="${d.id}">${t('uploadVersion')}</button>
+                <button class="btn btn-outline" style="padding:2px 8px;font-size:0.75rem" data-action="edit-doc" data-doc-id="${d.id}">${t('edit')}</button>
+                <button class="btn btn-outline" style="padding:2px 8px;font-size:0.75rem;color:#c5221f" data-action="delete-doc" data-doc-id="${d.id}">${t('delete')}</button>
+              ` : ''}
+            </div>
+          </div>
+          ${catName ? `<div class="doc-card-meta">${catName}</div>` : ''}
+          ${d.description ? `<div class="doc-card-desc">${d.description}</div>` : ''}
+          ${d.latest_file_name ? `<div class="doc-card-meta">${d.latest_file_name} · ${formatDate(d.latest_uploaded_at)}${d.latest_notes ? ' · ' + d.latest_notes : ''}</div>` : ''}
+          <div style="margin-top:6px">
+            <button style="background:none;border:none;cursor:pointer;font-size:0.78rem;color:#1a73e8" data-action="toggle-versions" data-doc-id="${d.id}">${isExp ? '▾' : '▸'} ${t('versionHistory')} ${d.current_version ? '('+d.current_version+')' : ''}</button>
+          </div>
+          ${isExp ? `<div class="version-list" id="versions-${d.id}">${docVersions[d.id] ? renderVersions(d.id) : '<div class="loading" style="padding:8px">'+t('loading')+'</div>'}</div>` : ''}
+        </div>`;
+      });
+
+      main.innerHTML = html;
+      bindAddDoc();
+
+      // Load versions for expanded docs
+      filtered.forEach(d => {
+        if (expandedDocs[d.id] && !docVersions[d.id]) loadVersions(d.id);
+      });
+    }
+
+    function bindAddDoc() {
+      const btn = document.getElementById('btn-add-doc');
+      if (btn) btn.addEventListener('click', () => {
+        currentDocMode = 'create'; currentDocId = null;
+        document.getElementById('t-modal-doc-title').textContent = t('addDocument');
+        document.getElementById('doc-name').value = '';
+        document.getElementById('doc-desc').value = '';
+        document.getElementById('doc-order').value = '0';
+        fillDocCategorySelect('');
+        openModal('modal-doc');
+      });
+    }
+
+    function fillDocCategorySelect(selectedId) {
+      const sel = document.getElementById('doc-category');
+      sel.innerHTML = `<option value="">—</option>`;
+      categories.forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c.id; opt.textContent = catLabel(c);
+        if (c.id === selectedId) opt.selected = true;
+        sel.appendChild(opt);
+      });
+    }
+
+    async function loadVersions(docId) {
+      try {
+        const rows = await apiFetch(`/project_docs/${docId}/versions`);
+        docVersions[docId] = rows;
+        const el = document.getElementById(`versions-${docId}`);
+        if (el) el.innerHTML = renderVersions(docId);
+      } catch(e) { console.error(e); }
+    }
+
+    function renderVersions(docId) {
+      const versions = docVersions[docId] || [];
+      if (!versions.length) return `<div style="color:#bbb;font-size:0.82rem">—</div>`;
+      return versions.map((v, i) => `
+        <div class="version-row">
+          <span class="v-num">v${v.version_number}</span>
+          ${i === 0 ? `<span class="badge-current">${t('currentVersion')}</span>` : ''}
+          <span class="v-date">${formatDate(v.uploaded_at)}</span>
+          <span class="v-file">${v.file_name || '—'}</span>
+          <span class="v-notes">${v.notes || ''}</span>
+          <button class="btn btn-outline" style="padding:1px 6px;font-size:0.72rem" data-action="download" data-ver-id="${v.id}">${t('download')}</button>
+        </div>
+      `).join('');
+    }
+
+    // ─── Actions ───
+
+    document.addEventListener('click', async e => {
+      const btn = e.target.closest('[data-action]');
+      if (!btn) return;
+      const action = btn.dataset.action;
+
+      if (action === 'toggle-versions') {
+        const docId = btn.dataset.docId;
+        expandedDocs[docId] = !expandedDocs[docId];
+        renderDocs();
+        return;
+      }
+
+      if (action === 'download') {
+        try {
+          const r = await apiFetch(`/project_docs/${btn.dataset.verId}/signed-download-url`);
+          if (r.url) window.open(r.url, '_blank');
+        } catch(err) { showToast(err.message, 'error'); }
+      }
+
+      if (action === 'upload-ver') {
+        currentVerDocId = btn.dataset.docId;
+        document.getElementById('ver-file').value = '';
+        document.getElementById('ver-notes').value = '';
+        openModal('modal-version');
+      }
+
+      if (action === 'edit-doc') {
+        const doc = allDocs.find(d => d.id === btn.dataset.docId);
+        if (!doc) return;
+        currentDocMode = 'edit'; currentDocId = doc.id;
+        document.getElementById('t-modal-doc-title').textContent = t('editDocument');
+        document.getElementById('doc-name').value = doc.name || '';
+        document.getElementById('doc-desc').value = doc.description || '';
+        document.getElementById('doc-order').value = doc.sort_order || 0;
+        fillDocCategorySelect(doc.category_id || '');
+        openModal('modal-doc');
+      }
+
+      if (action === 'delete-doc') {
+        if (!confirm(t('confirmDelete'))) return;
+        btn.disabled = true;
+        try {
+          await apiFetch(`/project_docs/${btn.dataset.docId}`, { method: 'DELETE' });
+          showToast(t('deleted'), 'success');
+          loadDocs();
+        } catch(err) { showToast(err.message, 'error'); btn.disabled = false; }
+      }
+    });
+
+    // ─── Save doc ───
+
+    document.getElementById('btn-doc-cancel').addEventListener('click', () => closeModal('modal-doc'));
+    document.getElementById('btn-doc-save').addEventListener('click', async () => {
+      const name = document.getElementById('doc-name').value.trim();
+      if (!name) { document.getElementById('doc-name').classList.add('invalid'); showToast(t('fillAllFields'), 'error'); return; }
+      document.getElementById('doc-name').classList.remove('invalid');
+
+      const body = {
+        folder_id: selectedFolder,
+        name,
+        category_id: document.getElementById('doc-category').value || '',
+        description: document.getElementById('doc-desc').value.trim(),
+        sort_order: document.getElementById('doc-order').value || '0',
+      };
+
+      closeModal('modal-doc');
+      try {
+        if (currentDocMode === 'create') {
+          await apiFetch('/project_docs', { method: 'POST', body: JSON.stringify(body) });
+        } else {
+          await apiFetch(`/project_docs/${currentDocId}`, { method: 'PUT', body: JSON.stringify(body) });
+        }
+        showToast(t('saved'), 'success');
+        loadDocs();
+      } catch(e) { showToast(e.message, 'error'); }
+    });
+
+    // ─── Upload version ───
+
+    document.getElementById('btn-ver-cancel').addEventListener('click', () => closeModal('modal-version'));
+    document.getElementById('btn-ver-save').addEventListener('click', async () => {
+      const file = document.getElementById('ver-file').files[0];
+      if (!file) { showToast(t('selectFile'), 'error'); return; }
+      closeModal('modal-version');
+      showToast(t('uploading'));
+      try {
+        const contentType = file.type || 'application/octet-stream';
+        const { upload_url, file_url } = await apiFetch('/project_docs/signed-upload-url', {
+          method: 'POST',
+          body: JSON.stringify({ folder_id: selectedFolder, document_id: currentVerDocId, file_name: file.name, content_type: contentType }),
+        });
+        await new Promise((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          xhr.open('PUT', upload_url);
+          xhr.setRequestHeader('Content-Type', contentType);
+          xhr.onload = () => xhr.status === 200 ? resolve() : reject(new Error('Upload failed'));
+          xhr.onerror = () => reject(new Error('Upload error'));
+          xhr.send(file);
+        });
+        await apiFetch(`/project_docs/${currentVerDocId}/versions`, {
+          method: 'POST',
+          body: JSON.stringify({ file_url, file_name: file.name, file_size: file.size, notes: document.getElementById('ver-notes').value.trim() }),
+        });
+        showToast(t('uploaded'), 'success');
+        docVersions[currentVerDocId] = null;
+        expandedDocs[currentVerDocId] = true;
+        loadDocs();
+      } catch(e) { showToast(e.message, 'error'); }
+    });
+
+    // ─── Add category ───
+
+    document.getElementById('btn-add-cat').addEventListener('click', () => {
+      const name = prompt(t('name') + ':');
+      if (!name) return;
+      apiFetch('/project_doc_categories', { method: 'POST', body: JSON.stringify({ name, name_en: name }) })
+        .then(() => { loadRefs().then(() => { renderCategories(); }); })
+        .catch(e => showToast(e.message, 'error'));
+    });
+
+    // ─── Keyboard ───
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape') { closeModal('modal-doc'); closeModal('modal-version'); }
+    });
+
+    // ─── Init ───
+    window.onLogin = async () => { updateTexts(); await loadRefs(); };
+    window.onLogout = () => { updateTexts(); };
+    window.onLangChange = () => { updateTexts(); if (allDocs.length) { renderCategories(); renderDocs(); } };
+
+    renderHeader('documentation');
+    updateTexts();
+  </script>
+</body>
+</html>
