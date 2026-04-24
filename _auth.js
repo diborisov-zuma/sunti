@@ -85,6 +85,23 @@ async function applyLogin(idToken, accessToken) {
 
   // Запускаем счётчик непрочитанных
   if (typeof startUnreadPolling === 'function') startUnreadPolling();
+
+  // Автообновление токена каждые 45 минут
+  startTokenRefresh();
+}
+
+let _tokenRefreshInterval = null;
+
+function startTokenRefresh() {
+  if (_tokenRefreshInterval) clearInterval(_tokenRefreshInterval);
+  _tokenRefreshInterval = setInterval(() => {
+    if (!_tokenClient) return;
+    _tokenClient.requestAccessToken({ prompt: '' });
+  }, 45 * 60 * 1000); // 45 минут
+}
+
+function stopTokenRefresh() {
+  if (_tokenRefreshInterval) { clearInterval(_tokenRefreshInterval); _tokenRefreshInterval = null; }
 }
 
 // Шаг 1 — Google возвращает ID Token после логина
@@ -98,7 +115,10 @@ function handleCredentialResponse(response) {
     callback: async (tokenResponse) => {
       if (tokenResponse.error) return;
       _accessToken = tokenResponse.access_token;
+      window._accessToken = _accessToken;
       localStorage.setItem('google_access_token', _accessToken);
+      // Если уже залогинены — просто обновляем токен, не перезагружаем UI
+      if (currentMe) return;
       await applyLogin(idToken, _accessToken);
     },
   });
@@ -120,6 +140,20 @@ async function tryAutoLogin() {
   if (!accessToken) {
     localStorage.removeItem('google_id_token');
     return;
+  }
+
+  // Инициализируем tokenClient для автообновления
+  if (!_tokenClient && typeof google !== 'undefined' && google.accounts?.oauth2) {
+    _tokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: GOOGLE_CLIENT_ID,
+      scope: 'https://www.googleapis.com/auth/devstorage.read_write',
+      callback: (tokenResponse) => {
+        if (tokenResponse.error) return;
+        _accessToken = tokenResponse.access_token;
+        window._accessToken = _accessToken;
+        localStorage.setItem('google_access_token', _accessToken);
+      },
+    });
   }
 
   await applyLogin(idToken, accessToken);
@@ -145,8 +179,9 @@ function logout() {
 
   if (typeof onLogout === 'function') onLogout();
 
-  // Останавливаем счётчик непрочитанных
+  // Останавливаем счётчик непрочитанных и обновление токена
   if (typeof stopUnreadPolling === 'function') stopUnreadPolling();
+  stopTokenRefresh();
 }
 
 document.addEventListener('DOMContentLoaded', () => {
