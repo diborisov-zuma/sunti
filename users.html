@@ -206,8 +206,9 @@
 
     function renderAdminPage() {
       document.getElementById('page-content').innerHTML = `
-        <div class="page-header">
+        <div class="page-header" style="display:flex;align-items:center;justify-content:space-between">
           <h1>${t('usersPage')}</h1>
+          <button class="btn btn-primary" id="btn-add-user">${t('addUser') || 'Add user'}</button>
         </div>
         <div class="table-wrap">
           <table>
@@ -230,6 +231,15 @@
       `;
       loadFolders();
       loadUsers();
+
+      document.getElementById('btn-add-user').addEventListener('click', () => {
+        const email = prompt(t('enterEmail') || 'Enter user email:');
+        if (!email || !email.includes('@')) return;
+        const name = prompt(t('enterName') || 'Enter user name:', '');
+        apiFetch('/users', { method: 'POST', body: JSON.stringify({ email, name: name || '' }) })
+          .then(() => { loadUsers(); })
+          .catch(e => alert(e.message));
+      });
     }
 
     function renderAccessDenied() {

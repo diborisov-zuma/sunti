@@ -28,30 +28,50 @@ async function applyLogin(idToken, accessToken) {
   window._googleToken = idToken;
   window._accessToken = accessToken;
 
-  // Авторегистрация + получение прав из БД
+  // Получаем права текущего пользователя (без авторегистрации)
   try {
-    // Регистрируем/обновляем пользователя
-    await fetch(`${API_BASE}/users`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
-      body: JSON.stringify({ name: user.name }),
-    });
-
-    // Получаем права текущего пользователя
     const meRes = await fetch(`${API_BASE}/users/me`, {
       headers: { 'Authorization': `Bearer ${accessToken}` },
     });
-    if (meRes.ok) {
-      currentMe = await meRes.json();
-      isAdmin   = currentMe && currentMe.is_admin === true;
-      window._currentMe = currentMe;
+    if (!meRes.ok) {
+      // Пользователь не найден в БД — не пускаем
+      console.warn('User not registered in system');
+      const guestView = document.getElementById('guest-view');
+      if (guestView) {
+        guestView.innerHTML = `<div style="text-align:center;padding:100px 24px">
+          <h2 style="color:#c5221f;margin-bottom:12px">Доступ запрещён</h2>
+          <p style="color:#666;margin-bottom:24px">Ваш аккаунт не зарегистрирован в системе.<br>Обратитесь к администратору.</p>
+          <button class="btn btn-outline" onclick="logout()">Выйти</button>
+        </div>`;
+        guestView.style.display = 'block';
+      }
+      document.getElementById('signin-btn').style.display = 'none';
+      return;
+    }
+    currentMe = await meRes.json();
+    isAdmin   = currentMe && currentMe.is_admin === true;
+    window._currentMe = currentMe;
+
+    // Проверяем что пользователь активен
+    if (!currentMe.is_active) {
+      const guestView = document.getElementById('guest-view');
+      if (guestView) {
+        guestView.innerHTML = `<div style="text-align:center;padding:100px 24px">
+          <h2 style="color:#c5221f;margin-bottom:12px">Аккаунт деактивирован</h2>
+          <p style="color:#666;margin-bottom:24px">Обратитесь к администратору.</p>
+          <button class="btn btn-outline" onclick="logout()">Выйти</button>
+        </div>`;
+        guestView.style.display = 'block';
+      }
+      document.getElementById('signin-btn').style.display = 'none';
+      return;
     }
 
     // Обновляем кнопку Telegram
     if (typeof updateTelegramStatus === 'function') {
       updateTelegramStatus(currentMe && currentMe.telegram_chat_id && currentMe.telegram_chat_id !== '');
     }
-  } catch(e) { console.error('Auth error:', e); }
+  } catch(e) { console.error('Auth error:', e); return; }
 
   document.getElementById('avatar').src         = user.picture;
   document.getElementById('uname').textContent  = user.name;

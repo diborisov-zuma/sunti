@@ -41,7 +41,8 @@ exports.users = async (req, res) => {
                 FROM ${table} WHERE email = @email`,
         params: { email },
       });
-      res.json(rows[0] || null);
+      if (!rows.length) { res.status(404).json({ error: 'User not found' }); return; }
+      res.json(rows[0]);
       return;
     }
 
@@ -57,20 +58,36 @@ exports.users = async (req, res) => {
       return;
     }
 
-    // POST — автологин: создать или обновить пользователя
+    // POST — создать пользователя (только админ)
     if (req.method === 'POST') {
-      const { name } = req.body;
+      const { name, email: targetEmail } = req.body;
+
+      // Проверяем что вызывающий — админ
+      const [callerRows] = await bigquery.query({
+        query: `SELECT is_admin FROM ${table} WHERE email = @email`,
+        params: { email },
+      });
+      if (!callerRows.length || !callerRows[0].is_admin) {
+        res.status(403).json({ error: 'Only admins can create users' });
+        return;
+      }
+
+      const newEmail = targetEmail || email;
+
+      // Проверяем что пользователь ещё не существует
+      const [existing] = await bigquery.query({
+        query: `SELECT email FROM ${table} WHERE email = @email`,
+        params: { email: newEmail },
+      });
+      if (existing.length) {
+        res.status(409).json({ error: 'User already exists' });
+        return;
+      }
 
       await bigquery.query({
-        query: `MERGE \`${PROJECT}.${DATASET}.${TABLE}\` T
-                USING (SELECT @email as email, @name as name) S
-                ON T.email = S.email
-                WHEN MATCHED THEN
-                  UPDATE SET last_login = CURRENT_TIMESTAMP(), name = S.name
-                WHEN NOT MATCHED THEN
-                  INSERT (id, email, name, telegram_chat_id, first_login, last_login, is_active, is_admin, can_see_salary)
-                  VALUES (GENERATE_UUID(), S.email, S.name, '', CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP(), true, false, false)`,
-        params: { email, name: name || email },
+        query: `INSERT INTO ${table} (id, email, name, telegram_chat_id, first_login, last_login, is_active, is_admin, can_see_salary)
+                VALUES (GENERATE_UUID(), @email, @name, '', CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP(), true, false, false)`,
+        params: { email: newEmail, name: name || newEmail },
       });
 
       res.json({ success: true });
