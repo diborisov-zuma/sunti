@@ -7,16 +7,16 @@ function renderHeader(activePage) {
 
     <nav class="nav">
       <a href="contracts.html" class="nav-link ${activePage === 'contracts' ? 'active' : ''}" id="t-nav-contracts" style="display:none"></a>
+      <a href="contractors.html" class="nav-link ${activePage === 'contractors' ? 'active' : ''}" id="t-nav-contractors2" style="display:none"></a>
       <a href="invoices.html" class="nav-link ${activePage === 'invoices' ? 'active' : ''}" id="t-nav-invoices"></a>
       <a href="finance.html"  class="nav-link ${activePage === 'finance'  ? 'active' : ''}" id="t-nav-finance"></a>
       <a href="statements.html" class="nav-link ${activePage === 'statements' ? 'active' : ''}" id="t-nav-statements"></a>
       <a href="reports.html"  class="nav-link ${activePage === 'reports'  ? 'active' : ''}" id="t-nav-reports"></a>
       <div class="nav-dropdown" id="nav-settings" style="display:none">
-        <a class="nav-link ${['folders','companies','users','categories','contractors','portal'].includes(activePage) ? 'active' : ''}" id="t-nav-settings">⚙</a>
+        <a class="nav-link ${['folders','companies','users','categories','portal'].includes(activePage) ? 'active' : ''}" id="t-nav-settings">⚙</a>
         <div class="nav-dropdown-menu">
           <a href="folders.html"      class="${activePage === 'folders'      ? 'active' : ''}" id="t-nav-folders"></a>
           <a href="companies.html"    class="${activePage === 'companies'    ? 'active' : ''}" id="t-nav-companies"></a>
-          <a href="contractors.html"  class="${activePage === 'contractors'  ? 'active' : ''}" id="t-nav-contractors"></a>
           <a href="users.html"        class="${activePage === 'users'        ? 'active' : ''}" id="t-nav-users"></a>
           <a href="categories.html"   class="${activePage === 'categories'   ? 'active' : ''}" id="t-nav-categories"></a>
           <a href="portal_settings.html" class="${activePage === 'portal' ? 'active' : ''}" id="t-nav-portal"></a>
@@ -101,7 +101,6 @@ function updateHeaderTexts() {
   const nc = document.getElementById('t-nav-companies');
   const nu = document.getElementById('t-nav-users');
   const ncat = document.getElementById('t-nav-categories');
-  const nctr = document.getElementById('t-nav-contractors');
   const nsett = document.getElementById('t-nav-settings');
   const settWrap = document.getElementById('nav-settings');
   const lb = document.getElementById('logout-btn');
@@ -114,11 +113,18 @@ function updateHeaderTexts() {
   if (nct) {
     nct.textContent = t('navContracts');
     const me = typeof currentMe !== 'undefined' ? currentMe : null;
-    nct.style.display = (me && (me.is_admin === true || me.has_contracts_access === true)) ? '' : 'none';
+    const hasAccess = me && (me.is_admin === true || me.has_contracts_access === true);
+    nct.style.display = hasAccess ? '' : 'none';
+  }
+  const nct2 = document.getElementById('t-nav-contractors2');
+  if (nct2) {
+    nct2.textContent = t('navContractors');
+    const me = typeof currentMe !== 'undefined' ? currentMe : null;
+    const hasAccess = me && (me.is_admin === true || me.has_contracts_access === true);
+    nct2.style.display = hasAccess ? '' : 'none';
   }
   if (nr) nr.textContent = t('navReports');
   if (nc) nc.textContent = t('navCompanies');
-  if (nctr) nctr.textContent = t('navContractors');
   if (nu) nu.textContent = t('navUsers');
   if (ncat) ncat.textContent = t('navCategories');
   const nportal = document.getElementById('t-nav-portal');
