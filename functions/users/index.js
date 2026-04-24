@@ -36,13 +36,17 @@ exports.users = async (req, res) => {
     // GET /users/me — данные текущего пользователя
     if (req.method === 'GET' && req.url.includes('/me')) {
       const [rows] = await bigquery.query({
-        query: `SELECT id, email, name, telegram_chat_id, telegram_username,
-                       is_admin, can_see_salary, is_active
-                FROM ${table} WHERE email = @email`,
+        query: `SELECT u.id, u.email, u.name, u.telegram_chat_id, u.telegram_username,
+                       u.is_admin, u.can_see_salary, u.is_active,
+                       (SELECT COUNT(*) FROM \`${PROJECT}.${DATASET}.users_folders\`
+                        WHERE user_email = u.email AND docs_access = 'editor') AS editor_folder_count
+                FROM ${table} u WHERE u.email = @email`,
         params: { email },
       });
       if (!rows.length) { res.status(404).json({ error: 'User not found' }); return; }
-      res.json(rows[0]);
+      const user = rows[0];
+      user.has_contracts_access = user.is_admin === true || parseInt(user.editor_folder_count) > 0;
+      res.json(user);
       return;
     }
 

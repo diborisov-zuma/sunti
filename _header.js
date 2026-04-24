@@ -6,7 +6,7 @@ function renderHeader(activePage) {
     <a class="logo" href="index.html">Sunti</a>
 
     <nav class="nav">
-      <a href="contracts.html" class="nav-link ${activePage === 'contracts' ? 'active' : ''}" id="t-nav-contracts"></a>
+      <a href="contracts.html" class="nav-link ${activePage === 'contracts' ? 'active' : ''}" id="t-nav-contracts" style="display:none"></a>
       <a href="invoices.html" class="nav-link ${activePage === 'invoices' ? 'active' : ''}" id="t-nav-invoices"></a>
       <a href="finance.html"  class="nav-link ${activePage === 'finance'  ? 'active' : ''}" id="t-nav-finance"></a>
       <a href="statements.html" class="nav-link ${activePage === 'statements' ? 'active' : ''}" id="t-nav-statements"></a>
@@ -111,7 +111,11 @@ function updateHeaderTexts() {
   if (nfi) nfi.textContent = t('navFinance');
   if (ns)  ns.textContent  = t('navStatements');
   const nct = document.getElementById('t-nav-contracts');
-  if (nct) nct.textContent = t('navContracts');
+  if (nct) {
+    nct.textContent = t('navContracts');
+    const me = typeof currentMe !== 'undefined' ? currentMe : null;
+    nct.style.display = (me && (me.is_admin === true || me.has_contracts_access === true)) ? '' : 'none';
+  }
   if (nr) nr.textContent = t('navReports');
   if (nc) nc.textContent = t('navCompanies');
   if (nctr) nctr.textContent = t('navContractors');
