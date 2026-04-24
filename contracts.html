@@ -121,6 +121,17 @@
             </tr>
           </thead>
           <tbody id="ct-tbody"></tbody>
+          <tfoot id="ct-tfoot" style="display:none">
+            <tr style="background:#f8f8f8;font-weight:600;border-top:2px solid #e8e8e8">
+              <td colspan="5" style="text-align:right;color:#888;padding:12px 14px">${t('totalAmount') || 'Total'}:</td>
+              <td id="tf-total"></td>
+              <td id="tf-invoiced"></td>
+              <td id="tf-paid"></td>
+              <td id="tf-outstanding"></td>
+              <td id="tf-progress"></td>
+              <td colspan="2"></td>
+            </tr>
+          </tfoot>
         </table>
       </div>
     </div>
@@ -569,6 +580,7 @@
       const tbody = document.getElementById('ct-tbody');
       if (!allContracts.length) {
         tbody.innerHTML = `<tr><td colspan="12" class="empty-state">${t('noContracts')}</td></tr>`;
+        const tf = document.getElementById('ct-tfoot'); if (tf) tf.style.display = 'none';
         return;
       }
       tbody.innerHTML = '';
@@ -610,6 +622,27 @@
 
         if (isExp) loadContractDetail(c.id);
       });
+
+      // Totals footer
+      const tfoot = document.getElementById('ct-tfoot');
+      if (tfoot && allContracts.length) {
+        let sumTotal = 0, sumInvoiced = 0, sumPaid = 0;
+        allContracts.forEach(c => {
+          sumTotal += numVal(c.total_amount);
+          sumInvoiced += numVal(c.invoiced_total);
+          sumPaid += numVal(c.paid_amount);
+        });
+        const sumOutstanding = sumTotal - sumInvoiced;
+        const dir = allContracts[0]?.direction || 'expense';
+        document.getElementById('tf-total').innerHTML = amtCell(sumTotal, dir);
+        document.getElementById('tf-invoiced').innerHTML = amtCell(sumInvoiced, dir);
+        document.getElementById('tf-paid').innerHTML = amtCell(sumPaid, dir);
+        document.getElementById('tf-outstanding').innerHTML = amtCell(sumOutstanding, dir);
+        document.getElementById('tf-progress').textContent = '';
+        tfoot.style.display = '';
+      } else if (tfoot) {
+        tfoot.style.display = 'none';
+      }
     }
 
     // ─── Contract detail (invoices) ───

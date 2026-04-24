@@ -8,6 +8,7 @@ function renderHeader(activePage) {
     <nav class="nav">
       <a href="contracts.html" class="nav-link ${activePage === 'contracts' ? 'active' : ''}" id="t-nav-contracts" style="display:none"></a>
       <a href="contractors.html" class="nav-link ${activePage === 'contractors' ? 'active' : ''}" id="t-nav-contractors2" style="display:none"></a>
+      <a href="documentation.html" class="nav-link ${activePage === 'documentation' ? 'active' : ''}" id="t-nav-docs" style="display:none"></a>
       <a href="invoices.html" class="nav-link ${activePage === 'invoices' ? 'active' : ''}" id="t-nav-invoices"></a>
       <a href="finance.html"  class="nav-link ${activePage === 'finance'  ? 'active' : ''}" id="t-nav-finance"></a>
       <a href="statements.html" class="nav-link ${activePage === 'statements' ? 'active' : ''}" id="t-nav-statements"></a>
@@ -119,9 +120,15 @@ function updateHeaderTexts() {
   const nct2 = document.getElementById('t-nav-contractors2');
   if (nct2) {
     nct2.textContent = t('navContractors');
-    const me = typeof currentMe !== 'undefined' ? currentMe : null;
-    const hasAccess = me && (me.is_admin === true || me.has_contracts_access === true);
-    nct2.style.display = hasAccess ? '' : 'none';
+    const me2 = typeof currentMe !== 'undefined' ? currentMe : null;
+    const hasAccess2 = me2 && (me2.is_admin === true || me2.has_contracts_access === true);
+    nct2.style.display = hasAccess2 ? '' : 'none';
+  }
+  const ndocs = document.getElementById('t-nav-docs');
+  if (ndocs) {
+    ndocs.textContent = t('navDocs');
+    const me3 = typeof currentMe !== 'undefined' ? currentMe : null;
+    ndocs.style.display = (me3 && (me3.is_admin === true || me3.has_docs_access === true)) ? '' : 'none';
   }
   if (nr) nr.textContent = t('navReports');
   if (nc) nc.textContent = t('navCompanies');

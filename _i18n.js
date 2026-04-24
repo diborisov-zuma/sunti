@@ -272,6 +272,25 @@ const i18n = {
     cancelled: 'Отменён',
     progressNotes: 'Комментарий по работам',
 
+    // Документация проекта
+    navDocs: 'Документация',
+    documentation: 'Документация проекта',
+    docCategories: 'Категории',
+    addDocCategory: 'Добавить категорию',
+    addDocument: 'Добавить документ',
+    editDocument: 'Редактировать документ',
+    noDocuments: 'Нет документов',
+    uploadVersion: 'Загрузить версию',
+    versionHistory: 'История версий',
+    versionNumber: 'Версия',
+    versionNotes: 'Что изменилось',
+    currentVersion: 'Текущая',
+    documentName: 'Название документа',
+    docsLevelNone: 'Нет доступа',
+    docsLevelViewer: 'Просмотр',
+    docsLevelEditor: 'Редактор',
+    docsAccess: 'Доступ к документации',
+
     // Портал клиентов
     navPortal: 'Портал',
     portalSettings: 'Настройки портала',
@@ -606,6 +625,25 @@ const i18n = {
     cancelled: 'Cancelled',
     progressNotes: 'Work progress notes',
 
+    // Project documentation
+    navDocs: 'Documentation',
+    documentation: 'Project documentation',
+    docCategories: 'Categories',
+    addDocCategory: 'Add category',
+    addDocument: 'Add document',
+    editDocument: 'Edit document',
+    noDocuments: 'No documents',
+    uploadVersion: 'Upload version',
+    versionHistory: 'Version history',
+    versionNumber: 'Version',
+    versionNotes: 'What changed',
+    currentVersion: 'Current',
+    documentName: 'Document name',
+    docsLevelNone: 'No access',
+    docsLevelViewer: 'View',
+    docsLevelEditor: 'Editor',
+    docsAccess: 'Documentation access',
+
     // Client portal
     navPortal: 'Portal',
     portalSettings: 'Portal settings',
@@ -939,6 +977,25 @@ const i18n = {
     completed: 'เสร็จสิ้น',
     cancelled: 'ยกเลิก',
     progressNotes: 'ความคืบหน้าของงาน',
+
+    // เอกสารโครงการ
+    navDocs: 'เอกสาร',
+    documentation: 'เอกสารโครงการ',
+    docCategories: 'หมวดหมู่',
+    addDocCategory: 'เพิ่มหมวดหมู่',
+    addDocument: 'เพิ่มเอกสาร',
+    editDocument: 'แก้ไขเอกสาร',
+    noDocuments: 'ไม่มีเอกสาร',
+    uploadVersion: 'อัปโหลดเวอร์ชัน',
+    versionHistory: 'ประวัติเวอร์ชัน',
+    versionNumber: 'เวอร์ชัน',
+    versionNotes: 'มีอะไรเปลี่ยน',
+    currentVersion: 'ปัจจุบัน',
+    documentName: 'ชื่อเอกสาร',
+    docsLevelNone: 'ไม่มีสิทธิ์',
+    docsLevelViewer: 'ดู',
+    docsLevelEditor: 'แก้ไข',
+    docsAccess: 'สิทธิ์เข้าถึงเอกสาร',
 
     // พอร์ทัลลูกค้า
     navPortal: 'พอร์ทัล',
