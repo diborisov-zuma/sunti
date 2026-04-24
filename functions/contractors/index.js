@@ -24,10 +24,15 @@ async function verifyToken(req) {
 
 async function getUser(email) {
   const [rows] = await bigquery.query({
-    query: `SELECT email, is_admin FROM \`${PROJECT}.${DATASET}.users\` WHERE email = @email`,
+    query: `SELECT u.email, u.is_admin,
+                   (SELECT COUNT(*) FROM \`${PROJECT}.${DATASET}.users_folders\`
+                    WHERE user_email = u.email AND docs_access = 'editor') AS editor_count
+            FROM \`${PROJECT}.${DATASET}.users\` u WHERE u.email = @email`,
     params: { email },
   });
-  return rows[0] || null;
+  if (!rows[0]) return null;
+  rows[0].can_edit = rows[0].is_admin === true || parseInt(rows[0].editor_count) > 0;
+  return rows[0];
 }
 
 exports.contractors = async (req, res) => {
@@ -79,7 +84,7 @@ exports.contractors = async (req, res) => {
 
     // POST — создать
     if (req.method === 'POST') {
-      if (!user.is_admin) { res.status(403).json({ error: 'Forbidden' }); return; }
+      if (!user.can_edit) { res.status(403).json({ error: 'Forbidden' }); return; }
       const b = req.body || {};
       if (!b.name_en && !b.name_th) {
         res.status(400).json({ error: 'name_en or name_th is required' });
@@ -124,7 +129,7 @@ exports.contractors = async (req, res) => {
 
     // PUT — редактировать
     if (req.method === 'PUT') {
-      if (!user.is_admin) { res.status(403).json({ error: 'Forbidden' }); return; }
+      if (!user.can_edit) { res.status(403).json({ error: 'Forbidden' }); return; }
       const id = (req.url || '').split('/').filter(Boolean).pop().split('?')[0];
       const b = req.body || {};
       if (!id) { res.status(400).json({ error: 'id is required' }); return; }
@@ -168,7 +173,7 @@ exports.contractors = async (req, res) => {
 
     // DELETE — hard delete
     if (req.method === 'DELETE') {
-      if (!user.is_admin) { res.status(403).json({ error: 'Forbidden' }); return; }
+      if (!user.can_edit) { res.status(403).json({ error: 'Forbidden' }); return; }
       const id = (req.url || '').split('/').filter(Boolean).pop().split('?')[0];
       if (!id) { res.status(400).json({ error: 'id is required' }); return; }
       await bigquery.query({ query: `DELETE FROM ${table} WHERE id = @id`, params: { id } });

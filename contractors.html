@@ -415,7 +415,7 @@
 
     window.onLogin = async () => {
       updateTexts();
-      if (isAdmin) {
+      if (isAdmin || (currentMe && currentMe.has_contracts_access)) {
         document.getElementById('btn-add').style.display = '';
       }
       await loadContractors();
