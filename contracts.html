@@ -123,7 +123,7 @@
           <tbody id="ct-tbody"></tbody>
           <tfoot id="ct-tfoot" style="display:none">
             <tr style="background:#f8f8f8;font-weight:600;border-top:2px solid #e8e8e8">
-              <td colspan="5" style="text-align:right;color:#888;padding:12px 14px">${t('totalAmount') || 'Total'}:</td>
+              <td colspan="5" style="text-align:right;color:#888;padding:12px 14px" id="tf-label"></td>
               <td id="tf-total"></td>
               <td id="tf-invoiced"></td>
               <td id="tf-paid"></td>
@@ -634,6 +634,7 @@
         });
         const sumOutstanding = sumTotal - sumInvoiced;
         const dir = allContracts[0]?.direction || 'expense';
+        document.getElementById('tf-label').textContent = t('totalAmount') + ':';
         document.getElementById('tf-total').innerHTML = amtCell(sumTotal, dir);
         document.getElementById('tf-invoiced').innerHTML = amtCell(sumInvoiced, dir);
         document.getElementById('tf-paid').innerHTML = amtCell(sumPaid, dir);

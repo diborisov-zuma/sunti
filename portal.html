@@ -110,6 +110,16 @@
         <table class="ct-table" id="contracts-table">
           <thead id="contracts-thead"></thead>
           <tbody id="ct-tbody"></tbody>
+          <tfoot id="ct-tfoot" style="display:none">
+            <tr style="background:#f8f8f8;font-weight:600;border-top:2px solid #e8e8e8">
+              <td colspan="5" style="text-align:right;color:#888;padding:12px 14px" id="ptf-label"></td>
+              <td id="ptf-total"></td>
+              <td id="ptf-invoiced"></td>
+              <td id="ptf-paid"></td>
+              <td id="ptf-outstanding"></td>
+              <td></td>
+            </tr>
+          </tfoot>
         </table>
       </div>
     </div>
@@ -297,8 +307,10 @@
 
     function renderContracts(colCount) {
       const tbody = document.getElementById('ct-tbody');
+      const tfoot = document.getElementById('ct-tfoot');
       if (!allContracts.length) {
         tbody.innerHTML = `<tr><td colspan="${colCount}" class="empty-state">${t('noContracts')}</td></tr>`;
+        if (tfoot) tfoot.style.display = 'none';
         return;
       }
       tbody.innerHTML = '';
@@ -339,6 +351,26 @@
 
         if (isExp) loadContractDetail(c.id, colCount);
       });
+
+      // Totals footer (only for full access)
+      if (tfoot && accessLevel === 'full' && allContracts.length) {
+        let sumTotal = 0, sumInvoiced = 0, sumPaid = 0;
+        allContracts.forEach(c => {
+          sumTotal += numVal(c.total_amount);
+          sumInvoiced += numVal(c.invoiced_total);
+          sumPaid += numVal(c.paid_amount);
+        });
+        const sumOutstanding = sumTotal - sumInvoiced;
+        const dir = allContracts[0]?.direction || 'expense';
+        document.getElementById('ptf-label').textContent = t('totalAmount') + ':';
+        document.getElementById('ptf-total').innerHTML = amtCell(sumTotal, dir);
+        document.getElementById('ptf-invoiced').innerHTML = amtCell(sumInvoiced, dir);
+        document.getElementById('ptf-paid').innerHTML = amtCell(sumPaid, dir);
+        document.getElementById('ptf-outstanding').innerHTML = amtCell(sumOutstanding, dir);
+        tfoot.style.display = '';
+      } else if (tfoot) {
+        tfoot.style.display = 'none';
+      }
     }
 
     async function loadContractDetail(contractId, colCount) {
