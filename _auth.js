@@ -95,9 +95,11 @@ let _tokenRefreshInterval = null;
 function startTokenRefresh() {
   if (_tokenRefreshInterval) clearInterval(_tokenRefreshInterval);
   _tokenRefreshInterval = setInterval(() => {
-    if (!_tokenClient) return;
-    _tokenClient.requestAccessToken({ prompt: '' });
-  }, 45 * 60 * 1000); // 45 минут
+    if (!_tokenClient || !currentUser?.email) return;
+    try {
+      _tokenClient.requestAccessToken({ prompt: '', login_hint: currentUser.email });
+    } catch(e) { console.warn('Silent token refresh failed:', e); }
+  }, 50 * 60 * 1000); // 50 минут (обновляем за 10 мин до истечения)
 }
 
 function stopTokenRefresh() {
@@ -131,16 +133,8 @@ async function tryAutoLogin() {
   const idToken     = localStorage.getItem('google_id_token');
   const accessToken = localStorage.getItem('google_access_token');
 
-  if (!idToken || isTokenExpired(idToken)) {
-    localStorage.removeItem('google_id_token');
-    localStorage.removeItem('google_access_token');
-    return;
-  }
-
-  if (!accessToken) {
-    localStorage.removeItem('google_id_token');
-    return;
-  }
+  if (!idToken) return;
+  if (!accessToken) return;
 
   // Инициализируем tokenClient для автообновления
   if (!_tokenClient && typeof google !== 'undefined' && google.accounts?.oauth2) {
