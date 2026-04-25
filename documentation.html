@@ -457,7 +457,11 @@
       const name = prompt(t('name') + ':');
       if (!name) return;
       apiFetch('/project_doc_categories', { method: 'POST', body: JSON.stringify({ name, name_en: name }) })
-        .then(() => { loadRefs().then(() => { renderCategories(); }); })
+        .then(async () => {
+          try { categories = await apiFetch('/project_doc_categories'); } catch(e) { categories = []; }
+          renderCategories();
+          showToast(t('saved'), 'success');
+        })
         .catch(e => showToast(e.message, 'error'));
     });
 
