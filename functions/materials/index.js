@@ -224,7 +224,7 @@ exports.materials = async (req, res) => {
           const parsed = parseKey(file_url);
           if (parsed) {
             const [buffer] = await storage.bucket(parsed.bucket).file(parsed.key).download();
-            const thumbBuffer = await sharp(buffer).resize(300, 300, { fit: 'inside', withoutEnlargement: true }).jpeg({ quality: 70 }).toBuffer();
+            const thumbBuffer = await sharp(buffer).resize(200, 200, { fit: 'inside', withoutEnlargement: true }).jpeg({ quality: 70 }).toBuffer();
             const thumbKey = parsed.key.replace(/(\.[^.]+)$/, '_thumb.jpg');
             await storage.bucket(parsed.bucket).file(thumbKey).save(thumbBuffer, { metadata: { contentType: 'image/jpeg' } });
             thumb_url = `https://storage.googleapis.com/${parsed.bucket}/${thumbKey}`;

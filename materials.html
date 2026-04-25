@@ -16,6 +16,8 @@
     .page-toolbar { display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap; }
     .page-toolbar h2 { font-size:1.1rem;color:#222;flex:1; }
 
+    .expand-toggle { background:none;border:none;cursor:pointer;font-size:1.1rem;color:#1a73e8;padding:4px 8px;flex-shrink:0;transition:transform 0.15s; }
+    .expand-toggle:hover { color:#1557b0; }
     .mat-card { background:#fff;border:1px solid #e8e8e8;border-radius:10px;padding:16px 20px;margin-bottom:12px; }
     .mat-card-header { display:flex;justify-content:space-between;align-items:flex-start;gap:12px; }
     .mat-card-name { font-size:1rem;font-weight:500;color:#222; }
@@ -29,9 +31,9 @@
     .status-archived { background:#f0f0f0;color:#888; }
 
     .files-grid { display:flex;flex-wrap:wrap;gap:10px;margin-top:12px; }
-    .file-thumb { width:120px;border:1px solid #e8e8e8;border-radius:8px;overflow:hidden;cursor:pointer;transition:border-color 0.15s;position:relative; }
+    .file-thumb { width:200px;border:1px solid #e8e8e8;border-radius:8px;overflow:hidden;cursor:pointer;transition:border-color 0.15s;position:relative; }
     .file-thumb:hover { border-color:#1a73e8; }
-    .file-thumb img { width:100%;height:80px;object-fit:cover;display:block; }
+    .file-thumb img { width:100%;height:auto;max-height:150px;object-fit:cover;display:block; }
     .file-thumb .pdf-icon { width:100%;height:80px;display:flex;align-items:center;justify-content:center;background:#f8f8f8;font-size:2rem;color:#c5221f; }
     .file-thumb .file-icon-generic { width:100%;height:80px;display:flex;align-items:center;justify-content:center;background:#f8f8f8;font-size:1.5rem;color:#888; }
     .file-thumb-name { padding:4px 6px;font-size:0.7rem;color:#666;overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
@@ -218,7 +220,8 @@
         return `
         <div class="mat-card" data-mat-id="${m.id}">
           <div class="mat-card-header">
-            <div>
+            <button class="expand-toggle" data-action="toggle-expand" data-id="${m.id}">${isExp ? '▼' : '▶'}</button>
+            <div style="flex:1;min-width:0">
               <div class="mat-card-name">${m.name || '—'}</div>
               ${m.description ? `<div class="mat-card-desc">${m.description}</div>` : ''}
               <div class="mat-card-meta">
@@ -235,7 +238,6 @@
                 <button class="btn btn-outline" style="padding:2px 8px;font-size:0.75rem" data-action="upload-file" data-id="${m.id}">${t('addFile')}</button>
                 <button class="btn btn-outline" style="padding:2px 8px;font-size:0.75rem;color:#c5221f" data-action="delete-mat" data-id="${m.id}">${t('delete')}</button>
               ` : ''}
-              <button style="background:none;border:none;cursor:pointer;font-size:0.8rem;color:#888;padding:4px" data-action="toggle-expand" data-id="${m.id}">${isExp ? '▾' : '▸'}</button>
             </div>
           </div>
           ${isExp ? `<div id="mat-detail-${m.id}"><div class="loading" style="padding:12px">${t('loading')}</div></div>` : ''}
