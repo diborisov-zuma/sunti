@@ -277,22 +277,25 @@
       else document.getElementById('ct-tbody').innerHTML = `<tr><td colspan="10" class="empty-state">${t('portalSelectProject')}</td></tr>`;
     });
 
-    async function loadContracts() {
-      const tbody = document.getElementById('ct-tbody');
+    function updateTableHeaders() {
       const thead = document.getElementById('contracts-thead');
-      tbody.innerHTML = `<tr><td colspan="10" class="loading">${t('loading')}</td></tr>`;
-
-      // Set headers based on access level
+      if (!thead) return;
       const amtHeaders = accessLevel === 'full'
         ? `<th>${t('contractTotal')}</th><th>${t('contractInvoiced')}</th><th>${t('paidAmount')}</th><th>${t('contractOutstanding')}</th>`
         : `<th>${t('portalProgress')}</th>`;
-      const colCount = accessLevel === 'full' ? 9 : 6;
       thead.innerHTML = `<tr>
         <th style="width:30px"></th><th>${t('date')}</th><th>${t('name')}</th>
         <th>${t('contractor')}</th><th>${t('folder')}</th>
         ${amtHeaders}
         <th>${t('statusLabel')}</th>
       </tr>`;
+    }
+
+    async function loadContracts() {
+      const tbody = document.getElementById('ct-tbody');
+      const colCount = accessLevel === 'full' ? 9 : 6;
+      tbody.innerHTML = `<tr><td colspan="10" class="loading">${t('loading')}</td></tr>`;
+      updateTableHeaders();
 
       try {
         const data = await portalFetch(`/portal_contracts?folder_id=${selectedFolder}`);
@@ -507,6 +510,7 @@
     // ─── Init ───
     window.onLangChange = () => {
       updateTexts();
+      updateTableHeaders();
       if (selectedFolder && allContracts.length) renderContracts(accessLevel === 'full' ? 9 : 6);
     };
 
