@@ -213,6 +213,15 @@
         <input type="checkbox" id="sec-docs-${userId}" ${docsSection ? 'checked' : ''}>
         <label for="sec-docs-${userId}" style="font-size:0.85rem">${t('navDocs')}</label>
       </div>`;
+      const matSection = data.sections.find(s => s.section === 'materials');
+      html += `<div class="checkbox-row">
+        <input type="checkbox" id="sec-mat-${userId}" ${matSection ? 'checked' : ''}>
+        <label for="sec-mat-${userId}" style="font-size:0.85rem">${t('navMaterials')}</label>
+        <select id="sec-mat-level-${userId}" style="border:1px solid #ddd;border-radius:4px;padding:2px 8px;font-size:0.82rem;margin-left:8px">
+          <option value="viewer" ${matSection?.access_level === 'viewer' ? 'selected' : ''}>${t('materialsLevelViewer')}</option>
+          <option value="editor" ${matSection?.access_level === 'editor' ? 'selected' : ''}>${t('materialsLevelEditor')}</option>
+        </select>
+      </div>`;
 
       html += `<div style="margin-top:14px">
         <button class="btn btn-primary" style="font-size:0.78rem;padding:4px 14px" data-action="save-access" data-user-id="${userId}">${t('save')}</button>
@@ -272,6 +281,11 @@
           const docsCb = document.getElementById(`sec-docs-${userId}`);
           if (docsCb && docsCb.checked) {
             sections.push({ section: 'documentation', access_level: 'viewer' });
+          }
+          const matCb = document.getElementById(`sec-mat-${userId}`);
+          if (matCb && matCb.checked) {
+            const matLevel = document.getElementById(`sec-mat-level-${userId}`).value;
+            sections.push({ section: 'materials', access_level: matLevel });
           }
           await apiFetch(`/portal_users/${userId}/sections`, {
             method: 'POST', body: JSON.stringify({ sections }),

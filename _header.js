@@ -9,6 +9,7 @@ function renderHeader(activePage) {
       <a href="contracts.html" class="nav-link ${activePage === 'contracts' ? 'active' : ''}" id="t-nav-contracts" style="display:none"></a>
       <a href="contractors.html" class="nav-link ${activePage === 'contractors' ? 'active' : ''}" id="t-nav-contractors2" style="display:none"></a>
       <a href="documentation.html" class="nav-link ${activePage === 'documentation' ? 'active' : ''}" id="t-nav-docs" style="display:none"></a>
+      <a href="materials.html" class="nav-link ${activePage === 'materials' ? 'active' : ''}" id="t-nav-materials" style="display:none"></a>
       <a href="invoices.html" class="nav-link ${activePage === 'invoices' ? 'active' : ''}" id="t-nav-invoices"></a>
       <a href="finance.html"  class="nav-link ${activePage === 'finance'  ? 'active' : ''}" id="t-nav-finance"></a>
       <a href="statements.html" class="nav-link ${activePage === 'statements' ? 'active' : ''}" id="t-nav-statements"></a>
@@ -129,6 +130,12 @@ function updateHeaderTexts() {
     ndocs.textContent = t('navDocs');
     const me3 = typeof currentMe !== 'undefined' ? currentMe : null;
     ndocs.style.display = (me3 && (me3.is_admin === true || me3.has_docs_access === true)) ? '' : 'none';
+  }
+  const nmat = document.getElementById('t-nav-materials');
+  if (nmat) {
+    nmat.textContent = t('navMaterials');
+    const me4 = typeof currentMe !== 'undefined' ? currentMe : null;
+    nmat.style.display = (me4 && (me4.is_admin === true || me4.has_materials_access === true)) ? '' : 'none';
   }
   if (nr) nr.textContent = t('navReports');
   if (nc) nc.textContent = t('navCompanies');

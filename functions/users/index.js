@@ -41,7 +41,9 @@ exports.users = async (req, res) => {
                        (SELECT COUNT(*) FROM \`${PROJECT}.${DATASET}.users_folders\`
                         WHERE user_email = u.email AND docs_access = 'editor') AS editor_folder_count,
                        (SELECT COUNT(*) FROM \`${PROJECT}.${DATASET}.users_folders\`
-                        WHERE user_email = u.email AND docs_level IN ('viewer','editor')) AS docs_folder_count
+                        WHERE user_email = u.email AND docs_level IN ('viewer','editor')) AS docs_folder_count,
+                       (SELECT COUNT(*) FROM \`${PROJECT}.${DATASET}.users_folders\`
+                        WHERE user_email = u.email AND materials_level IN ('viewer','editor')) AS materials_folder_count
                 FROM ${table} u WHERE u.email = @email`,
         params: { email },
       });
@@ -49,6 +51,7 @@ exports.users = async (req, res) => {
       const user = rows[0];
       user.has_contracts_access = user.is_admin === true || parseInt(user.editor_folder_count) > 0;
       user.has_docs_access = user.is_admin === true || parseInt(user.docs_folder_count) > 0;
+      user.has_materials_access = user.is_admin === true || parseInt(user.materials_folder_count) > 0;
       res.json(user);
       return;
     }

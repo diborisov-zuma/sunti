@@ -50,7 +50,7 @@ exports.users_folders = async (req, res) => {
 
       if (user_email) {
         const [rows] = await bigquery.query({
-          query: `SELECT uf.id, uf.user_email, uf.folder_id, uf.docs_access, uf.docs_level,
+          query: `SELECT uf.id, uf.user_email, uf.folder_id, uf.docs_access, uf.docs_level, uf.materials_level,
                          f.name as folder_name
                   FROM ${table} uf
                   JOIN \`${PROJECT}.${DATASET}.folders\` f ON f.id = uf.folder_id
@@ -64,7 +64,7 @@ exports.users_folders = async (req, res) => {
 
       if (folder_id) {
         const [rows] = await bigquery.query({
-          query: `SELECT uf.id, uf.user_email, uf.folder_id, uf.docs_access, uf.docs_level,
+          query: `SELECT uf.id, uf.user_email, uf.folder_id, uf.docs_access, uf.docs_level, uf.materials_level,
                          u.name as user_name
                   FROM ${table} uf
                   JOIN \`${PROJECT}.${DATASET}.users\` u ON u.email = uf.user_email
@@ -104,9 +104,9 @@ exports.users_folders = async (req, res) => {
       const { v4: uuidv4 } = require('uuid');
       const id = uuidv4();
       await bigquery.query({
-        query: `INSERT INTO ${table} (id, user_email, folder_id, docs_access, docs_level, created_at, updated_at)
-                VALUES (@id, @user_email, @folder_id, @docs_access, @docs_level, CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP())`,
-        params: { id, user_email, folder_id, docs_access, docs_level: req.body.docs_level || 'none' },
+        query: `INSERT INTO ${table} (id, user_email, folder_id, docs_access, docs_level, materials_level, created_at, updated_at)
+                VALUES (@id, @user_email, @folder_id, @docs_access, @docs_level, @materials_level, CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP())`,
+        params: { id, user_email, folder_id, docs_access, docs_level: req.body.docs_level || 'none', materials_level: req.body.materials_level || 'none' },
       });
 
       res.json({ success: true, id });
@@ -127,8 +127,8 @@ exports.users_folders = async (req, res) => {
       }
 
       await bigquery.query({
-        query: `UPDATE ${table} SET docs_access = @docs_access, docs_level = @docs_level, updated_at = CURRENT_TIMESTAMP() WHERE id = @id`,
-        params: { docs_access, docs_level: req.body.docs_level || 'none', id },
+        query: `UPDATE ${table} SET docs_access = @docs_access, docs_level = @docs_level, materials_level = @materials_level, updated_at = CURRENT_TIMESTAMP() WHERE id = @id`,
+        params: { docs_access, docs_level: req.body.docs_level || 'none', materials_level: req.body.materials_level || 'none', id },
       });
 
       res.json({ success: true });

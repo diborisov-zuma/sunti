@@ -360,10 +360,11 @@
         const rows = allFolders.map(f => {
           const current = currentUserFolderAccess[f.id]?.docs_access || 'none';
           const docsLvl = currentUserFolderAccess[f.id]?.docs_level || 'none';
+          const matLvl = currentUserFolderAccess[f.id]?.materials_level || 'none';
           return `
             <div class="folder-access-row" data-folder-id="${f.id}">
               <span class="folder-name" title="${f.name}">${f.name}</span>
-              <select class="folder-access-select">
+              <select class="folder-access-select" title="${t('sectionDocAccess')}">
                 <option value="none"   ${current === 'none'   ? 'selected' : ''}>${t('accessNone')}</option>
                 <option value="viewer" ${current === 'viewer' ? 'selected' : ''}>${t('accessViewer')}</option>
                 <option value="editor" ${current === 'editor' ? 'selected' : ''}>${t('accessEditor')}</option>
@@ -372,6 +373,11 @@
                 <option value="none"   ${docsLvl === 'none'   ? 'selected' : ''}>${t('docsLevelNone')}</option>
                 <option value="viewer" ${docsLvl === 'viewer' ? 'selected' : ''}>${t('docsLevelViewer')}</option>
                 <option value="editor" ${docsLvl === 'editor' ? 'selected' : ''}>${t('docsLevelEditor')}</option>
+              </select>
+              <select class="folder-materials-select" title="${t('materialsAccess')}">
+                <option value="none"   ${matLvl === 'none'   ? 'selected' : ''}>${t('materialsLevelNone')}</option>
+                <option value="viewer" ${matLvl === 'viewer' ? 'selected' : ''}>${t('materialsLevelViewer')}</option>
+                <option value="editor" ${matLvl === 'editor' ? 'selected' : ''}>${t('materialsLevelEditor')}</option>
               </select>
             </div>
           `;
@@ -459,21 +465,22 @@
         const folderId  = row.dataset.folderId;
         const newAccess = row.querySelector('.folder-access-select').value;
         const newDocsLevel = row.querySelector('.folder-docs-select')?.value || 'none';
+        const newMatLevel = row.querySelector('.folder-materials-select')?.value || 'none';
         const existing  = currentUserFolderAccess[folderId];
-        const anyAccess = newAccess !== 'none' || newDocsLevel !== 'none';
+        const anyAccess = newAccess !== 'none' || newDocsLevel !== 'none' || newMatLevel !== 'none';
         if (existing) {
           if (!anyAccess) {
             promises.push(apiFetch(`/users_folders/${existing.id}`, { method: 'DELETE' }));
-          } else if (existing.docs_access !== newAccess || existing.docs_level !== newDocsLevel) {
+          } else if (existing.docs_access !== newAccess || existing.docs_level !== newDocsLevel || existing.materials_level !== newMatLevel) {
             promises.push(apiFetch(`/users_folders/${existing.id}`, {
               method: 'PUT',
-              body: JSON.stringify({ docs_access: newAccess, docs_level: newDocsLevel }),
+              body: JSON.stringify({ docs_access: newAccess, docs_level: newDocsLevel, materials_level: newMatLevel }),
             }));
           }
         } else if (anyAccess) {
           promises.push(apiFetch('/users_folders', {
             method: 'POST',
-            body: JSON.stringify({ user_email: userEmail, folder_id: folderId, docs_access: newAccess, docs_level: newDocsLevel }),
+            body: JSON.stringify({ user_email: userEmail, folder_id: folderId, docs_access: newAccess, docs_level: newDocsLevel, materials_level: newMatLevel }),
           }));
         }
       }

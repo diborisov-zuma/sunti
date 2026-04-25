@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sunti — Материалы</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="stylesheet" href="style.css">
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <script src="_i18n.js"></script>
+  <script src="_config.js"></script>
+  <script src="_auth.js"></script>
+  <script src="_header.js"></script>
+  <style>
+    .page-wrap { padding:24px;max-width:1200px;margin:0 auto; }
+    .page-toolbar { display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap; }
+    .page-toolbar h2 { font-size:1.1rem;color:#222;flex:1; }
+
+    .mat-card { background:#fff;border:1px solid #e8e8e8;border-radius:10px;padding:16px 20px;margin-bottom:12px; }
+    .mat-card-header { display:flex;justify-content:space-between;align-items:flex-start;gap:12px; }
+    .mat-card-name { font-size:1rem;font-weight:500;color:#222; }
+    .mat-card-desc { font-size:0.84rem;color:#666;margin-top:6px; }
+    .mat-card-meta { font-size:0.78rem;color:#999;margin-top:4px; }
+
+    .status-badge { display:inline-block;padding:3px 10px;border-radius:12px;font-size:0.75rem;font-weight:600; }
+    .status-pending { background:#fef7e0;color:#e37400; }
+    .status-approved { background:#e6f4ea;color:#1e8e3e; }
+    .status-rejected { background:#fce8e6;color:#c5221f; }
+    .status-archived { background:#f0f0f0;color:#888; }
+
+    .files-grid { display:flex;flex-wrap:wrap;gap:10px;margin-top:12px; }
+    .file-thumb { width:120px;border:1px solid #e8e8e8;border-radius:8px;overflow:hidden;cursor:pointer;transition:border-color 0.15s;position:relative; }
+    .file-thumb:hover { border-color:#1a73e8; }
+    .file-thumb img { width:100%;height:80px;object-fit:cover;display:block; }
+    .file-thumb .pdf-icon { width:100%;height:80px;display:flex;align-items:center;justify-content:center;background:#f8f8f8;font-size:2rem;color:#c5221f; }
+    .file-thumb .file-icon-generic { width:100%;height:80px;display:flex;align-items:center;justify-content:center;background:#f8f8f8;font-size:1.5rem;color:#888; }
+    .file-thumb-name { padding:4px 6px;font-size:0.7rem;color:#666;overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
+    .file-thumb-actions { position:absolute;top:4px;right:4px;display:none; }
+    .file-thumb:hover .file-thumb-actions { display:flex;gap:2px; }
+    .file-thumb-btn { background:rgba(255,255,255,0.9);border:1px solid #ddd;border-radius:4px;cursor:pointer;padding:2px 4px;font-size:0.65rem;color:#666; }
+    .file-thumb-btn:hover { color:#c5221f;border-color:#c5221f; }
+
+    .comments-section { margin-top:14px;border-top:1px solid #f0f0f0;padding-top:10px; }
+    .comment-row { padding:6px 0;border-bottom:1px solid #f8f8f8; }
+    .comment-author { font-size:0.78rem;font-weight:500;color:#333; }
+    .comment-date { font-size:0.72rem;color:#999;margin-left:8px; }
+    .comment-text { font-size:0.84rem;color:#444;margin-top:2px; }
+    .comment-input { display:flex;gap:8px;margin-top:8px; }
+    .comment-input input { flex:1;border:1px solid #ddd;border-radius:6px;padding:6px 10px;font-size:0.85rem;outline:none; }
+    .comment-input input:focus { border-color:#1a73e8; }
+
+    .empty-state { text-align:center;padding:48px 24px;color:#bbb; }
+    .loading { text-align:center;padding:32px;color:#bbb; }
+    .field-group { margin-bottom:12px; }
+    .field-group label { display:block;font-size:0.82rem;color:#666;margin-bottom:4px; }
+    .field-group input, .field-group select, .field-group textarea {
+      width:100%;border:1px solid #ddd;border-radius:6px;padding:8px 12px;font-size:0.9rem;outline:none;box-sizing:border-box;background:#fff;
+    }
+    .field-group textarea { resize:vertical;min-height:50px; }
+
+    /* Image lightbox */
+    .lightbox { display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:500;align-items:center;justify-content:center;cursor:pointer; }
+    .lightbox.open { display:flex; }
+    .lightbox img { max-width:90vw;max-height:90vh;border-radius:8px; }
+  </style>
+</head>
+<body>
+  <header id="header"></header>
+  <div id="guest-view"><h2 id="t-guest-title"></h2><p id="t-guest-sub"></p></div>
+
+  <div id="app-view" style="display:none">
+    <div class="page-wrap">
+      <div class="page-toolbar">
+        <h2 id="t-page-title"></h2>
+        <select class="filter-select" id="filter-folder" style="min-width:200px"><option value="">—</option></select>
+        <button class="btn btn-primary" id="btn-add-mat" style="display:none"></button>
+      </div>
+      <div id="mat-list"></div>
+    </div>
+  </div>
+
+  <!-- Модалка: материал -->
+  <div class="modal-overlay" id="modal-mat">
+    <div class="modal" style="width:500px;max-width:95vw">
+      <h3 id="t-modal-mat-title"></h3>
+      <div class="field-group">
+        <label class="required" id="lbl-mat-name"></label>
+        <input type="text" id="mat-name">
+      </div>
+      <div class="field-group">
+        <label id="lbl-mat-desc"></label>
+        <textarea id="mat-desc" rows="3"></textarea>
+      </div>
+      <div class="field-group">
+        <label id="lbl-mat-status"></label>
+        <select id="mat-status">
+          <option value="pending_approval"></option>
+          <option value="approved"></option>
+          <option value="rejected"></option>
+          <option value="archived"></option>
+        </select>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-outline" id="btn-mat-cancel"></button>
+        <button class="btn btn-primary" id="btn-mat-save"></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Lightbox -->
+  <div class="lightbox" id="lightbox" onclick="this.classList.remove('open')">
+    <img id="lightbox-img" src="">
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    let allMaterials = [];
+    let foldersCache = [];
+    let selectedFolder = '';
+    let accessLevel = 'none';
+    let currentMatMode = 'create';
+    let currentMatId = null;
+    let expandedMat = {};
+    let matFiles = {};
+    let matComments = {};
+
+    function formatDate(val) {
+      if (!val) return '—';
+      const d = new Date(val.value || val);
+      if (isNaN(d)) return '—';
+      return `${String(d.getUTCDate()).padStart(2,'0')}.${String(d.getUTCMonth()+1).padStart(2,'0')}.${d.getUTCFullYear()}`;
+    }
+    function showToast(msg, type) {
+      const el = document.getElementById('toast');
+      el.textContent = msg; el.className = 'toast show' + (type ? ' ' + type : '');
+      clearTimeout(el._t); el._t = setTimeout(() => el.className = 'toast', 3000);
+    }
+    function openModal(id) { document.getElementById(id).classList.add('open'); }
+    function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+    function statusBadge(s) {
+      const map = {
+        pending_approval: ['status-pending', t('statusPending')],
+        approved: ['status-approved', t('statusApproved')],
+        rejected: ['status-rejected', t('statusRejected')],
+        archived: ['status-archived', t('statusArchived')],
+      };
+      const [cls, label] = map[s] || ['status-archived', s || '—'];
+      return `<span class="status-badge ${cls}">${label}</span>`;
+    }
+
+    function isImage(contentType, fileName) {
+      if (contentType && contentType.startsWith('image/')) return true;
+      const ext = (fileName || '').split('.').pop().toLowerCase();
+      return ['jpg','jpeg','png','gif','webp','bmp','svg'].includes(ext);
+    }
+
+    function isPdf(contentType, fileName) {
+      if (contentType === 'application/pdf') return true;
+      return (fileName || '').toLowerCase().endsWith('.pdf');
+    }
+
+    function updateTexts() {
+      document.getElementById('t-guest-title').textContent = t('guestTitle');
+      document.getElementById('t-guest-sub').textContent = t('guestSub');
+      document.getElementById('t-page-title').textContent = t('materials');
+      document.getElementById('btn-add-mat').textContent = t('addMaterial');
+      document.getElementById('lbl-mat-name').textContent = t('name');
+      document.getElementById('lbl-mat-desc').textContent = t('description');
+      document.getElementById('lbl-mat-status').textContent = t('statusLabel');
+      document.getElementById('mat-status').options[0].text = t('statusPending');
+      document.getElementById('mat-status').options[1].text = t('statusApproved');
+      document.getElementById('mat-status').options[2].text = t('statusRejected');
+      document.getElementById('mat-status').options[3].text = t('statusArchived');
+      document.getElementById('btn-mat-cancel').textContent = t('cancel');
+      document.getElementById('btn-mat-save').textContent = t('save');
+      updateHeaderTexts();
+    }
+
+    async function loadRefs() {
+      try { foldersCache = await apiFetch('/folders'); } catch(e) { foldersCache = []; }
+      const sel = document.getElementById('filter-folder');
+      sel.innerHTML = `<option value="">${t('portalSelectProject')}</option>`;
+      foldersCache.forEach(f => {
+        if (f.status === 'archive') return;
+        const opt = document.createElement('option');
+        opt.value = f.id; opt.textContent = f.name;
+        sel.appendChild(opt);
+      });
+    }
+
+    document.getElementById('filter-folder').addEventListener('change', e => {
+      selectedFolder = e.target.value;
+      expandedMat = {}; matFiles = {}; matComments = {};
+      if (selectedFolder) loadMaterials();
+      else document.getElementById('mat-list').innerHTML = `<div class="empty-state">${t('portalSelectProject')}</div>`;
+    });
+
+    async function loadMaterials() {
+      const list = document.getElementById('mat-list');
+      list.innerHTML = `<div class="loading">${t('loading')}</div>`;
+      try {
+        const data = await apiFetch(`/materials?folder_id=${selectedFolder}`);
+        allMaterials = data.rows || [];
+        accessLevel = data.access_level || 'none';
+        document.getElementById('btn-add-mat').style.display = accessLevel === 'editor' ? '' : 'none';
+        renderMaterials();
+      } catch(e) { list.innerHTML = `<div class="empty-state">${e.message}</div>`; }
+    }
+
+    function renderMaterials() {
+      const list = document.getElementById('mat-list');
+      if (!allMaterials.length) { list.innerHTML = `<div class="empty-state">${t('noMaterials')}</div>`; return; }
+
+      list.innerHTML = allMaterials.map(m => {
+        const isExp = expandedMat[m.id];
+        return `
+        <div class="mat-card" data-mat-id="${m.id}">
+          <div class="mat-card-header">
+            <div>
+              <div class="mat-card-name">${m.name || '—'}</div>
+              ${m.description ? `<div class="mat-card-desc">${m.description}</div>` : ''}
+              <div class="mat-card-meta">
+                ${statusBadge(m.status)}
+                ${m.status_date ? ` · ${formatDate(m.status_date)}` : ''}
+                ${m.status_by ? ` · ${m.status_by}` : ''}
+                · ${m.file_count || 0} ${t('file').toLowerCase()}
+                · ${m.comment_count || 0} ${t('comments').toLowerCase()}
+              </div>
+            </div>
+            <div style="display:flex;gap:4px;align-items:center;flex-shrink:0">
+              ${accessLevel === 'editor' ? `
+                <button class="btn btn-outline" style="padding:2px 8px;font-size:0.75rem" data-action="edit-mat" data-id="${m.id}">${t('edit')}</button>
+                <button class="btn btn-outline" style="padding:2px 8px;font-size:0.75rem" data-action="upload-file" data-id="${m.id}">${t('addFile')}</button>
+                <button class="btn btn-outline" style="padding:2px 8px;font-size:0.75rem;color:#c5221f" data-action="delete-mat" data-id="${m.id}">${t('delete')}</button>
+              ` : ''}
+              <button style="background:none;border:none;cursor:pointer;font-size:0.8rem;color:#888;padding:4px" data-action="toggle-expand" data-id="${m.id}">${isExp ? '▾' : '▸'}</button>
+            </div>
+          </div>
+          ${isExp ? `<div id="mat-detail-${m.id}"><div class="loading" style="padding:12px">${t('loading')}</div></div>` : ''}
+        </div>`;
+      }).join('');
+
+      allMaterials.forEach(m => { if (expandedMat[m.id]) loadMatDetail(m.id); });
+    }
+
+    async function loadMatDetail(matId) {
+      const inner = document.getElementById(`mat-detail-${matId}`);
+      if (!inner) return;
+      try {
+        const [files, comments] = await Promise.all([
+          apiFetch(`/materials/${matId}/files`),
+          apiFetch(`/materials/${matId}/comments`),
+        ]);
+        matFiles[matId] = files;
+        matComments[matId] = comments;
+        renderMatDetail(matId);
+      } catch(e) { inner.innerHTML = `<div style="color:#c33">${e.message}</div>`; }
+    }
+
+    function renderMatDetail(matId) {
+      const inner = document.getElementById(`mat-detail-${matId}`);
+      if (!inner) return;
+      const files = matFiles[matId] || [];
+      const comments = matComments[matId] || [];
+
+      // Files
+      let html = '<div class="files-grid">';
+      files.forEach(f => {
+        if (isImage(f.content_type, f.file_name)) {
+          html += `<div class="file-thumb" data-action="view-image" data-file-id="${f.id}">
+            <img src="" data-lazy-file-id="${f.id}" alt="${f.file_name}">
+            <div class="file-thumb-name">${f.file_name}</div>
+            <div class="file-thumb-actions">
+              <button class="file-thumb-btn" data-action="download-file" data-file-id="${f.id}">⬇</button>
+              ${accessLevel === 'editor' ? `<button class="file-thumb-btn" data-action="delete-file" data-file-id="${f.id}" data-mat-id="${matId}">×</button>` : ''}
+            </div>
+          </div>`;
+        } else if (isPdf(f.content_type, f.file_name)) {
+          html += `<div class="file-thumb">
+            <div class="pdf-icon">📄</div>
+            <div class="file-thumb-name">${f.file_name}</div>
+            <div class="file-thumb-actions">
+              <button class="file-thumb-btn" data-action="download-file" data-file-id="${f.id}">⬇</button>
+              ${accessLevel === 'editor' ? `<button class="file-thumb-btn" data-action="delete-file" data-file-id="${f.id}" data-mat-id="${matId}">×</button>` : ''}
+            </div>
+          </div>`;
+        } else {
+          html += `<div class="file-thumb">
+            <div class="file-icon-generic">📎</div>
+            <div class="file-thumb-name">${f.file_name}</div>
+            <div class="file-thumb-actions">
+              <button class="file-thumb-btn" data-action="download-file" data-file-id="${f.id}">⬇</button>
+              ${accessLevel === 'editor' ? `<button class="file-thumb-btn" data-action="delete-file" data-file-id="${f.id}" data-mat-id="${matId}">×</button>` : ''}
+            </div>
+          </div>`;
+        }
+      });
+      if (!files.length) html += `<div style="color:#ccc;font-size:0.82rem;padding:8px">—</div>`;
+      html += '</div>';
+
+      // Comments
+      html += `<div class="comments-section">
+        <div style="font-size:0.78rem;font-weight:600;color:#888;text-transform:uppercase;margin-bottom:6px">${t('comments')} (${comments.length})</div>`;
+      comments.forEach(c => {
+        html += `<div class="comment-row">
+          <span class="comment-author">${c.author_name || c.author_email}</span>
+          <span class="comment-date">${formatDate(c.created_at)}</span>
+          <div class="comment-text">${c.text}</div>
+        </div>`;
+      });
+      html += `<div class="comment-input">
+        <input type="text" id="comment-input-${matId}" placeholder="${t('addComment')}...">
+        <button class="btn btn-primary" style="padding:4px 12px;font-size:0.78rem" data-action="add-comment" data-mat-id="${matId}">${t('addComment')}</button>
+      </div></div>`;
+
+      inner.innerHTML = html;
+
+      // Lazy load image thumbnails
+      files.forEach(f => {
+        if (isImage(f.content_type, f.file_name)) {
+          const img = inner.querySelector(`[data-lazy-file-id="${f.id}"]`);
+          if (img) {
+            apiFetch(`/materials/files/${f.id}/signed-view-url`).then(r => { img.src = r.url; }).catch(() => {});
+          }
+        }
+      });
+    }
+
+    // ─── Actions ───
+
+    document.addEventListener('click', async e => {
+      const btn = e.target.closest('[data-action]');
+      if (!btn) return;
+      const action = btn.dataset.action;
+
+      if (action === 'toggle-expand') {
+        const id = btn.dataset.id;
+        expandedMat[id] = !expandedMat[id];
+        renderMaterials();
+        return;
+      }
+
+      if (action === 'view-image') {
+        const fileId = btn.dataset.fileId || btn.closest('[data-file-id]')?.dataset.fileId;
+        if (!fileId) return;
+        try {
+          const r = await apiFetch(`/materials/files/${fileId}/signed-view-url`);
+          document.getElementById('lightbox-img').src = r.url;
+          document.getElementById('lightbox').classList.add('open');
+        } catch(err) { showToast(err.message, 'error'); }
+        return;
+      }
+
+      if (action === 'download-file') {
+        e.stopPropagation();
+        try {
+          const r = await apiFetch(`/materials/files/${btn.dataset.fileId}/signed-download-url`);
+          if (r.url) window.open(r.url, '_blank');
+        } catch(err) { showToast(err.message, 'error'); }
+      }
+
+      if (action === 'delete-file') {
+        e.stopPropagation();
+        if (!confirm(t('confirmDelete'))) return;
+        btn.disabled = true;
+        try {
+          await apiFetch(`/materials/files/${btn.dataset.fileId}`, { method: 'DELETE' });
+          showToast(t('deleted'), 'success');
+          loadMatDetail(btn.dataset.matId);
+        } catch(err) { showToast(err.message, 'error'); btn.disabled = false; }
+      }
+
+      if (action === 'upload-file') {
+        const matId = btn.dataset.id;
+        const input = document.createElement('input');
+        input.type = 'file'; input.multiple = true;
+        input.accept = 'image/*,.pdf,.doc,.docx,.xls,.xlsx';
+        input.onchange = async () => {
+          for (const file of input.files) {
+            showToast(t('uploading'));
+            try {
+              const contentType = file.type || 'application/octet-stream';
+              const { upload_url, file_url } = await apiFetch('/materials/signed-upload-url', {
+                method: 'POST',
+                body: JSON.stringify({ folder_id: selectedFolder, material_id: matId, file_name: file.name, content_type: contentType }),
+              });
+              await new Promise((resolve, reject) => {
+                const xhr = new XMLHttpRequest();
+                xhr.open('PUT', upload_url);
+                xhr.setRequestHeader('Content-Type', contentType);
+                xhr.onload = () => xhr.status === 200 ? resolve() : reject(new Error('Upload failed'));
+                xhr.onerror = () => reject(new Error('Upload error'));
+                xhr.send(file);
+              });
+              await apiFetch(`/materials/${matId}/files`, {
+                method: 'POST',
+                body: JSON.stringify({ file_url, file_name: file.name, file_size: file.size, content_type: contentType }),
+              });
+            } catch(err) { showToast(err.message, 'error'); }
+          }
+          showToast(t('uploaded'), 'success');
+          expandedMat[matId] = true;
+          loadMaterials();
+        };
+        input.click();
+      }
+
+      if (action === 'edit-mat') {
+        const m = allMaterials.find(x => x.id === btn.dataset.id);
+        if (!m) return;
+        currentMatMode = 'edit'; currentMatId = m.id;
+        document.getElementById('t-modal-mat-title').textContent = t('editMaterial');
+        document.getElementById('mat-name').value = m.name || '';
+        document.getElementById('mat-desc').value = m.description || '';
+        document.getElementById('mat-status').value = m.status || 'pending_approval';
+        openModal('modal-mat');
+      }
+
+      if (action === 'delete-mat') {
+        if (!confirm(t('confirmDelete'))) return;
+        btn.disabled = true;
+        try {
+          await apiFetch(`/materials/${btn.dataset.id}`, { method: 'DELETE' });
+          showToast(t('deleted'), 'success'); loadMaterials();
+        } catch(err) { showToast(err.message, 'error'); btn.disabled = false; }
+      }
+
+      if (action === 'add-comment') {
+        const matId = btn.dataset.matId;
+        const input = document.getElementById(`comment-input-${matId}`);
+        const text = input?.value?.trim();
+        if (!text) return;
+        btn.disabled = true;
+        try {
+          await apiFetch(`/materials/${matId}/comments`, {
+            method: 'POST',
+            body: JSON.stringify({ text, author_name: currentMe?.name || currentMe?.email || '' }),
+          });
+          input.value = '';
+          loadMatDetail(matId);
+        } catch(err) { showToast(err.message, 'error'); }
+        btn.disabled = false;
+      }
+    });
+
+    // ─── Create material ───
+
+    document.getElementById('btn-add-mat').addEventListener('click', () => {
+      currentMatMode = 'create'; currentMatId = null;
+      document.getElementById('t-modal-mat-title').textContent = t('addMaterial');
+      document.getElementById('mat-name').value = '';
+      document.getElementById('mat-desc').value = '';
+      document.getElementById('mat-status').value = 'pending_approval';
+      openModal('modal-mat');
+    });
+
+    document.getElementById('btn-mat-cancel').addEventListener('click', () => closeModal('modal-mat'));
+    document.getElementById('btn-mat-save').addEventListener('click', async () => {
+      const name = document.getElementById('mat-name').value.trim();
+      if (!name) { document.getElementById('mat-name').classList.add('invalid'); showToast(t('fillAllFields'), 'error'); return; }
+      document.getElementById('mat-name').classList.remove('invalid');
+
+      const body = {
+        folder_id: selectedFolder,
+        name,
+        description: document.getElementById('mat-desc').value.trim(),
+        status: document.getElementById('mat-status').value,
+      };
+
+      closeModal('modal-mat');
+      try {
+        if (currentMatMode === 'create') {
+          const r = await apiFetch('/materials', { method: 'POST', body: JSON.stringify(body) });
+          expandedMat[r.id] = true;
+        } else {
+          await apiFetch(`/materials/${currentMatId}`, { method: 'PUT', body: JSON.stringify(body) });
+        }
+        showToast(t('saved'), 'success'); loadMaterials();
+      } catch(e) { showToast(e.message, 'error'); }
+    });
+
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeModal('modal-mat'); document.getElementById('lightbox').classList.remove('open'); } });
+
+    window.onLogin = async () => { updateTexts(); await loadRefs(); };
+    window.onLogout = () => { updateTexts(); };
+    window.onLangChange = () => { updateTexts(); if (allMaterials.length) renderMaterials(); };
+
+    renderHeader('materials');
+    updateTexts();
+  </script>
+</body>
+</html>
