@@ -13,7 +13,6 @@ function renderHeader(activePage) {
       <a href="invoices.html" class="nav-link ${activePage === 'invoices' ? 'active' : ''}" id="t-nav-invoices"></a>
       <a href="finance.html"  class="nav-link ${activePage === 'finance'  ? 'active' : ''}" id="t-nav-finance"></a>
       <a href="statements.html" class="nav-link ${activePage === 'statements' ? 'active' : ''}" id="t-nav-statements"></a>
-      <a href="reports.html"  class="nav-link ${activePage === 'reports'  ? 'active' : ''}" id="t-nav-reports"></a>
       <div class="nav-dropdown" id="nav-settings" style="display:none">
         <a class="nav-link ${['folders','companies','users','categories','portal'].includes(activePage) ? 'active' : ''}" id="t-nav-settings">⚙</a>
         <div class="nav-dropdown-menu">
@@ -99,7 +98,7 @@ function updateHeaderTexts() {
   const ni = document.getElementById('t-nav-invoices');
   const nfi = document.getElementById('t-nav-finance');
   const ns  = document.getElementById('t-nav-statements');
-  const nr = document.getElementById('t-nav-reports');
+  // const nr - reports removed
   const nc = document.getElementById('t-nav-companies');
   const nu = document.getElementById('t-nav-users');
   const ncat = document.getElementById('t-nav-categories');
@@ -137,13 +136,13 @@ function updateHeaderTexts() {
     const me4 = typeof currentMe !== 'undefined' ? currentMe : null;
     nmat.style.display = (me4 && (me4.is_admin === true || me4.has_materials_access === true)) ? '' : 'none';
   }
-  if (nr) nr.textContent = t('navReports');
+  // reports removed
   if (nc) nc.textContent = t('navCompanies');
   if (nu) nu.textContent = t('navUsers');
   if (ncat) ncat.textContent = t('navCategories');
   const nportal = document.getElementById('t-nav-portal');
   if (nportal) nportal.textContent = t('navPortal');
-  if (nsett) nsett.textContent = '⚙ ' + t('navSettings');
+  if (nsett) nsett.textContent = '⚙';
   if (settWrap) settWrap.style.display = (typeof isAdmin !== 'undefined' && isAdmin) ? 'inline-flex' : 'none';
   if (lb) lb.textContent = t('logout');
   if (nt) nt.textContent = t('notifications');
@@ -212,13 +211,13 @@ function updateTelegramStatus(hasChatId) {
   if (!btn) return;
   btn.style.display = 'block';
   if (hasChatId) {
-    btn.textContent = '✓ Telegram';
+    btn.textContent = '✓ TG';
     btn.style.background = '#444';
     btn.style.color = '#fff';
     btn.style.pointerEvents = 'none';
     btn.style.cursor = 'default';
   } else {
-    btn.textContent = 'Link Telegram';
+    btn.textContent = 'TG';
     btn.style.background = '#c5221f';
     btn.style.color = '#fff';
     btn.style.pointerEvents = 'auto';

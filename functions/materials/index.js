@@ -1,6 +1,7 @@
 const { BigQuery } = require('@google-cloud/bigquery');
 const { Storage }  = require('@google-cloud/storage');
 const { v4: uuidv4 } = require('uuid');
+const sharp = require('sharp');
 
 const bigquery = new BigQuery();
 const storage  = new Storage();
@@ -74,6 +75,21 @@ const matTable  = `\`${PROJECT}.${DATASET}.materials\``;
 const mfTable   = `\`${PROJECT}.${DATASET}.material_files\``;
 const mcTable   = `\`${PROJECT}.${DATASET}.material_comments\``;
 
+async function addAutoComment(materialId, email, text) {
+  await bigquery.query({
+    query: `INSERT INTO ${mcTable} (id, material_id, text, author_email, author_name, created_at)
+            VALUES (@id, @matId, @text, @email, '⚙ system', CURRENT_TIMESTAMP())`,
+    params: { id: uuidv4(), matId: materialId, text, email },
+  });
+}
+
+const STATUS_LABELS = {
+  pending_approval: 'Pending approval',
+  approved: 'Approved',
+  rejected: 'Rejected',
+  archived: 'Archived',
+};
+
 exports.materials = async (req, res) => {
   setCors(res);
   if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
@@ -123,10 +139,12 @@ exports.materials = async (req, res) => {
     if (req.method === 'GET' && path.includes('/files/') && path.endsWith('/signed-view-url')) {
       const fileId = path.split('/files/')[1].split('/')[0];
       const [rows] = await bigquery.query({
-        query: `SELECT file_url, file_name, content_type FROM ${mfTable} WHERE id = @id`,
+        query: `SELECT file_url, file_name, content_type, thumb_url FROM ${mfTable} WHERE id = @id`,
         params: { id: fileId },
       });
       if (!rows.length) { res.status(404).json({ error: 'Not found' }); return; }
+
+      // Return both thumb and original signed URLs
       const parsed = parseKey(rows[0].file_url);
       if (!parsed) { res.status(500).json({ error: 'Bad file URL' }); return; }
       const [url] = await storage.bucket(parsed.bucket).file(parsed.key).getSignedUrl({
@@ -134,7 +152,21 @@ exports.materials = async (req, res) => {
         expires: Date.now() + SIGN_TTL_MS,
         responseType: rows[0].content_type || 'application/octet-stream',
       });
-      res.json({ url });
+
+      let thumb_signed = '';
+      if (rows[0].thumb_url) {
+        const tp = parseKey(rows[0].thumb_url);
+        if (tp) {
+          const [tu] = await storage.bucket(tp.bucket).file(tp.key).getSignedUrl({
+            version: 'v4', action: 'read',
+            expires: Date.now() + SIGN_TTL_MS,
+            responseType: 'image/jpeg',
+          });
+          thumb_signed = tu;
+        }
+      }
+
+      res.json({ url, thumb_url: thumb_signed || '' });
       return;
     }
 
@@ -143,7 +175,7 @@ exports.materials = async (req, res) => {
       const matId = path.split('/').filter(Boolean)[0];
       const [rows] = await bigquery.query({
         query: `SELECT id, material_id, text, author_email, author_name, created_at
-                FROM ${mcTable} WHERE material_id = @id ORDER BY created_at ASC`,
+                FROM ${mcTable} WHERE material_id = @id ORDER BY created_at DESC`,
         params: { id: matId },
       });
       res.json(rows);
@@ -169,7 +201,7 @@ exports.materials = async (req, res) => {
     if (req.method === 'GET' && path.endsWith('/files')) {
       const matId = path.split('/').filter(Boolean)[0];
       const [rows] = await bigquery.query({
-        query: `SELECT id, material_id, file_url, file_name, file_size, content_type, uploaded_by, uploaded_at
+        query: `SELECT id, material_id, file_url, file_name, file_size, content_type, thumb_url, uploaded_by, uploaded_at
                 FROM ${mfTable} WHERE material_id = @id ORDER BY uploaded_at ASC`,
         params: { id: matId },
       });
@@ -183,11 +215,29 @@ exports.materials = async (req, res) => {
       const { file_url, file_name, file_size, content_type } = req.body || {};
       if (!file_url) { res.status(400).json({ error: 'file_url required' }); return; }
       const id = uuidv4();
+      // Generate thumbnail if image
+      let thumb_url = '';
+      const isImg = (content_type || '').startsWith('image/') ||
+        /\.(jpg|jpeg|png|gif|webp|bmp)$/i.test(file_name || '');
+      if (isImg && file_url) {
+        try {
+          const parsed = parseKey(file_url);
+          if (parsed) {
+            const [buffer] = await storage.bucket(parsed.bucket).file(parsed.key).download();
+            const thumbBuffer = await sharp(buffer).resize(300, 300, { fit: 'inside', withoutEnlargement: true }).jpeg({ quality: 70 }).toBuffer();
+            const thumbKey = parsed.key.replace(/(\.[^.]+)$/, '_thumb.jpg');
+            await storage.bucket(parsed.bucket).file(thumbKey).save(thumbBuffer, { metadata: { contentType: 'image/jpeg' } });
+            thumb_url = `https://storage.googleapis.com/${parsed.bucket}/${thumbKey}`;
+          }
+        } catch(e) { console.error('Thumbnail generation failed:', e.message); }
+      }
+
       await bigquery.query({
-        query: `INSERT INTO ${mfTable} (id, material_id, file_url, file_name, file_size, content_type, uploaded_by, uploaded_at)
-                VALUES (@id, @matId, @file_url, @file_name, @file_size, @content_type, @email, CURRENT_TIMESTAMP())`,
-        params: { id, matId, file_url, file_name: file_name || '', file_size: parseInt(file_size || 0), content_type: content_type || '', email },
+        query: `INSERT INTO ${mfTable} (id, material_id, file_url, file_name, file_size, content_type, thumb_url, uploaded_by, uploaded_at)
+                VALUES (@id, @matId, @file_url, @file_name, @file_size, @content_type, NULLIF(@thumb_url,''), @email, CURRENT_TIMESTAMP())`,
+        params: { id, matId, file_url, file_name: file_name || '', file_size: parseInt(file_size || 0), content_type: content_type || '', thumb_url, email },
       });
+      await addAutoComment(matId, email, `File added: ${file_name || 'file'}`);
       res.json({ success: true, id });
       return;
     }
@@ -197,7 +247,7 @@ exports.materials = async (req, res) => {
       const fileId = path.split('/files/')[1]?.split('/')[0]?.split('?')[0];
       if (!fileId) { res.status(400).json({ error: 'file id required' }); return; }
       const [rows] = await bigquery.query({
-        query: `SELECT file_url FROM ${mfTable} WHERE id = @id`, params: { id: fileId },
+        query: `SELECT file_url, file_name, material_id, thumb_url FROM ${mfTable} WHERE id = @id`, params: { id: fileId },
       });
       if (rows.length) {
         const parsed = parseKey(rows[0].file_url);
@@ -205,6 +255,14 @@ exports.materials = async (req, res) => {
           try { await storage.bucket(parsed.bucket).file(parsed.key).delete({ ignoreNotFound: true }); }
           catch(e) { console.error('GCS delete failed', e.message); }
         }
+        if (rows[0].thumb_url) {
+          const tp = parseKey(rows[0].thumb_url);
+          if (tp) {
+            try { await storage.bucket(tp.bucket).file(tp.key).delete({ ignoreNotFound: true }); }
+            catch(e) { console.error('Thumb delete failed', e.message); }
+          }
+        }
+        await addAutoComment(rows[0].material_id, email, `File deleted: ${rows[0].file_name || 'file'}`);
       }
       await bigquery.query({ query: `DELETE FROM ${mfTable} WHERE id = @id`, params: { id: fileId } });
       res.json({ success: true });
@@ -216,10 +274,19 @@ exports.materials = async (req, res) => {
       const matId = path.split('/').filter(Boolean)[0];
       const { status } = req.body || {};
       if (!status) { res.status(400).json({ error: 'status required' }); return; }
+
+      // Get old status for auto-comment
+      const [old] = await bigquery.query({
+        query: `SELECT status FROM ${matTable} WHERE id = @id`, params: { id: matId },
+      });
+      const oldStatus = old[0]?.status || '—';
+
       await bigquery.query({
         query: `UPDATE ${matTable} SET status = @status, status_date = CURRENT_TIMESTAMP(), status_by = @email WHERE id = @id`,
         params: { id: matId, status, email },
       });
+
+      await addAutoComment(matId, email, `Status changed: ${STATUS_LABELS[oldStatus] || oldStatus} → ${STATUS_LABELS[status] || status}`);
       res.json({ success: true });
       return;
     }
@@ -274,6 +341,7 @@ exports.materials = async (req, res) => {
           sort_order: parseInt(b.sort_order || 0), email,
         },
       });
+      await addAutoComment(id, email, `Material created: ${b.name}`);
       res.json({ success: true, id });
       return;
     }

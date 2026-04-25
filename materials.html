@@ -270,7 +270,7 @@
       files.forEach(f => {
         if (isImage(f.content_type, f.file_name)) {
           html += `<div class="file-thumb" data-action="view-image" data-file-id="${f.id}">
-            <img src="" data-lazy-file-id="${f.id}" alt="${f.file_name}">
+            <img src="" data-lazy-file-id="${f.id}" data-thumb-url="${f.thumb_url || ''}" alt="${f.file_name}">
             <div class="file-thumb-name">${f.file_name}</div>
             <div class="file-thumb-actions">
               <button class="file-thumb-btn" data-action="download-file" data-file-id="${f.id}">⬇</button>
@@ -322,7 +322,9 @@
         if (isImage(f.content_type, f.file_name)) {
           const img = inner.querySelector(`[data-lazy-file-id="${f.id}"]`);
           if (img) {
-            apiFetch(`/materials/files/${f.id}/signed-view-url`).then(r => { img.src = r.url; }).catch(() => {});
+            apiFetch(`/materials/files/${f.id}/signed-view-url`).then(r => {
+              img.src = r.thumb_url || r.url; // Use thumbnail if available
+            }).catch(() => {});
           }
         }
       });
