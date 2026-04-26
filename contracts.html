@@ -701,6 +701,12 @@
           <div style="font-size:0.85rem;color:#333;white-space:pre-wrap">${contract.progress_notes}</div>
         </div>`;
       }
+      if (contract?.notes) {
+        html += `<div style="margin-bottom:12px;padding:10px 14px;background:#fff;border:1px solid #e8e8e8;border-radius:8px">
+          <div style="font-size:0.75rem;color:#888;text-transform:uppercase;margin-bottom:4px">${t('notes')}</div>
+          <div style="font-size:0.85rem;color:#333;white-space:pre-wrap">${contract.notes}</div>
+        </div>`;
+      }
       html += renderFileList(cFiles, 'contract', contractId, contractId);
 
       html += `<div style="display:flex;gap:8px;margin:10px 0">

@@ -251,12 +251,12 @@
       const inner = document.getElementById(`mat-detail-${matId}`);
       if (!inner) return;
       try {
-        const [files, comments] = await Promise.all([
+        const [files, commentsData] = await Promise.all([
           apiFetch(`/materials/${matId}/files`),
-          apiFetch(`/materials/${matId}/comments`),
+          apiFetch(`/materials/${matId}/comments?limit=5&offset=0`),
         ]);
         matFiles[matId] = files;
-        matComments[matId] = comments;
+        matComments[matId] = { rows: commentsData.rows || commentsData, hasMore: commentsData.hasMore, offset: 5 };
         renderMatDetail(matId);
       } catch(e) { inner.innerHTML = `<div style="color:#c33">${e.message}</div>`; }
     }
@@ -265,7 +265,8 @@
       const inner = document.getElementById(`mat-detail-${matId}`);
       if (!inner) return;
       const files = matFiles[matId] || [];
-      const comments = matComments[matId] || [];
+      const commentsData = matComments[matId] || { rows: [], hasMore: false, offset: 0 };
+      const comments = commentsData.rows || [];
 
       // Files
       let html = '<div class="files-grid">';
@@ -304,7 +305,7 @@
 
       // Comments
       html += `<div class="comments-section">
-        <div style="font-size:0.78rem;font-weight:600;color:#888;text-transform:uppercase;margin-bottom:6px">${t('comments')} (${comments.length})</div>`;
+        <div style="font-size:0.78rem;font-weight:600;color:#888;text-transform:uppercase;margin-bottom:6px">${t('comments')}</div>`;
       comments.forEach(c => {
         html += `<div class="comment-row">
           <span class="comment-author">${c.author_name || c.author_email}</span>
@@ -312,6 +313,9 @@
           <div class="comment-text">${c.text}</div>
         </div>`;
       });
+      if (commentsData.hasMore) {
+        html += `<div style="margin-top:6px"><button class="btn btn-outline" style="font-size:0.75rem;padding:3px 12px" data-action="load-more-comments" data-mat-id="${matId}">${t('loading')}...</button></div>`;
+      }
       html += `<div class="comment-input">
         <input type="text" id="comment-input-${matId}" placeholder="${t('addComment')}...">
         <button class="btn btn-primary" style="padding:4px 12px;font-size:0.78rem" data-action="add-comment" data-mat-id="${matId}">${t('addComment')}</button>
@@ -428,6 +432,21 @@
         try {
           await apiFetch(`/materials/${btn.dataset.id}`, { method: 'DELETE' });
           showToast(t('deleted'), 'success'); loadMaterials();
+        } catch(err) { showToast(err.message, 'error'); btn.disabled = false; }
+      }
+
+      if (action === 'load-more-comments') {
+        const matId = btn.dataset.matId;
+        const cd = matComments[matId];
+        if (!cd) return;
+        btn.disabled = true;
+        try {
+          const moreData = await apiFetch(`/materials/${matId}/comments?limit=5&offset=${cd.offset}`);
+          const moreRows = moreData.rows || moreData;
+          cd.rows = [...cd.rows, ...moreRows];
+          cd.hasMore = moreData.hasMore;
+          cd.offset += moreRows.length;
+          renderMatDetail(matId);
         } catch(err) { showToast(err.message, 'error'); btn.disabled = false; }
       }
 

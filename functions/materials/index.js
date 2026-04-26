@@ -75,11 +75,26 @@ const matTable  = `\`${PROJECT}.${DATASET}.materials\``;
 const mfTable   = `\`${PROJECT}.${DATASET}.material_files\``;
 const mcTable   = `\`${PROJECT}.${DATASET}.material_comments\``;
 
+async function getUserName(email) {
+  const [rows] = await bigquery.query({
+    query: `SELECT name FROM \`${PROJECT}.${DATASET}.users\` WHERE email = @email`,
+    params: { email },
+  });
+  if (rows[0]?.name) return rows[0].name;
+  // Check portal users
+  const [pr] = await bigquery.query({
+    query: `SELECT name FROM \`${PROJECT}.${DATASET}.portal_users\` WHERE email = @email`,
+    params: { email },
+  });
+  return pr[0]?.name || email;
+}
+
 async function addAutoComment(materialId, email, text) {
+  const authorName = await getUserName(email);
   await bigquery.query({
     query: `INSERT INTO ${mcTable} (id, material_id, text, author_email, author_name, created_at)
-            VALUES (@id, @matId, @text, @email, '⚙ system', CURRENT_TIMESTAMP())`,
-    params: { id: uuidv4(), matId: materialId, text, email },
+            VALUES (@id, @matId, @text, @email, @author_name, CURRENT_TIMESTAMP())`,
+    params: { id: uuidv4(), matId: materialId, text, email, author_name: authorName },
   });
 }
 
@@ -173,12 +188,17 @@ exports.materials = async (req, res) => {
     // GET /materials/:id/comments
     if (req.method === 'GET' && path.endsWith('/comments')) {
       const matId = path.split('/').filter(Boolean)[0];
+      const limit = parseInt(req.query.limit || 5);
+      const offset = parseInt(req.query.offset || 0);
       const [rows] = await bigquery.query({
         query: `SELECT id, material_id, text, author_email, author_name, created_at
-                FROM ${mcTable} WHERE material_id = @id ORDER BY created_at DESC`,
+                FROM ${mcTable} WHERE material_id = @id ORDER BY created_at DESC
+                LIMIT ${limit + 1} OFFSET ${offset}`,
         params: { id: matId },
       });
-      res.json(rows);
+      const hasMore = rows.length > limit;
+      if (hasMore) rows.pop();
+      res.json({ rows, hasMore, offset });
       return;
     }
 
