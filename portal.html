@@ -106,6 +106,7 @@
       <div class="page-toolbar">
         <h2 id="t-page-title"></h2>
         <select class="filter-select" id="filter-folder"></select>
+        <input type="text" class="filter-select" id="portal-search" placeholder="" style="min-width:150px">
       </div>
       <div class="ct-wrap">
         <table class="ct-table" id="contracts-table">
@@ -156,6 +157,8 @@
     let invoiceTrx = {};
     let contractFiles = {};
     let selectedFolder = '';
+    let portalSearchText = '';
+    let portalSearchDebounce = null;
 
     function fmt(v) {
       const n = typeof v === 'object' ? parseFloat(v?.value || v) : parseFloat(v);
@@ -200,6 +203,8 @@
       document.getElementById('t-portal-welcome').textContent = t('portalWelcome');
       document.getElementById('t-portal-login-hint').textContent = t('guestSub');
       document.getElementById('portal-nav-contracts').textContent = t('portalContracts');
+      const ps = document.getElementById('portal-search');
+      if (ps) ps.placeholder = t('search');
       document.getElementById('portal-nav-materials').textContent = t('navMaterials');
       const matTitle = document.getElementById('t-mat-title');
       if (matTitle) matTitle.textContent = t('materials');
@@ -309,6 +314,12 @@
       else document.getElementById('ct-tbody').innerHTML = `<tr><td colspan="10" class="empty-state">${t('portalSelectProject')}</td></tr>`;
     });
 
+    document.getElementById('portal-search').addEventListener('input', e => {
+      portalSearchText = e.target.value.trim();
+      clearTimeout(portalSearchDebounce);
+      portalSearchDebounce = setTimeout(() => { if (selectedFolder) loadContracts(); }, 300);
+    });
+
     function updateTableHeaders() {
       const thead = document.getElementById('contracts-thead');
       if (!thead) return;
@@ -330,7 +341,9 @@
       updateTableHeaders();
 
       try {
-        const data = await portalFetch(`/portal_contracts?folder_id=${selectedFolder}`);
+        let portalUrl = `/portal_contracts?folder_id=${selectedFolder}`;
+        if (portalSearchText) portalUrl += `&search=${encodeURIComponent(portalSearchText)}`;
+        const data = await portalFetch(portalUrl);
         allContracts = data.rows;
         contractFiles = data.files || {};
         accessLevel = data.access_level || accessLevel;

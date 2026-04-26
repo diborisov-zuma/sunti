@@ -113,6 +113,7 @@ exports.contracts = async (req, res) => {
         params.email = email;
       }
 
+      if (req.query.search) { where += ' AND LOWER(c.name) LIKE LOWER(@search)'; params.search = `%${req.query.search.trim()}%`; }
       if (folder_id)     { where += ' AND c.folder_id = @folder_id'; params.folder_id = folder_id; }
       if (contractor_id) { where += ' AND c.contractor_id = @contractor_id'; params.contractor_id = contractor_id; }
       if (status && status !== 'all') { where += ' AND c.status = @status'; params.status = status; }

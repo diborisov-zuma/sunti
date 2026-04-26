@@ -91,6 +91,7 @@
         <div class="toolbar-right">
           <select class="filter-select" id="filter-company"><option value="">—</option></select>
           <select class="filter-select" id="filter-folder"><option value="">—</option></select>
+          <input type="text" class="filter-select" id="filter-search" placeholder="" style="min-width:160px">
           <select class="filter-select" id="filter-contractor"><option value="">—</option></select>
           <select class="filter-select" id="filter-status">
             <option value="active"></option>
@@ -374,6 +375,8 @@
     let filterFolder     = '';
     let filterContractor = '';
     let filterStatus     = 'active';
+    let filterSearch     = '';
+    let searchDebounce   = null;
     let expandedContracts = {};
     let expandedInvoices  = {};
     let expandedTrx       = {};
@@ -425,6 +428,7 @@
       document.getElementById('t-guest-title').textContent = t('guestTitle');
       document.getElementById('t-guest-sub').textContent = t('guestSub');
       document.getElementById('t-page-title').textContent = t('contracts');
+      document.getElementById('filter-search').placeholder = t('search');
       document.getElementById('btn-create').textContent = t('createContract');
 
       const fs = document.getElementById('filter-status');
@@ -553,6 +557,11 @@
       fillFolderFilter(); fillContractorFilter(); loadContracts();
     });
     document.getElementById('filter-folder').addEventListener('change', e => { filterFolder = e.target.value; loadContracts(); });
+    document.getElementById('filter-search').addEventListener('input', e => {
+      filterSearch = e.target.value.trim();
+      clearTimeout(searchDebounce);
+      searchDebounce = setTimeout(loadContracts, 300);
+    });
     document.getElementById('filter-contractor').addEventListener('change', e => { filterContractor = e.target.value; loadContracts(); });
     document.getElementById('filter-status').addEventListener('change', e => { filterStatus = e.target.value; loadContracts(); });
 
@@ -565,6 +574,7 @@
       tbody.innerHTML = `<tr><td colspan="12" class="loading">${t('loading')}</td></tr>`;
       try {
         let url = `/contracts?company_id=${filterCompany}&status=${filterStatus}`;
+        if (filterSearch) url += `&search=${encodeURIComponent(filterSearch)}`;
         if (filterFolder) url += `&folder_id=${filterFolder}`;
         if (filterContractor) url += `&contractor_id=${filterContractor}`;
         allContracts = await apiFetch(url);

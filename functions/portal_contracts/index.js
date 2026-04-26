@@ -235,8 +235,9 @@ exports.portal_contracts = async (req, res) => {
                 GROUP BY contract_id
               ) inv_agg ON inv_agg.contract_id = c.id
               WHERE c.folder_id = @fid AND IFNULL(c.status,'active') != 'deleted'
+              ${req.query.search ? 'AND LOWER(c.name) LIKE LOWER(@search)' : ''}
               ORDER BY c.date DESC NULLS LAST`,
-      params: { fid: folderId },
+      params: { fid: folderId, ...(req.query.search ? { search: `%${req.query.search.trim()}%` } : {}) },
     });
 
     // Load contract files
