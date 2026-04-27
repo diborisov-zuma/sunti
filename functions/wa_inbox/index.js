@@ -86,7 +86,7 @@ exports.wa_inbox = async (req, res) => {
                        media_url, media_filename, media_size, created_at
                 FROM ${msgTable}
                 WHERE contact_id = @cid
-                ORDER BY created_at ASC
+                ORDER BY created_at ASC, id ASC
                 LIMIT ${limit} OFFSET ${offset}`,
         params: { cid: contactId },
       });
