@@ -58,8 +58,12 @@ exports.wa_inbox = async (req, res) => {
         query: `SELECT c.id, c.phone, c.name, c.contact_type, c.contact_type_by,
                        c.notes, c.first_message_at, c.last_message_at,
                        c.message_count, c.is_new,
-                       (SELECT text FROM ${msgTable} WHERE contact_id = c.id ORDER BY created_at DESC LIMIT 1) AS last_text
+                       lm.text AS last_text
                 FROM ${contactTable} c
+                LEFT JOIN (
+                  SELECT contact_id, text, ROW_NUMBER() OVER (PARTITION BY contact_id ORDER BY created_at DESC) AS rn
+                  FROM ${msgTable}
+                ) lm ON lm.contact_id = c.id AND lm.rn = 1
                 ${where}
                 ORDER BY c.last_message_at DESC
                 LIMIT 100`,
