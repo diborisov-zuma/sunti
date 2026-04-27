@@ -71,37 +71,39 @@ exports.wa_webhook = async (req, res) => {
     const payloadStr = JSON.stringify(payload).substring(0, 10000);
     console.log('WA webhook:', payloadStr);
 
-    // Log raw payload for debugging
-    try {
-      await bigquery.query({
-        query: `INSERT INTO ${msgTable} (id, contact_id, phone, direction, message_type, text, wa_message_id, raw_data, created_at)
-                VALUES (@id, 'debug', 'debug', 'incoming', 'debug', @text, @wid, @raw, CURRENT_TIMESTAMP())`,
-        params: { id: uuidv4(), text: 'RAW WEBHOOK PAYLOAD', wid: 'debug_' + Date.now(), raw: payloadStr },
-      });
-    } catch(e) { console.error('Debug log failed:', e.message); }
+    // Debug logging removed — format known
 
-    // WhatsMonster webhook format varies — handle common structures
-    const data = payload.data || payload;
-    const event = data.event || payload.event || '';
+    // WhatsMonster format: { instance_id, data: { event, data: { messages: [...], type } } }
+    const outerData = payload.data || payload;
+    const event = outerData.event || '';
+    const innerData = outerData.data || outerData;
 
     // Only process message events
-    if (!['message', 'messages', 'chat'].includes(event) && !data.message && !data.messages) {
-      res.json({ ok: true, skipped: true });
-      return;
+    const messages = innerData.messages || outerData.messages || [];
+    if (!messages.length && !innerData.message) {
+      // Try flat format
+      if (outerData.message || payload.message) {
+        messages.push(outerData.message || payload);
+      } else {
+        res.json({ ok: true, skipped: true, event });
+        return;
+      }
     }
 
-    // Extract message data
-    const msg = data.message || data.messages?.[0] || data;
-    const from = msg.from || msg.sender || '';
-    const to = msg.to || msg.recipient || '';
-    const body = msg.body || msg.text || msg.message || '';
-    const waMessageId = msg.id || msg.key?.id || uuidv4();
-    const senderName = msg.pushName || msg.senderName || msg.notify || '';
-    const isOutgoing = msg.fromMe === true || msg.from_me === true;
-    const msgType = msg.type || 'text';
-    const mediaUrl = msg.mediaUrl || msg.media_url || msg.image?.url || msg.document?.url || msg.video?.url || msg.audio?.url || '';
+    const msg = messages[0] || innerData.message || {};
+    const key = msg.key || {};
+    const msgContent = msg.message || {};
 
-    const phone = cleanPhone(isOutgoing ? to : from);
+    // Extract fields
+    const from = key.remoteJid || msg.from || '';
+    const body = msgContent.conversation || msgContent.extendedTextMessage?.text || msg.body || msg.text || '';
+    const waMessageId = key.id || msg.id || uuidv4();
+    const senderName = msg.pushName || msg.senderName || msg.notify || '';
+    const isOutgoing = key.fromMe === true || msg.fromMe === true;
+    const msgType = msgContent.imageMessage ? 'image' : msgContent.documentMessage ? 'document' : msgContent.videoMessage ? 'video' : msgContent.audioMessage ? 'audio' : 'text';
+    const mediaUrl = msgContent.imageMessage?.url || msgContent.documentMessage?.url || msgContent.videoMessage?.url || msgContent.audioMessage?.url || msg.mediaUrl || '';
+
+    const phone = cleanPhone(from);
     if (!phone) { res.json({ ok: true, no_phone: true }); return; }
 
     const direction = isOutgoing ? 'outgoing' : 'incoming';
