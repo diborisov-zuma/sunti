@@ -68,7 +68,17 @@ exports.wa_webhook = async (req, res) => {
 
   try {
     const payload = req.body || {};
-    console.log('WA webhook:', JSON.stringify(payload).substring(0, 500));
+    const payloadStr = JSON.stringify(payload).substring(0, 10000);
+    console.log('WA webhook:', payloadStr);
+
+    // Log raw payload for debugging
+    try {
+      await bigquery.query({
+        query: `INSERT INTO ${msgTable} (id, contact_id, phone, direction, message_type, text, wa_message_id, raw_data, created_at)
+                VALUES (@id, 'debug', 'debug', 'incoming', 'debug', @text, @wid, @raw, CURRENT_TIMESTAMP())`,
+        params: { id: uuidv4(), text: 'RAW WEBHOOK PAYLOAD', wid: 'debug_' + Date.now(), raw: payloadStr },
+      });
+    } catch(e) { console.error('Debug log failed:', e.message); }
 
     // WhatsMonster webhook format varies — handle common structures
     const data = payload.data || payload;
