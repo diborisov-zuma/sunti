@@ -7,6 +7,7 @@ function renderHeader(activePage) {
 
     <nav class="nav">
       <a href="contracts.html" class="nav-link ${activePage === 'contracts' ? 'active' : ''}" id="t-nav-contracts" style="display:none"></a>
+      <a href="ctc.html" class="nav-link ${activePage === 'ctc' ? 'active' : ''}" id="t-nav-ctc" style="display:none"></a>
       <a href="contractors.html" class="nav-link ${activePage === 'contractors' ? 'active' : ''}" id="t-nav-contractors2" style="display:none"></a>
       <a href="documentation.html" class="nav-link ${activePage === 'documentation' ? 'active' : ''}" id="t-nav-docs" style="display:none"></a>
       <a href="materials.html" class="nav-link ${activePage === 'materials' ? 'active' : ''}" id="t-nav-materials" style="display:none"></a>
@@ -116,6 +117,12 @@ function updateHeaderTexts() {
     const me = typeof currentMe !== 'undefined' ? currentMe : null;
     const hasAccess = me && (me.is_admin === true || me.has_contracts_access === true);
     nct.style.display = hasAccess ? '' : 'none';
+  }
+  const nctc = document.getElementById('t-nav-ctc');
+  if (nctc) {
+    nctc.textContent = t('navCtc');
+    const me0 = typeof currentMe !== 'undefined' ? currentMe : null;
+    nctc.style.display = (me0 && (me0.is_admin === true || me0.has_contracts_access === true)) ? '' : 'none';
   }
   const nct2 = document.getElementById('t-nav-contractors2');
   if (nct2) {

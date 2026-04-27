@@ -291,6 +291,24 @@ const i18n = {
     docsLevelEditor: 'Редактор',
     docsAccess: 'Доступ к документации',
 
+    // CTC Report
+    navCtc: 'CTC',
+    ctcReport: 'CTC отчёт',
+    snapshots: 'Срезы',
+    saveSnapshot: 'Сохранить снимок',
+    snapshotName: 'Название снимка',
+    snapshotDate: 'Дата',
+    noSnapshots: 'Нет срезов',
+    compareSelected: 'Сравнить выбранные',
+    selectTwoSnapshots: 'Выберите ровно 2 среза',
+    backToSnapshots: 'Назад к срезам',
+    budget: 'Бюджет',
+    newContract: 'НОВЫЙ',
+    removedContract: 'УДАЛЁН',
+    overrun: 'ПЕРЕРАСХОД',
+    contractsCount: 'контрактов',
+    delta: 'Изменение',
+
     // Материалы
     navMaterials: 'Материалы',
     materials: 'Материалы',
@@ -668,6 +686,24 @@ const i18n = {
     docsLevelEditor: 'Editor',
     docsAccess: 'Documentation access',
 
+    // CTC Report
+    navCtc: 'CTC',
+    ctcReport: 'CTC Report',
+    snapshots: 'Snapshots',
+    saveSnapshot: 'Save snapshot',
+    snapshotName: 'Snapshot name',
+    snapshotDate: 'Date',
+    noSnapshots: 'No snapshots',
+    compareSelected: 'Compare selected',
+    selectTwoSnapshots: 'Select exactly 2 snapshots',
+    backToSnapshots: 'Back to snapshots',
+    budget: 'Budget',
+    newContract: 'NEW',
+    removedContract: 'REMOVED',
+    overrun: 'OVERRUN',
+    contractsCount: 'contracts',
+    delta: 'Change',
+
     // Materials
     navMaterials: 'Materials',
     materials: 'Materials',
@@ -1044,6 +1080,24 @@ const i18n = {
     docsLevelViewer: 'ดู',
     docsLevelEditor: 'แก้ไข',
     docsAccess: 'สิทธิ์เข้าถึงเอกสาร',
+
+    // CTC
+    navCtc: 'CTC',
+    ctcReport: 'รายงาน CTC',
+    snapshots: 'สแนปชอต',
+    saveSnapshot: 'บันทึกสแนปชอต',
+    snapshotName: 'ชื่อสแนปชอต',
+    snapshotDate: 'วันที่',
+    noSnapshots: 'ไม่มีสแนปชอต',
+    compareSelected: 'เปรียบเทียบที่เลือก',
+    selectTwoSnapshots: 'เลือก 2 สแนปชอต',
+    backToSnapshots: 'กลับไปสแนปชอต',
+    budget: 'งบประมาณ',
+    newContract: 'ใหม่',
+    removedContract: 'ลบแล้ว',
+    overrun: 'เกินงบ',
+    contractsCount: 'สัญญา',
+    delta: 'เปลี่ยนแปลง',
 
     // วัสดุ
     navMaterials: 'วัสดุ',

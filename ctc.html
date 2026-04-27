@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sunti — CTC Report</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="stylesheet" href="style.css">
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <script src="_i18n.js"></script>
+  <script src="_config.js"></script>
+  <script src="_auth.js"></script>
+  <script src="_header.js"></script>
+  <style>
+    .page-wrap { padding:24px;max-width:1400px;margin:0 auto; }
+    .page-toolbar { display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap; }
+    .page-toolbar h2 { font-size:1.1rem;color:#222;flex:1; }
+
+    .snap-table { width:100%;border-collapse:collapse;background:#fff;border:1px solid #e8e8e8;border-radius:10px;overflow:hidden; }
+    .snap-table thead { background:#f8f8f8;border-bottom:1px solid #e8e8e8; }
+    .snap-table th { padding:10px 14px;font-size:0.78rem;font-weight:600;color:#888;text-align:left;text-transform:uppercase; }
+    .snap-table td { padding:11px 14px;font-size:0.88rem;color:#333;border-bottom:1px solid #f0f0f0; }
+    .snap-table tr:last-child td { border-bottom:none; }
+    .snap-table tr:hover td { background:#fafafa; }
+
+    .summary-cards { display:flex;gap:16px;margin-bottom:20px;flex-wrap:wrap; }
+    .summary-card { background:#fff;border:1px solid #e8e8e8;border-radius:10px;padding:14px 18px;min-width:180px;flex:1; }
+    .summary-card .label { font-size:0.72rem;color:#888;text-transform:uppercase;letter-spacing:0.03em; }
+    .summary-card .value { font-size:1.1rem;font-weight:600;color:#222;margin-top:2px; }
+    .summary-card .prev { font-size:0.78rem;color:#999;margin-top:2px; }
+    .summary-card .delta { font-size:0.82rem;font-weight:600;margin-top:2px; }
+    .delta-up { color:#c5221f; }
+    .delta-down { color:#1e8e3e; }
+    .delta-neutral { color:#888; }
+
+    .cmp-table { width:100%;border-collapse:collapse;background:#fff;border:1px solid #e8e8e8;border-radius:10px;overflow:hidden; }
+    .cmp-table thead { background:#f8f8f8;border-bottom:1px solid #e8e8e8; }
+    .cmp-table th { padding:8px 12px;font-size:0.72rem;font-weight:600;color:#888;text-align:left;text-transform:uppercase; }
+    .cmp-table td { padding:10px 12px;font-size:0.85rem;color:#333;border-bottom:1px solid #f0f0f0; }
+    .cmp-table tr:last-child td { border-bottom:none; }
+    .cmp-table tfoot td { background:#f8f8f8;font-weight:600;border-top:2px solid #e8e8e8; }
+
+    .tag { display:inline-block;padding:2px 8px;border-radius:10px;font-size:0.7rem;font-weight:600; }
+    .tag-new { background:#e8f0fe;color:#1a73e8; }
+    .tag-removed { background:#f0f0f0;color:#888;text-decoration:line-through; }
+    .tag-overrun { background:#fce8e6;color:#c5221f; }
+
+    .empty-state { text-align:center;padding:48px 24px;color:#bbb; }
+    .loading { text-align:center;padding:32px;color:#bbb; }
+    .field-group { margin-bottom:12px; }
+    .field-group label { display:block;font-size:0.82rem;color:#666;margin-bottom:4px; }
+    .field-group input { width:100%;border:1px solid #ddd;border-radius:6px;padding:8px 12px;font-size:0.9rem;outline:none;box-sizing:border-box; }
+  </style>
+</head>
+<body>
+  <header id="header"></header>
+  <div id="guest-view"><h2 id="t-guest-title"></h2><p id="t-guest-sub"></p></div>
+
+  <div id="app-view" style="display:none">
+    <div class="page-wrap">
+      <div class="page-toolbar">
+        <h2 id="t-page-title"></h2>
+        <select class="filter-select" id="filter-folder" style="min-width:200px"><option value="">—</option></select>
+        <button class="btn btn-primary" id="btn-snapshot"></button>
+      </div>
+
+      <!-- Snapshot list view -->
+      <div id="view-list"></div>
+
+      <!-- Comparison view -->
+      <div id="view-compare" style="display:none"></div>
+    </div>
+  </div>
+
+  <!-- Modal: snapshot name -->
+  <div class="modal-overlay" id="modal-snap">
+    <div class="modal" style="width:400px;max-width:95vw">
+      <h3 id="t-snap-title"></h3>
+      <div class="field-group">
+        <label id="lbl-snap-name"></label>
+        <input type="text" id="snap-name">
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-outline" id="btn-snap-cancel"></button>
+        <button class="btn btn-primary" id="btn-snap-save"></button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    let foldersCache = [];
+    let selectedFolder = '';
+    let allSnapshots = [];
+    let checkedDates = new Set();
+
+    function fmt(v) {
+      const n = typeof v === 'object' ? parseFloat(v?.value || v) : parseFloat(v);
+      if (isNaN(n)) return '—';
+      return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+    function fmtK(v) {
+      const n = typeof v === 'object' ? parseFloat(v?.value || v) : parseFloat(v);
+      if (isNaN(n)) return '—';
+      if (Math.abs(n) >= 1000000) return (n/1000000).toFixed(1) + 'M';
+      if (Math.abs(n) >= 1000) return (n/1000).toFixed(0) + 'K';
+      return fmt(n);
+    }
+    function numVal(v) { return typeof v === 'object' ? parseFloat(v?.value || 0) : parseFloat(v || 0); }
+    function formatDate(val) {
+      if (!val) return '—';
+      const d = new Date(val.value || val);
+      if (isNaN(d)) return '—';
+      return `${String(d.getUTCDate()).padStart(2,'0')}.${String(d.getUTCMonth()+1).padStart(2,'0')}.${d.getUTCFullYear()}`;
+    }
+    function showToast(msg, type) {
+      const el = document.getElementById('toast');
+      el.textContent = msg; el.className = 'toast show' + (type ? ' ' + type : '');
+      clearTimeout(el._t); el._t = setTimeout(() => el.className = 'toast', 3000);
+    }
+    function openModal(id) { document.getElementById(id).classList.add('open'); }
+    function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+    function deltaHtml(newVal, oldVal) {
+      const d = newVal - oldVal;
+      if (Math.abs(d) < 0.01) return `<span class="delta-neutral">—</span>`;
+      const sign = d > 0 ? '+' : '';
+      const cls = d > 0 ? 'delta-up' : 'delta-down';
+      return `<span class="${cls}">${sign}${fmtK(d)}</span>`;
+    }
+
+    function updateTexts() {
+      document.getElementById('t-guest-title').textContent = t('guestTitle');
+      document.getElementById('t-guest-sub').textContent = t('guestSub');
+      document.getElementById('t-page-title').textContent = t('ctcReport');
+      document.getElementById('btn-snapshot').textContent = t('saveSnapshot');
+      document.getElementById('t-snap-title').textContent = t('saveSnapshot');
+      document.getElementById('lbl-snap-name').textContent = t('snapshotName');
+      document.getElementById('btn-snap-cancel').textContent = t('cancel');
+      document.getElementById('btn-snap-save').textContent = t('save');
+      updateHeaderTexts();
+    }
+
+    async function loadRefs() {
+      try { foldersCache = await apiFetch('/folders'); } catch(e) { foldersCache = []; }
+      const sel = document.getElementById('filter-folder');
+      sel.innerHTML = `<option value="">${t('portalSelectProject')}</option>`;
+      foldersCache.forEach(f => {
+        if (f.status === 'archive') return;
+        const opt = document.createElement('option');
+        opt.value = f.id; opt.textContent = f.name;
+        sel.appendChild(opt);
+      });
+    }
+
+    document.getElementById('filter-folder').addEventListener('change', e => {
+      selectedFolder = e.target.value;
+      checkedDates.clear();
+      document.getElementById('view-compare').style.display = 'none';
+      if (selectedFolder) loadSnapshots();
+      else document.getElementById('view-list').innerHTML = `<div class="empty-state">${t('portalSelectProject')}</div>`;
+    });
+
+    async function loadSnapshots() {
+      const list = document.getElementById('view-list');
+      list.innerHTML = `<div class="loading">${t('loading')}</div>`;
+      try {
+        allSnapshots = await apiFetch(`/project_snapshots?folder_id=${selectedFolder}`);
+        renderSnapshots();
+      } catch(e) { list.innerHTML = `<div class="empty-state">${e.message}</div>`; }
+    }
+
+    function renderSnapshots() {
+      const list = document.getElementById('view-list');
+      list.style.display = '';
+      document.getElementById('view-compare').style.display = 'none';
+
+      if (!allSnapshots.length) {
+        list.innerHTML = `<div class="empty-state">${t('noSnapshots')}</div>`;
+        return;
+      }
+
+      let html = `<table class="snap-table"><thead><tr>
+        <th style="width:40px"></th>
+        <th>${t('snapshotDate')}</th>
+        <th>${t('snapshotName')}</th>
+        <th>${t('budget')}</th>
+        <th>${t('contractInvoiced')}</th>
+        <th>${t('paidAmount')}</th>
+        <th>${t('contractsCount')}</th>
+        <th style="width:60px"></th>
+      </tr></thead><tbody>`;
+
+      allSnapshots.forEach(s => {
+        const dateStr = s.snapshot_date?.value || s.snapshot_date || '';
+        const checked = checkedDates.has(dateStr) ? 'checked' : '';
+        html += `<tr>
+          <td><input type="checkbox" data-snap-date="${dateStr}" ${checked}></td>
+          <td><strong>${formatDate(s.snapshot_date)}</strong></td>
+          <td>${s.snapshot_name || '—'}</td>
+          <td style="color:#c5221f;font-weight:500">${fmtK(s.sum_total)}</td>
+          <td>${fmtK(s.sum_invoiced)}</td>
+          <td>${fmtK(s.sum_paid)}</td>
+          <td style="color:#666">${s.contracts_count}</td>
+          <td><button class="btn btn-outline" style="padding:1px 6px;font-size:0.72rem;color:#c5221f" data-action="delete-snap" data-date="${dateStr}">${t('delete')}</button></td>
+        </tr>`;
+      });
+
+      html += `</tbody></table>`;
+      html += `<div style="margin-top:12px"><button class="btn btn-primary" id="btn-compare">${t('compareSelected')}</button></div>`;
+
+      list.innerHTML = html;
+
+      // Checkbox handlers
+      list.querySelectorAll('[data-snap-date]').forEach(cb => {
+        cb.addEventListener('change', e => {
+          const d = e.target.dataset.snapDate;
+          if (e.target.checked) checkedDates.add(d);
+          else checkedDates.delete(d);
+          // Max 2
+          if (checkedDates.size > 2) {
+            const first = [...checkedDates][0];
+            checkedDates.delete(first);
+            const el = list.querySelector(`[data-snap-date="${first}"]`);
+            if (el) el.checked = false;
+          }
+        });
+      });
+
+      document.getElementById('btn-compare').addEventListener('click', () => {
+        if (checkedDates.size !== 2) { showToast(t('selectTwoSnapshots'), 'error'); return; }
+        const dates = [...checkedDates].sort();
+        loadComparison(dates[0], dates[1]);
+      });
+    }
+
+    async function loadComparison(date1, date2) {
+      const cmpDiv = document.getElementById('view-compare');
+      document.getElementById('view-list').style.display = 'none';
+      cmpDiv.style.display = '';
+      cmpDiv.innerHTML = `<div class="loading">${t('loading')}</div>`;
+
+      try {
+        const data = await apiFetch(`/project_snapshots/compare?folder_id=${selectedFolder}&date1=${date1}&date2=${date2}`);
+        renderComparison(data.snapshot1, data.snapshot2, date1, date2);
+      } catch(e) { cmpDiv.innerHTML = `<div class="empty-state">${e.message}</div>`; }
+    }
+
+    function renderComparison(snap1, snap2, date1, date2) {
+      const cmpDiv = document.getElementById('view-compare');
+      const name1 = snap1[0]?.snapshot_name || date1;
+      const name2 = snap2[0]?.snapshot_name || date2;
+
+      // Build maps
+      const map1 = {}; snap1.forEach(r => { map1[r.contract_id] = r; });
+      const map2 = {}; snap2.forEach(r => { map2[r.contract_id] = r; });
+      const allIds = [...new Set([...Object.keys(map1), ...Object.keys(map2)])];
+
+      // Sums
+      let sum1 = { total: 0, invoiced: 0, paid: 0 };
+      let sum2 = { total: 0, invoiced: 0, paid: 0 };
+      snap1.forEach(r => { sum1.total += numVal(r.total_amount); sum1.invoiced += numVal(r.invoiced_total); sum1.paid += numVal(r.paid_amount); });
+      snap2.forEach(r => { sum2.total += numVal(r.total_amount); sum2.invoiced += numVal(r.invoiced_total); sum2.paid += numVal(r.paid_amount); });
+
+      let html = `<div style="margin-bottom:16px">
+        <button class="btn btn-outline" id="btn-back-list" style="font-size:0.82rem">← ${t('backToSnapshots')}</button>
+        <span style="margin-left:12px;font-size:0.95rem;font-weight:500">${formatDate(date1)} "${name1}" → ${formatDate(date2)} "${name2}"</span>
+      </div>`;
+
+      // Summary cards
+      html += `<div class="summary-cards">
+        <div class="summary-card">
+          <div class="label">${t('budget')}</div>
+          <div class="value">${fmtK(sum2.total)}</div>
+          <div class="prev">${name1}: ${fmtK(sum1.total)}</div>
+          <div class="delta">${deltaHtml(sum2.total, sum1.total)}</div>
+        </div>
+        <div class="summary-card">
+          <div class="label">${t('contractInvoiced')}</div>
+          <div class="value">${fmtK(sum2.invoiced)}</div>
+          <div class="prev">${name1}: ${fmtK(sum1.invoiced)}</div>
+          <div class="delta">${deltaHtml(sum2.invoiced, sum1.invoiced)}</div>
+        </div>
+        <div class="summary-card">
+          <div class="label">${t('paidAmount')}</div>
+          <div class="value">${fmtK(sum2.paid)}</div>
+          <div class="prev">${name1}: ${fmtK(sum1.paid)}</div>
+          <div class="delta">${deltaHtml(sum2.paid, sum1.paid)}</div>
+        </div>
+        <div class="summary-card">
+          <div class="label">${t('portalProgress')}</div>
+          <div class="value">${sum2.total ? Math.round(sum2.paid / sum2.total * 100) : 0}%</div>
+          <div class="prev">${name1}: ${sum1.total ? Math.round(sum1.paid / sum1.total * 100) : 0}%</div>
+        </div>
+      </div>`;
+
+      // Table
+      html += `<table class="cmp-table"><thead><tr>
+        <th>${t('contractor')}</th>
+        <th>${t('contract')}</th>
+        <th>${t('budget')} (${formatDate(date1)})</th>
+        <th>${t('budget')} (${formatDate(date2)})</th>
+        <th>${t('delta')}</th>
+        <th>${t('paidAmount')} (${formatDate(date1)})</th>
+        <th>${t('paidAmount')} (${formatDate(date2)})</th>
+        <th>${t('delta')}</th>
+        <th>% (${formatDate(date1)})</th>
+        <th>% (${formatDate(date2)})</th>
+      </tr></thead><tbody>`;
+
+      let ft = { t1: 0, t2: 0, p1: 0, p2: 0 };
+
+      allIds.forEach(cid => {
+        const r1 = map1[cid];
+        const r2 = map2[cid];
+
+        const t1 = numVal(r1?.total_amount);
+        const t2 = numVal(r2?.total_amount);
+        const p1 = numVal(r1?.paid_amount);
+        const p2 = numVal(r2?.paid_amount);
+        const pct1 = numVal(r1?.progress_pct);
+        const pct2 = numVal(r2?.progress_pct);
+        ft.t1 += t1; ft.t2 += t2; ft.p1 += p1; ft.p2 += p2;
+
+        const name = r2?.contract_name || r1?.contract_name || '—';
+        const contractor = r2?.contractor_name || r1?.contractor_name || '—';
+
+        let tag = '';
+        if (!r1 && r2) tag = `<span class="tag tag-new">${t('newContract')}</span>`;
+        else if (r1 && !r2) tag = `<span class="tag tag-removed">${t('removedContract')}</span>`;
+        else if (t2 > t1 * 1.01) tag = `<span class="tag tag-overrun">${t('overrun')}</span>`;
+
+        html += `<tr>
+          <td>${contractor}</td>
+          <td>${name} ${tag}</td>
+          <td>${r1 ? fmt(t1) : '—'}</td>
+          <td>${r2 ? fmt(t2) : '—'}</td>
+          <td>${r1 && r2 ? deltaHtml(t2, t1) : ''}</td>
+          <td>${r1 ? fmt(p1) : '—'}</td>
+          <td>${r2 ? fmt(p2) : '—'}</td>
+          <td>${r1 && r2 ? deltaHtml(p2, p1) : ''}</td>
+          <td>${r1 ? pct1 + '%' : '—'}</td>
+          <td>${r2 ? pct2 + '%' : '—'}</td>
+        </tr>`;
+      });
+
+      html += `</tbody><tfoot><tr>
+        <td colspan="2" style="text-align:right">${t('totalAmount')}:</td>
+        <td>${fmt(ft.t1)}</td><td>${fmt(ft.t2)}</td><td>${deltaHtml(ft.t2, ft.t1)}</td>
+        <td>${fmt(ft.p1)}</td><td>${fmt(ft.p2)}</td><td>${deltaHtml(ft.p2, ft.p1)}</td>
+        <td colspan="2"></td>
+      </tr></tfoot></table>`;
+
+      cmpDiv.innerHTML = html;
+
+      document.getElementById('btn-back-list').addEventListener('click', () => {
+        cmpDiv.style.display = 'none';
+        document.getElementById('view-list').style.display = '';
+      });
+    }
+
+    // Actions
+    document.addEventListener('click', async e => {
+      const btn = e.target.closest('[data-action]');
+      if (!btn) return;
+      if (btn.dataset.action === 'delete-snap') {
+        if (!confirm(t('confirmDelete'))) return;
+        btn.disabled = true;
+        try {
+          await apiFetch(`/project_snapshots?folder_id=${selectedFolder}&date=${btn.dataset.date}`, { method: 'DELETE' });
+          showToast(t('deleted'), 'success');
+          loadSnapshots();
+        } catch(err) { showToast(err.message, 'error'); btn.disabled = false; }
+      }
+    });
+
+    // Save snapshot
+    document.getElementById('btn-snapshot').addEventListener('click', () => {
+      if (!selectedFolder) { showToast(t('portalSelectProject'), 'error'); return; }
+      document.getElementById('snap-name').value = new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+      openModal('modal-snap');
+    });
+    document.getElementById('btn-snap-cancel').addEventListener('click', () => closeModal('modal-snap'));
+    document.getElementById('btn-snap-save').addEventListener('click', async () => {
+      const name = document.getElementById('snap-name').value.trim();
+      closeModal('modal-snap');
+      showToast(t('loading'));
+      try {
+        const r = await apiFetch('/project_snapshots', {
+          method: 'POST',
+          body: JSON.stringify({ folder_id: selectedFolder, snapshot_name: name }),
+        });
+        showToast(`${t('saved')}: ${r.contracts_count} ${t('contractsCount')}`, 'success');
+        loadSnapshots();
+      } catch(e) { showToast(e.message, 'error'); }
+    });
+
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal('modal-snap'); });
+
+    window.onLogin = async () => { updateTexts(); await loadRefs(); };
+    window.onLogout = () => { updateTexts(); };
+    window.onLangChange = () => { updateTexts(); if (allSnapshots.length) renderSnapshots(); };
+
+    renderHeader('ctc');
+    updateTexts();
+  </script>
+</body>
+</html>
