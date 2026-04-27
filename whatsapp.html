@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sunti — WhatsApp</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="stylesheet" href="style.css">
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <script src="_i18n.js"></script>
+  <script src="_config.js"></script>
+  <script src="_auth.js"></script>
+  <script src="_header.js"></script>
+  <style>
+    .wa-layout { display:flex;height:calc(100vh - 56px);overflow:hidden; }
+    .wa-sidebar { width:340px;flex-shrink:0;background:#fff;border-right:1px solid #e8e8e8;display:flex;flex-direction:column; }
+    .wa-sidebar-header { padding:12px;border-bottom:1px solid #e8e8e8; }
+    .wa-sidebar-filters { display:flex;gap:4px;margin-top:8px;flex-wrap:wrap; }
+    .wa-filter-btn { background:none;border:1px solid #ddd;border-radius:14px;padding:3px 10px;font-size:0.75rem;cursor:pointer;color:#666;transition:all 0.15s; }
+    .wa-filter-btn:hover { border-color:#1a73e8;color:#1a73e8; }
+    .wa-filter-btn.active { background:#1a73e8;border-color:#1a73e8;color:#fff; }
+    .wa-search { width:100%;border:1px solid #ddd;border-radius:6px;padding:6px 10px;font-size:0.85rem;outline:none; }
+    .wa-search:focus { border-color:#1a73e8; }
+
+    .wa-chat-list { flex:1;overflow-y:auto; }
+    .wa-chat-item { padding:10px 14px;border-bottom:1px solid #f0f0f0;cursor:pointer;transition:background 0.1s; }
+    .wa-chat-item:hover { background:#f8f8f8; }
+    .wa-chat-item.active { background:#e8f0fe; }
+    .wa-chat-item.is-new { border-left:3px solid #c5221f; }
+    .wa-chat-name { font-size:0.9rem;font-weight:500;color:#222;display:flex;justify-content:space-between; }
+    .wa-chat-phone { font-size:0.75rem;color:#999; }
+    .wa-chat-preview { font-size:0.8rem;color:#888;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
+    .wa-chat-meta { display:flex;gap:6px;align-items:center;margin-top:3px; }
+    .wa-tag { display:inline-block;padding:1px 6px;border-radius:8px;font-size:0.65rem;font-weight:600; }
+    .wa-tag-client { background:#e6f4ea;color:#1e8e3e; }
+    .wa-tag-agent { background:#e8f0fe;color:#1a73e8; }
+    .wa-tag-unknown { background:#f0f0f0;color:#888; }
+    .wa-tag-new { background:#fce8e6;color:#c5221f; }
+
+    .wa-main { flex:1;display:flex;flex-direction:column;background:#f4f4f4; }
+    .wa-main-header { padding:12px 20px;background:#fff;border-bottom:1px solid #e8e8e8;display:flex;align-items:center;gap:12px; }
+    .wa-main-header .name { font-size:1rem;font-weight:500;color:#222;flex:1; }
+    .wa-messages { flex:1;overflow-y:auto;padding:16px 20px; }
+
+    .wa-msg { max-width:70%;margin-bottom:8px;clear:both; }
+    .wa-msg.incoming { float:left; }
+    .wa-msg.outgoing { float:right; }
+    .wa-msg-bubble { padding:8px 12px;border-radius:12px;font-size:0.88rem;line-height:1.4;word-break:break-word; }
+    .wa-msg.incoming .wa-msg-bubble { background:#fff;border:1px solid #e8e8e8;border-bottom-left-radius:4px; }
+    .wa-msg.outgoing .wa-msg-bubble { background:#dcf8c6;border-bottom-right-radius:4px; }
+    .wa-msg-time { font-size:0.68rem;color:#999;margin-top:2px; }
+    .wa-msg.outgoing .wa-msg-time { text-align:right; }
+    .wa-msg-media { margin-top:4px; }
+    .wa-msg-media img { max-width:250px;max-height:200px;border-radius:8px;cursor:pointer; }
+
+    .wa-empty { display:flex;align-items:center;justify-content:center;height:100%;color:#bbb;font-size:1rem; }
+    .wa-type-btns { display:flex;gap:4px; }
+    .wa-type-btn { padding:2px 8px;font-size:0.72rem;border-radius:6px;cursor:pointer;border:1px solid #ddd;background:#fff;transition:all 0.15s; }
+    .wa-type-btn:hover { border-color:#1a73e8; }
+    .wa-type-btn.active-client { background:#e6f4ea;border-color:#1e8e3e;color:#1e8e3e; }
+    .wa-type-btn.active-agent { background:#e8f0fe;border-color:#1a73e8;color:#1a73e8; }
+  </style>
+</head>
+<body>
+  <header id="header"></header>
+  <div id="guest-view"><h2 id="t-guest-title"></h2><p id="t-guest-sub"></p></div>
+
+  <div id="app-view" style="display:none">
+    <div class="wa-layout">
+      <div class="wa-sidebar">
+        <div class="wa-sidebar-header">
+          <input type="text" class="wa-search" id="wa-search" placeholder="">
+          <div class="wa-sidebar-filters" id="wa-filters"></div>
+        </div>
+        <div class="wa-chat-list" id="wa-chat-list"></div>
+      </div>
+      <div class="wa-main">
+        <div id="wa-main-content">
+          <div class="wa-empty" id="wa-empty"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    let allContacts = [];
+    let selectedContactId = null;
+    let currentFilter = 'all';
+    let searchDebounce = null;
+
+    function formatTime(val) {
+      if (!val) return '';
+      const d = new Date(val.value || val);
+      if (isNaN(d)) return '';
+      const now = new Date();
+      const isToday = d.toDateString() === now.toDateString();
+      if (isToday) return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      return `${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')}`;
+    }
+    function formatFullTime(val) {
+      if (!val) return '';
+      const d = new Date(val.value || val);
+      if (isNaN(d)) return '';
+      return `${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')}.${d.getFullYear()} ${d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}`;
+    }
+    function showToast(msg, type) {
+      const el = document.getElementById('toast');
+      el.textContent = msg; el.className = 'toast show' + (type ? ' ' + type : '');
+      clearTimeout(el._t); el._t = setTimeout(() => el.className = 'toast', 3000);
+    }
+
+    function typeTag(type) {
+      if (type === 'client') return `<span class="wa-tag wa-tag-client">${t('waMarkClient')}</span>`;
+      if (type === 'agent') return `<span class="wa-tag wa-tag-agent">${t('waMarkAgent')}</span>`;
+      return `<span class="wa-tag wa-tag-unknown">${t('waMarkUnknown')}</span>`;
+    }
+
+    function updateTexts() {
+      document.getElementById('t-guest-title').textContent = t('guestTitle');
+      document.getElementById('t-guest-sub').textContent = t('guestSub');
+      document.getElementById('wa-search').placeholder = t('search');
+      document.getElementById('wa-empty').textContent = t('waNoChats');
+
+      document.getElementById('wa-filters').innerHTML = [
+        { k: 'all', l: t('waAllChats') },
+        { k: 'new', l: t('waNewChats') },
+        { k: 'client', l: t('waClients') },
+        { k: 'agent', l: t('waAgents') },
+        { k: 'unknown', l: t('waUnknown') },
+      ].map(f => `<button class="wa-filter-btn${currentFilter === f.k ? ' active' : ''}" data-filter="${f.k}">${f.l}</button>`).join('');
+
+      updateHeaderTexts();
+    }
+
+    // Filter clicks
+    document.getElementById('wa-filters').addEventListener('click', e => {
+      const btn = e.target.closest('[data-filter]');
+      if (!btn) return;
+      currentFilter = btn.dataset.filter;
+      updateTexts();
+      loadContacts();
+    });
+
+    // Search
+    document.getElementById('wa-search').addEventListener('input', e => {
+      clearTimeout(searchDebounce);
+      searchDebounce = setTimeout(loadContacts, 300);
+    });
+
+    async function loadContacts() {
+      try {
+        let url = `/wa_inbox/contacts?filter=${currentFilter}`;
+        const search = document.getElementById('wa-search').value.trim();
+        if (search) url += `&search=${encodeURIComponent(search)}`;
+        allContacts = await apiFetch(url);
+        renderContacts();
+      } catch(e) { console.error(e); }
+    }
+
+    function renderContacts() {
+      const list = document.getElementById('wa-chat-list');
+      if (!allContacts.length) {
+        list.innerHTML = `<div style="padding:24px;text-align:center;color:#bbb">${t('waNoChats')}</div>`;
+        return;
+      }
+      list.innerHTML = allContacts.map(c => `
+        <div class="wa-chat-item ${c.id === selectedContactId ? 'active' : ''} ${c.is_new ? 'is-new' : ''}" data-contact-id="${c.id}">
+          <div class="wa-chat-name">
+            <span>${c.name || c.phone}</span>
+            <span style="font-size:0.72rem;color:#999">${formatTime(c.last_message_at)}</span>
+          </div>
+          <div class="wa-chat-phone">${c.phone}${c.message_count ? ' · ' + c.message_count + ' ' + t('waMessages') : ''}</div>
+          <div class="wa-chat-preview">${c.last_text || '—'}</div>
+          <div class="wa-chat-meta">
+            ${typeTag(c.contact_type)}
+            ${c.is_new ? `<span class="wa-tag wa-tag-new">${t('waNewContact')}</span>` : ''}
+          </div>
+        </div>
+      `).join('');
+    }
+
+    // Click on chat
+    document.getElementById('wa-chat-list').addEventListener('click', e => {
+      const item = e.target.closest('[data-contact-id]');
+      if (!item) return;
+      selectedContactId = item.dataset.contactId;
+      renderContacts();
+      loadMessages(selectedContactId);
+    });
+
+    async function loadMessages(contactId) {
+      const main = document.getElementById('wa-main-content');
+      const contact = allContacts.find(c => c.id === contactId);
+      if (!contact) return;
+
+      main.innerHTML = `
+        <div class="wa-main-header">
+          <div class="name">${contact.name || contact.phone}</div>
+          <div class="wa-chat-phone">${contact.phone}</div>
+          <div class="wa-type-btns">
+            <button class="wa-type-btn ${contact.contact_type === 'client' ? 'active-client' : ''}" data-set-type="client">${t('waMarkClient')}</button>
+            <button class="wa-type-btn ${contact.contact_type === 'agent' ? 'active-agent' : ''}" data-set-type="agent">${t('waMarkAgent')}</button>
+          </div>
+        </div>
+        <div class="wa-messages" id="wa-messages"><div style="text-align:center;padding:20px;color:#bbb">${t('loading')}</div></div>
+      `;
+
+      try {
+        const messages = await apiFetch(`/wa_inbox/messages?contact_id=${contactId}`);
+        renderMessages(messages);
+        // Refresh contacts to update is_new
+        loadContacts();
+      } catch(e) {
+        document.getElementById('wa-messages').innerHTML = `<div style="color:#c33;padding:20px">${e.message}</div>`;
+      }
+    }
+
+    function renderMessages(messages) {
+      const container = document.getElementById('wa-messages');
+      if (!messages.length) {
+        container.innerHTML = `<div style="text-align:center;padding:40px;color:#bbb">${t('waNoMessages')}</div>`;
+        return;
+      }
+      container.innerHTML = messages.map(m => {
+        let content = '';
+        if (m.media_url && (m.message_type === 'image')) {
+          content += `<div class="wa-msg-media"><img src="${m.media_url}" onclick="window.open('${m.media_url}','_blank')"></div>`;
+        } else if (m.media_url) {
+          content += `<div class="wa-msg-media"><a href="${m.media_url}" target="_blank" style="color:#1a73e8;font-size:0.82rem">📎 ${m.media_filename || 'file'}</a></div>`;
+        }
+        if (m.text) content += `<div>${m.text}</div>`;
+        return `
+          <div class="wa-msg ${m.direction}" style="clear:both">
+            <div class="wa-msg-bubble">${content || '—'}</div>
+            <div class="wa-msg-time">${formatFullTime(m.created_at)}</div>
+          </div>`;
+      }).join('') + '<div style="clear:both"></div>';
+
+      container.scrollTop = container.scrollHeight;
+    }
+
+    // Set contact type
+    document.addEventListener('click', async e => {
+      const btn = e.target.closest('[data-set-type]');
+      if (!btn || !selectedContactId) return;
+      const newType = btn.dataset.setType;
+      try {
+        await apiFetch(`/wa_inbox/contacts/${selectedContactId}`, {
+          method: 'PUT', body: JSON.stringify({ contact_type: newType }),
+        });
+        const c = allContacts.find(x => x.id === selectedContactId);
+        if (c) c.contact_type = newType;
+        loadMessages(selectedContactId);
+        showToast(t('saved'), 'success');
+      } catch(err) { showToast(err.message, 'error'); }
+    });
+
+    // Auto-refresh every 30 seconds
+    let refreshInterval = null;
+    function startRefresh() {
+      refreshInterval = setInterval(() => {
+        loadContacts();
+        if (selectedContactId) loadMessages(selectedContactId);
+      }, 30000);
+    }
+
+    window.onLogin = () => { updateTexts(); loadContacts(); startRefresh(); };
+    window.onLogout = () => { updateTexts(); if (refreshInterval) clearInterval(refreshInterval); };
+    window.onLangChange = () => { updateTexts(); renderContacts(); };
+
+    renderHeader('whatsapp');
+    updateTexts();
+  </script>
+</body>
+</html>

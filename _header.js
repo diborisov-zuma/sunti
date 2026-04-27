@@ -11,6 +11,7 @@ function renderHeader(activePage) {
       <a href="contractors.html" class="nav-link ${activePage === 'contractors' ? 'active' : ''}" id="t-nav-contractors2" style="display:none"></a>
       <a href="documentation.html" class="nav-link ${activePage === 'documentation' ? 'active' : ''}" id="t-nav-docs" style="display:none"></a>
       <a href="materials.html" class="nav-link ${activePage === 'materials' ? 'active' : ''}" id="t-nav-materials" style="display:none"></a>
+      <a href="whatsapp.html" class="nav-link ${activePage === 'whatsapp' ? 'active' : ''}" id="t-nav-whatsapp" style="display:none"></a>
       <a href="invoices.html" class="nav-link ${activePage === 'invoices' ? 'active' : ''}" id="t-nav-invoices"></a>
       <a href="finance.html"  class="nav-link ${activePage === 'finance'  ? 'active' : ''}" id="t-nav-finance"></a>
       <a href="statements.html" class="nav-link ${activePage === 'statements' ? 'active' : ''}" id="t-nav-statements"></a>
@@ -108,6 +109,12 @@ function updateHeaderTexts() {
   const lb = document.getElementById('logout-btn');
   const nt = document.getElementById('t-notifications-title');
   if (nf) nf.textContent = t('navFolders');
+  const nwa = document.getElementById('t-nav-whatsapp');
+  if (nwa) {
+    nwa.textContent = t('navWhatsapp');
+    const meW = typeof currentMe !== 'undefined' ? currentMe : null;
+    nwa.style.display = (meW && meW.is_admin === true) ? '' : 'none';
+  }
   if (ni) ni.textContent = t('navInvoices');
   if (nfi) nfi.textContent = t('navFinance');
   if (ns)  ns.textContent  = t('navStatements');

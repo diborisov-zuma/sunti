@@ -309,6 +309,22 @@ const i18n = {
     contractsCount: 'контрактов',
     delta: 'Изменение',
 
+    // WhatsApp
+    navWhatsapp: 'WhatsApp',
+    waInbox: 'WhatsApp Inbox',
+    waAllChats: 'Все',
+    waNewChats: 'Новые',
+    waClients: 'Клиенты',
+    waAgents: 'Агенты',
+    waUnknown: 'Неизвестные',
+    waNoChats: 'Нет чатов',
+    waNoMessages: 'Нет сообщений',
+    waMarkClient: 'Клиент',
+    waMarkAgent: 'Агент',
+    waMarkUnknown: 'Неизвестный',
+    waNewContact: 'Новый контакт',
+    waMessages: 'сообщений',
+
     // Материалы
     navMaterials: 'Материалы',
     materials: 'Материалы',
@@ -704,6 +720,22 @@ const i18n = {
     contractsCount: 'contracts',
     delta: 'Change',
 
+    // WhatsApp
+    navWhatsapp: 'WhatsApp',
+    waInbox: 'WhatsApp Inbox',
+    waAllChats: 'All',
+    waNewChats: 'New',
+    waClients: 'Clients',
+    waAgents: 'Agents',
+    waUnknown: 'Unknown',
+    waNoChats: 'No chats',
+    waNoMessages: 'No messages',
+    waMarkClient: 'Client',
+    waMarkAgent: 'Agent',
+    waMarkUnknown: 'Unknown',
+    waNewContact: 'New contact',
+    waMessages: 'messages',
+
     // Materials
     navMaterials: 'Materials',
     materials: 'Materials',
@@ -1098,6 +1130,22 @@ const i18n = {
     overrun: 'เกินงบ',
     contractsCount: 'สัญญา',
     delta: 'เปลี่ยนแปลง',
+
+    // WhatsApp
+    navWhatsapp: 'WhatsApp',
+    waInbox: 'WhatsApp Inbox',
+    waAllChats: 'ทั้งหมด',
+    waNewChats: 'ใหม่',
+    waClients: 'ลูกค้า',
+    waAgents: 'เอเจนต์',
+    waUnknown: 'ไม่ทราบ',
+    waNoChats: 'ไม่มีแชท',
+    waNoMessages: 'ไม่มีข้อความ',
+    waMarkClient: 'ลูกค้า',
+    waMarkAgent: 'เอเจนต์',
+    waMarkUnknown: 'ไม่ทราบ',
+    waNewContact: 'ผู้ติดต่อใหม่',
+    waMessages: 'ข้อความ',
 
     // วัสดุ
     navMaterials: 'วัสดุ',
