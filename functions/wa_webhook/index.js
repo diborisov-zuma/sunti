@@ -95,7 +95,8 @@ exports.wa_webhook = async (req, res) => {
     const msgContent = msg.message || {};
 
     // Extract fields
-    const from = key.remoteJid || msg.from || '';
+    const remoteJid = key.remoteJid || msg.from || '';
+    const remoteJidAlt = key.remoteJidAlt || '';
     const body = msgContent.conversation || msgContent.extendedTextMessage?.text || msg.body || msg.text || '';
     const waMessageId = key.id || msg.id || uuidv4();
     const senderName = msg.pushName || msg.senderName || msg.notify || '';
@@ -103,7 +104,19 @@ exports.wa_webhook = async (req, res) => {
     const msgType = msgContent.imageMessage ? 'image' : msgContent.documentMessage ? 'document' : msgContent.videoMessage ? 'video' : msgContent.audioMessage ? 'audio' : 'text';
     const mediaUrl = msgContent.imageMessage?.url || msgContent.documentMessage?.url || msgContent.videoMessage?.url || msgContent.audioMessage?.url || msg.mediaUrl || '';
 
-    const phone = cleanPhone(from);
+    // Get counterpart phone: for outgoing use remoteJidAlt (actual phone),
+    // for incoming use remoteJid. Skip @lid addresses without alt.
+    let rawJid = remoteJid;
+    if (isOutgoing && remoteJidAlt && remoteJidAlt.includes('@s.whatsapp.net')) {
+      rawJid = remoteJidAlt;
+    } else if (!isOutgoing && remoteJidAlt && remoteJid.includes('@lid')) {
+      rawJid = remoteJidAlt;
+    }
+    // Skip group messages and status broadcasts
+    if (rawJid.includes('@g.us') || rawJid === 'status@broadcast') {
+      res.json({ ok: true, skipped: 'group_or_status' }); return;
+    }
+    const phone = cleanPhone(rawJid);
     if (!phone) { res.json({ ok: true, no_phone: true }); return; }
 
     const direction = isOutgoing ? 'outgoing' : 'incoming';
@@ -128,12 +141,13 @@ exports.wa_webhook = async (req, res) => {
     if (contacts.length) {
       contactId = contacts[0].id;
       // Update last_message_at and count
+      // For outgoing messages, don't update name (senderName is our own name)
       await bigquery.query({
         query: `UPDATE ${contactTable}
                 SET last_message_at = CURRENT_TIMESTAMP(),
                     message_count = IFNULL(message_count, 0) + 1,
-                    name = IF(@name != '' AND (name IS NULL OR name = ''), @name, name),
-                    is_new = IF(@direction = 'incoming' AND is_new = TRUE, TRUE, IF(@direction = 'outgoing', FALSE, is_new))
+                    name = IF(@direction = 'incoming' AND @name != '' AND (name IS NULL OR name = ''), @name, name),
+                    is_new = IF(@direction = 'outgoing', FALSE, is_new)
                 WHERE id = @id`,
         params: { id: contactId, name: senderName, direction },
       });
