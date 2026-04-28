@@ -777,6 +777,16 @@
             <td><span class="amount-col ${cls}">${sign}${fmt(tx.amount)}</span></td>
             <td style="font-size:0.78rem">${tx.account_name || '—'}</td>
             <td style="font-size:0.78rem;color:#666">${tx.description || '—'}</td>
+            <td style="white-space:nowrap">
+              <button class="btn btn-outline" style="padding:1px 6px;font-size:0.72rem"
+                data-action="edit-direct-trx" data-id="${tx.id}" data-contract-id="${contractId}"
+                data-date="${tx.date ? (tx.date.value || tx.date) : ''}"
+                data-direction="${tx.direction}" data-amount="${tx.amount}"
+                data-account="${tx.account_id||''}" data-category="${tx.category_id||''}"
+                data-desc="${(tx.description||'').replace(/"/g,'&quot;')}">${t('edit')}</button>
+              <button class="btn btn-outline" style="padding:1px 6px;font-size:0.72rem;color:#c5221f"
+                data-action="delete-direct-trx" data-id="${tx.id}" data-contract-id="${contractId}">×</button>
+            </td>
           </tr>`;
         });
         html += `</tbody></table>`;
@@ -1003,6 +1013,34 @@
           })});
           closeModal('modal-link-inv');
           showToast(t('saved'), 'success');
+          loadContractDetail(contractId);
+          loadContracts();
+        } catch(err) { showToast(err.message, 'error'); btn.disabled = false; }
+      }
+
+      if (action === 'edit-direct-trx') {
+        const contractId = btn.dataset.contractId;
+        const contract = allContracts.find(c => c.id === contractId);
+        currentTrxMode = 'edit'; currentTrxId = btn.dataset.id; currentTrxInvoiceId = null;
+        window._directPaymentContractId = contractId;
+        document.getElementById('t-modal-trx-title').textContent = t('edit');
+        document.getElementById('tx-date').value = btn.dataset.date ? btn.dataset.date.split('T')[0] : '';
+        document.getElementById('tx-direction').value = btn.dataset.direction || 'expense';
+        document.getElementById('tx-amount').value = btn.dataset.amount;
+        document.getElementById('tx-desc').value = btn.dataset.desc || '';
+        fillAccountSelect(contract?.folder_id);
+        document.getElementById('tx-account').value = btn.dataset.account || '';
+        fillCategorySelect('tx-category', btn.dataset.category || '');
+        openModal('modal-trx');
+      }
+
+      if (action === 'delete-direct-trx') {
+        if (!confirm(t('confirmDelete'))) return;
+        btn.disabled = true;
+        const contractId = btn.dataset.contractId;
+        try {
+          await apiFetch(`/transactions/${btn.dataset.id}`, { method: 'DELETE' });
+          showToast(t('deleted'), 'success');
           loadContractDetail(contractId);
           loadContracts();
         } catch(err) { showToast(err.message, 'error'); btn.disabled = false; }
@@ -1341,12 +1379,17 @@
 
       closeModal('modal-trx');
       try {
-        await apiFetch('/transactions', { method: 'POST', body: JSON.stringify({
+        const txBody = {
           date, amount, direction: document.getElementById('tx-direction').value,
           category_id, description: document.getElementById('tx-desc').value,
           invoice_id: invId || '', folder_id: folderId, account_id, contractor_id: contractorId,
           contract_id: directContractId || '',
-        })});
+        };
+        if (currentTrxMode === 'edit' && currentTrxId) {
+          await apiFetch(`/transactions/${currentTrxId}`, { method: 'PUT', body: JSON.stringify(txBody) });
+        } else {
+          await apiFetch('/transactions', { method: 'POST', body: JSON.stringify(txBody) });
+        }
         showToast(t('saved'), 'success');
         window._directPaymentContractId = null;
         if (reloadContractId) {
