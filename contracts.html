@@ -111,6 +111,7 @@
             <tr>
               <th style="width:30px"></th>
               <th id="th-date"></th>
+              <th style="width:24px"></th>
               <th id="th-name"></th>
               <th id="th-contractor"></th>
               <th id="th-folder"></th>
@@ -597,10 +598,10 @@
     async function loadContracts() {
       const tbody = document.getElementById('ct-tbody');
       if (!filterCompany) {
-        tbody.innerHTML = `<tr><td colspan="12" class="empty-state">${t('selectCompanyFirst')}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="13" class="empty-state">${t('selectCompanyFirst')}</td></tr>`;
         return;
       }
-      tbody.innerHTML = `<tr><td colspan="12" class="loading">${t('loading')}</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="13" class="loading">${t('loading')}</td></tr>`;
       try {
         let url = `/contracts?company_id=${filterCompany}&status=${filterStatus}`;
         if (filterSearch) url += `&search=${encodeURIComponent(filterSearch)}`;
@@ -609,7 +610,7 @@
         allContracts = await apiFetch(url);
         renderContracts();
       } catch(e) {
-        tbody.innerHTML = `<tr><td colspan="12" class="empty-state">${e.message}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="13" class="empty-state">${e.message}</td></tr>`;
       }
     }
 
@@ -618,7 +619,7 @@
     function renderContracts() {
       const tbody = document.getElementById('ct-tbody');
       if (!allContracts.length) {
-        tbody.innerHTML = `<tr><td colspan="12" class="empty-state">${t('noContracts')}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="13" class="empty-state">${t('noContracts')}</td></tr>`;
         const tf = document.getElementById('ct-tfoot'); if (tf) tf.style.display = 'none';
         return;
       }
@@ -633,7 +634,8 @@
         tr.innerHTML = `
           <td><button class="expand-btn${isExp?' open':''}" data-expand-contract="${c.id}">${isExp?'▼':'▶'}</button></td>
           <td>${formatDate(c.date)}</td>
-          <td><strong>${c.name || '—'}</strong>${parseInt(c.file_count) > 0 ? ' <span title="Files" style="color:#1a73e8;font-size:0.85rem">📄</span>' : ''}${c.external_ref ? `<br><span style="font-size:0.75rem;color:#999">${c.external_ref}</span>` : ''}</td>
+          <td style="text-align:center">${parseInt(c.file_count) > 0 ? '<span style="font-size:1rem" title="Files">📄</span>' : ''}</td>
+          <td><strong>${c.name || '—'}</strong>${c.external_ref ? `<br><span style="font-size:0.75rem;color:#999">${c.external_ref}</span>` : ''}</td>
           <td style="font-size:0.82rem">${contractorName(c)}</td>
           <td style="font-size:0.82rem">${c.folder_name || '—'}</td>
           <td>${amtCell(c.total_amount, dir)}</td>
@@ -656,7 +658,7 @@
         detailTr.className = 'detail-row';
         detailTr.style.display = isExp ? '' : 'none';
         detailTr.id = `contract-detail-${c.id}`;
-        detailTr.innerHTML = `<td colspan="12"><div class="detail-inner" id="contract-inner-${c.id}">${isExp ? '<div class="loading">'+t('loading')+'</div>' : ''}</div></td>`;
+        detailTr.innerHTML = `<td colspan="13"><div class="detail-inner" id="contract-inner-${c.id}">${isExp ? '<div class="loading">'+t('loading')+'</div>' : ''}</div></td>`;
         tbody.appendChild(detailTr);
 
         if (isExp) loadContractDetail(c.id);
@@ -715,9 +717,9 @@
           const size = f.file_size > 1048576 ? (f.file_size/1048576).toFixed(1)+' MB' : Math.round((f.file_size||0)/1024)+' KB';
           const isPdf = (f.file_name || '').toLowerCase().endsWith('.pdf');
           html += `<div style="display:flex;align-items:center;gap:8px;padding:4px 0;font-size:0.82rem;margin-bottom:2px">
+            ${isPdf ? `<button style="background:none;border:none;cursor:pointer;font-size:1rem;padding:0" title="View PDF"
+              data-action="view-pdf" data-entity-type="${entityType}" data-file-id="${f.id}" data-file-name="${(f.file_name||'').replace(/"/g,'&quot;')}">👁</button>` : '<span style="width:1rem;display:inline-block"></span>'}
             <span style="flex:1;color:#333">${isPdf ? '📄' : '📎'} ${f.file_name || '—'} <span style="color:#999">(${size})</span></span>
-            ${isPdf ? `<button class="btn btn-outline" style="padding:1px 6px;font-size:0.72rem"
-              data-action="view-pdf" data-entity-type="${entityType}" data-file-id="${f.id}" data-file-name="${(f.file_name||'').replace(/"/g,'&quot;')}">👁</button>` : ''}
             <button class="btn btn-outline" style="padding:1px 6px;font-size:0.72rem"
               data-action="download-file" data-entity-type="${entityType}" data-file-id="${f.id}">${t('download')}</button>
             <button class="btn btn-outline" style="padding:1px 6px;font-size:0.72rem;color:#c5221f;border-color:#c5221f"
@@ -1014,7 +1016,7 @@
           const r = await apiFetch(`/${endpoint}/${fileId}/signed-download-url?view=true`);
           if (r.url) {
             document.getElementById('pdf-title').textContent = fileName;
-            document.getElementById('pdf-iframe').src = r.url;
+            document.getElementById('pdf-iframe').src = r.url + '#toolbar=1&navpanes=0';
             openModal('modal-pdf');
           }
         } catch(err) { showToast(err.message, 'error'); }
