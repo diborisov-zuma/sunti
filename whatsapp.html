@@ -170,7 +170,6 @@
         list.innerHTML = `<div style="padding:24px;text-align:center;color:#bbb">${t('waNoChats')}</div>`;
         return;
       }
-      const unread = parseInt(c.unread_count) || 0;
       list.innerHTML = allContacts.map(c => {
         const unread = parseInt(c.unread_count) || 0;
         const hasUnread = unread > 0;
