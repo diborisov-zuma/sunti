@@ -116,7 +116,8 @@ exports.contracts = async (req, res) => {
       if (req.query.search) { where += ' AND LOWER(c.name) LIKE LOWER(@search)'; params.search = `%${req.query.search.trim()}%`; }
       if (folder_id)     { where += ' AND c.folder_id = @folder_id'; params.folder_id = folder_id; }
       if (contractor_id) { where += ' AND c.contractor_id = @contractor_id'; params.contractor_id = contractor_id; }
-      if (status && status !== 'all') { where += ' AND c.status = @status'; params.status = status; }
+      if (status === 'active') { where += " AND c.status IN ('estimate','confirmed','active')"; }
+      else if (status && status !== 'all') { where += ' AND c.status = @status'; params.status = status; }
       if (date_from) { where += ' AND c.date >= @date_from'; params.date_from = date_from; }
       if (date_to)   { where += ' AND c.date <= @date_to';   params.date_to   = date_to; }
 
@@ -129,7 +130,8 @@ exports.contracts = async (req, res) => {
                        f.name AS folder_name,
                        ct.name_en AS contractor_name_en, ct.name_th AS contractor_name_th,
                        IFNULL(inv_agg.invoiced_total, CAST(0 AS NUMERIC)) AS invoiced_total,
-                       IFNULL(inv_agg.invoice_count, 0) AS invoice_count
+                       IFNULL(inv_agg.invoice_count, 0) AS invoice_count,
+                       IFNULL(cf_agg.file_count, 0) AS file_count
                 FROM ${table} c
                 JOIN ${fldTable} f ON c.folder_id = f.id
                 LEFT JOIN ${ctrTable} ct ON c.contractor_id = ct.id
@@ -141,6 +143,11 @@ exports.contracts = async (req, res) => {
                   WHERE IFNULL(status, 'active') != 'deleted' AND contract_id IS NOT NULL
                   GROUP BY contract_id
                 ) inv_agg ON inv_agg.contract_id = c.id
+                LEFT JOIN (
+                  SELECT contract_id, COUNT(*) AS file_count
+                  FROM \`${PROJECT}.${DATASET}.contract_files\`
+                  GROUP BY contract_id
+                ) cf_agg ON cf_agg.contract_id = c.id
                 ${where}
                 ORDER BY c.date DESC NULLS LAST, c.created_at DESC`,
         params,

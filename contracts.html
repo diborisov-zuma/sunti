@@ -95,6 +95,8 @@
           <select class="filter-select" id="filter-contractor"><option value="">—</option></select>
           <select class="filter-select" id="filter-status">
             <option value="active"></option>
+            <option value="estimate"></option>
+            <option value="confirmed"></option>
             <option value="completed"></option>
             <option value="cancelled"></option>
             <option value="all"></option>
@@ -172,6 +174,15 @@
           <select id="c-direction">
             <option value="expense" id="c-opt-expense"></option>
             <option value="income" id="c-opt-income"></option>
+          </select>
+        </div>
+        <div class="field-group">
+          <label id="lbl-c-status"></label>
+          <select id="c-status-select">
+            <option value="estimate"></option>
+            <option value="confirmed"></option>
+            <option value="completed"></option>
+            <option value="cancelled"></option>
           </select>
         </div>
       </div>
@@ -412,6 +423,8 @@
     function numVal(v) { return typeof v === 'object' ? parseFloat(v?.value || 0) : parseFloat(v || 0); }
     function contractorName(c) { return c?.contractor_name_en || c?.contractor_name_th || '—'; }
     function statusBadge(s) {
+      if (s === 'estimate')  return `<span class="badge badge-yellow">${t('estimate')}</span>`;
+      if (s === 'confirmed') return `<span class="badge badge-green">${t('confirmed')}</span>`;
       if (s === 'active')    return `<span class="badge badge-green">${t('active')}</span>`;
       if (s === 'completed') return `<span class="badge badge-gray">${t('completed')}</span>`;
       if (s === 'cancelled') return `<span class="badge badge-red">${t('cancelled')}</span>`;
@@ -432,8 +445,9 @@
       document.getElementById('btn-create').textContent = t('createContract');
 
       const fs = document.getElementById('filter-status');
-      fs.options[0].text = t('active'); fs.options[1].text = t('completed');
-      fs.options[2].text = t('cancelled'); fs.options[3].text = t('allStatuses');
+      fs.options[0].text = t('active'); fs.options[1].text = t('estimate');
+      fs.options[2].text = t('confirmed'); fs.options[3].text = t('completed');
+      fs.options[4].text = t('cancelled'); fs.options[5].text = t('allStatuses');
 
       document.getElementById('th-date').textContent = t('date');
       document.getElementById('th-name').textContent = t('name');
@@ -455,6 +469,10 @@
       document.getElementById('lbl-c-direction').textContent = t('direction');
       document.getElementById('c-opt-expense').textContent = t('expense');
       document.getElementById('c-opt-income').textContent = t('income');
+      document.getElementById('lbl-c-status').textContent = t('statusLabel');
+      const cs = document.getElementById('c-status-select');
+      cs.options[0].text = t('estimate'); cs.options[1].text = t('confirmed');
+      cs.options[2].text = t('completed'); cs.options[3].text = t('cancelled');
       document.getElementById('lbl-c-subtotal').textContent = t('subtotal');
       document.getElementById('lbl-c-vat').textContent = t('vatAmount');
       document.getElementById('lbl-c-total').textContent = t('contractTotal');
@@ -604,7 +622,7 @@
         tr.innerHTML = `
           <td><button class="expand-btn${isExp?' open':''}" data-expand-contract="${c.id}">${isExp?'▼':'▶'}</button></td>
           <td>${formatDate(c.date)}</td>
-          <td><strong>${c.name || '—'}</strong>${c.external_ref ? `<br><span style="font-size:0.75rem;color:#999">${c.external_ref}</span>` : ''}</td>
+          <td><strong>${c.name || '—'}</strong>${parseInt(c.file_count) > 0 ? ' <span title="Files" style="color:#1a73e8;font-size:0.85rem">📄</span>' : ''}${c.external_ref ? `<br><span style="font-size:0.75rem;color:#999">${c.external_ref}</span>` : ''}</td>
           <td style="font-size:0.82rem">${contractorName(c)}</td>
           <td style="font-size:0.82rem">${c.folder_name || '—'}</td>
           <td>${amtCell(c.total_amount, dir)}</td>
@@ -851,6 +869,7 @@
         document.getElementById('c-extref').value = c.external_ref || '';
         document.getElementById('c-date').value = c.date ? (c.date.value || c.date).split('T')[0] : '';
         document.getElementById('c-direction').value = c.direction || 'expense';
+        document.getElementById('c-status-select').value = c.status || 'estimate';
         document.getElementById('c-subtotal').value = numVal(c.subtotal) || '';
         document.getElementById('c-vat').value = numVal(c.vat_amount) || '';
         document.getElementById('c-total').value = numVal(c.total_amount) || '';
@@ -1103,6 +1122,7 @@
       ['c-name','c-extref','c-subtotal','c-vat','c-total','c-terms','c-notes','c-progress','c-progress-notes'].forEach(id => document.getElementById(id).value = '');
       document.getElementById('c-date').value = new Date().toISOString().split('T')[0];
       document.getElementById('c-direction').value = 'expense';
+      document.getElementById('c-status-select').value = 'estimate';
       openModal('modal-contract');
     });
 
@@ -1136,7 +1156,7 @@
         notes: document.getElementById('c-notes').value.trim(),
         progress_pct: document.getElementById('c-progress').value || '0',
         progress_notes: document.getElementById('c-progress-notes').value.trim(),
-        status: currentContractMode === 'edit' ? (allContracts.find(c => c.id === currentContractId)?.status || 'active') : 'active',
+        status: document.getElementById('c-status-select').value || 'estimate',
       };
 
       closeModal('modal-contract');
