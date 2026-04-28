@@ -257,13 +257,38 @@
       } catch(err) { showToast(err.message, 'error'); }
     });
 
-    // Auto-refresh every 30 seconds
+    // Auto-refresh: only update contacts list silently, append new messages
     let refreshInterval = null;
+    let lastMessageCount = 0;
+
     function startRefresh() {
-      refreshInterval = setInterval(() => {
-        loadContacts();
-        if (selectedContactId) loadMessages(selectedContactId);
-      }, 30000);
+      refreshInterval = setInterval(async () => {
+        // Silently refresh contacts
+        try {
+          let url = `/wa_inbox/contacts?filter=${currentFilter}`;
+          const search = document.getElementById('wa-search').value.trim();
+          if (search) url += `&search=${encodeURIComponent(search)}`;
+          const newContacts = await apiFetch(url);
+          // Only re-render if data changed
+          const newJson = JSON.stringify(newContacts.map(c => c.id + c.message_count + c.is_new));
+          const oldJson = JSON.stringify(allContacts.map(c => c.id + c.message_count + c.is_new));
+          if (newJson !== oldJson) {
+            allContacts = newContacts;
+            renderContacts();
+          }
+        } catch(e) {}
+
+        // If chat is open, check for new messages
+        if (selectedContactId) {
+          try {
+            const msgs = await apiFetch(`/wa_inbox/messages?contact_id=${selectedContactId}`);
+            if (msgs.length !== lastMessageCount) {
+              lastMessageCount = msgs.length;
+              renderMessages(msgs);
+            }
+          } catch(e) {}
+        }
+      }, 15000);
     }
 
     window.onLogin = () => { updateTexts(); loadContacts(); startRefresh(); };
