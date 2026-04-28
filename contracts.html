@@ -462,9 +462,9 @@
     }
     function amtCell(val, dir) {
       const n = numVal(val);
-      const cls = dir === 'expense' ? 'expense' : 'income';
-      const sign = dir === 'expense' ? '-' : '';
-      return `<span class="amount-col ${cls}">${sign}${fmt(n)}</span>`;
+      const display = dir === 'expense' ? -n : n;
+      const cls = display < 0 ? 'expense' : display > 0 ? 'income' : '';
+      return `<span class="amount-col ${cls}">${fmt(display)}</span>`;
     }
 
     function updateTexts() {
