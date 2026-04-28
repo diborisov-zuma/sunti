@@ -13,6 +13,9 @@
   <script src="_header.js"></script>
   <style>
     .page-wrap { padding:16px 24px; }
+    .sortable { cursor:pointer;user-select:none;white-space:nowrap; }
+    .sortable:hover { color:#1a73e8; }
+    .sort-arrow { font-size:0.65rem;margin-left:3px;color:#1a73e8; }
     .page-toolbar { display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap; }
     .page-toolbar h2 { font-size:1.1rem;color:#222;flex:1; }
     .toolbar-right { display:flex;align-items:center;gap:8px;flex-wrap:wrap; }
@@ -111,18 +114,18 @@
           <thead>
             <tr>
               <th style="width:30px"></th>
-              <th id="th-date"></th>
+              <th class="sortable" data-sort="date" id="th-date"></th>
               <th style="width:24px"></th>
-              <th id="th-name"></th>
-              <th id="th-contractor"></th>
+              <th class="sortable" data-sort="name" id="th-name"></th>
+              <th class="sortable" data-sort="contractor" id="th-contractor"></th>
               <th id="th-folder"></th>
-              <th id="th-total"></th>
-              <th id="th-invoiced"></th>
-              <th id="th-paid"></th>
-              <th id="th-outstanding"></th>
-              <th id="th-remaining"></th>
-              <th id="th-progress"></th>
-              <th id="th-status"></th>
+              <th class="sortable" data-sort="total_amount" id="th-total"></th>
+              <th class="sortable" data-sort="invoiced_total" id="th-invoiced"></th>
+              <th class="sortable" data-sort="paid_amount" id="th-paid"></th>
+              <th class="sortable" data-sort="outstanding" id="th-outstanding"></th>
+              <th class="sortable" data-sort="remaining" id="th-remaining"></th>
+              <th class="sortable" data-sort="progress_pct" id="th-progress"></th>
+              <th class="sortable" data-sort="status" id="th-status"></th>
               <th style="width:100px"></th>
             </tr>
           </thead>
@@ -411,6 +414,8 @@
     let filterSearch     = '';
     let searchDebounce   = null;
     let usersCache       = [];
+    let sortField        = 'date';
+    let sortDir          = 'desc'; // 'asc' | 'desc'
     let expandedContracts = {};
     let expandedInvoices  = {};
     let expandedTrx       = {};
@@ -665,6 +670,16 @@
 
     // ─── Render contracts ───
 
+    function updateSortArrows() {
+      document.querySelectorAll('.sortable').forEach(th => {
+        const arrow = th.querySelector('.sort-arrow');
+        if (arrow) arrow.remove();
+        if (th.dataset.sort === sortField) {
+          th.insertAdjacentHTML('beforeend', `<span class="sort-arrow">${sortDir === 'asc' ? '▲' : '▼'}</span>`);
+        }
+      });
+    }
+
     function renderContracts() {
       const tbody = document.getElementById('ct-tbody');
       if (!allContracts.length) {
@@ -672,8 +687,42 @@
         const tf = document.getElementById('ct-tfoot'); if (tf) tf.style.display = 'none';
         return;
       }
+
+      // Sort
+      const sorted = [...allContracts].sort((a, b) => {
+        let va, vb;
+        switch(sortField) {
+          case 'date':
+            va = a.date?.value || a.date || ''; vb = b.date?.value || b.date || '';
+            break;
+          case 'name':
+            va = (a.name || '').toLowerCase(); vb = (b.name || '').toLowerCase();
+            break;
+          case 'contractor':
+            va = (a.contractor_name_en || a.contractor_name_th || '').toLowerCase();
+            vb = (b.contractor_name_en || b.contractor_name_th || '').toLowerCase();
+            break;
+          case 'total_amount': va = numVal(a.total_amount); vb = numVal(b.total_amount); break;
+          case 'invoiced_total': va = numVal(a.invoiced_total); vb = numVal(b.invoiced_total); break;
+          case 'paid_amount': va = numVal(a.paid_amount); vb = numVal(b.paid_amount); break;
+          case 'outstanding':
+            va = numVal(a.total_amount) - numVal(a.invoiced_total);
+            vb = numVal(b.total_amount) - numVal(b.invoiced_total); break;
+          case 'remaining':
+            va = numVal(a.total_amount) - numVal(a.paid_amount);
+            vb = numVal(b.total_amount) - numVal(b.paid_amount); break;
+          case 'progress_pct': va = numVal(a.progress_pct); vb = numVal(b.progress_pct); break;
+          case 'status': va = a.status || ''; vb = b.status || ''; break;
+          default: va = ''; vb = '';
+        }
+        if (va < vb) return sortDir === 'asc' ? -1 : 1;
+        if (va > vb) return sortDir === 'asc' ? 1 : -1;
+        return 0;
+      });
+
       tbody.innerHTML = '';
-      allContracts.forEach(c => {
+      updateSortArrows();
+      sorted.forEach(c => {
         const isExp = expandedContracts[c.id];
         const dir = c.direction || 'expense';
         const outstanding = numVal(c.total_amount) - numVal(c.invoiced_total);
@@ -938,6 +987,17 @@
     // ─── Actions ───
 
     document.addEventListener('click', async e => {
+      // Sort header click
+      const sortTh = e.target.closest('.sortable');
+      if (sortTh) {
+        const field = sortTh.dataset.sort;
+        if (sortField === field) sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+        else { sortField = field; sortDir = 'asc'; }
+        renderContracts();
+        updateSortArrows();
+        return;
+      }
+
       // Expand contract
       const expC = e.target.closest('[data-expand-contract]');
       if (expC) {
