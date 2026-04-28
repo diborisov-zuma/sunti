@@ -404,6 +404,8 @@
     let expandedInvoices  = {};
     let expandedTrx       = {};
     let contractInvoices  = {}; // contractId → [invoices]
+    let contractFilesCache = {}; // contractId → [files]
+    let contractDirectTrx  = {}; // contractId → [transactions]
     let invoiceTrx        = {}; // invoiceId → [transactions]
     let fileUploadCtx     = null; // { type:'contract'|'invoice'|'transaction', id, folderId, contractId }
 
@@ -699,6 +701,8 @@
           apiFetch(`/transactions?contract_id=${contractId}`),
         ]);
         contractInvoices[contractId] = invs;
+        contractFilesCache[contractId] = cFiles;
+        contractDirectTrx[contractId] = directTrx;
         renderContractDetail(contractId, invs, cFiles, directTrx);
       } catch(e) {
         inner.innerHTML = `<div style="color:#c33">${e.message}</div>`;
@@ -886,7 +890,7 @@
         const id = expI.dataset.expandInvoice;
         expandedInvoices[id] = !expandedInvoices[id];
         const contractId = expI.dataset.contractId;
-        renderContractDetail(contractId, contractInvoices[contractId] || []);
+        renderContractDetail(contractId, contractInvoices[contractId] || [], contractFilesCache[contractId] || [], contractDirectTrx[contractId] || []);
         if (expandedInvoices[id]) loadInvoiceTrx(id, contractId);
         return;
       }
