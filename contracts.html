@@ -48,7 +48,7 @@
     .inv-mini-table tr:hover td { background:#f0f4ff; }
     .inv-mini-table tr.inv-expanded td { background:#e8f0fe; }
 
-    .trx-detail { padding:12px 12px 12px 36px;background:#f4f7fb;border-bottom:1px solid #e8e8e8; }
+    .trx-detail { padding:12px 12px 12px 36px;background:#e8faed;border-bottom:1px solid #e8e8e8;border-radius:6px;margin:4px 0; }
     .trx-mini-table { width:100%;border-collapse:collapse;margin-top:6px; }
     .trx-mini-table th { padding:4px 8px;font-size:0.7rem;font-weight:600;color:#888;text-align:left; }
     .trx-mini-table td { padding:6px 8px;font-size:0.82rem;color:#333; }
@@ -124,13 +124,12 @@
               <th class="sortable" data-sort="remaining" id="th-remaining"></th>
               <th class="sortable" data-sort="progress_pct" id="th-progress"></th>
               <th class="sortable" data-sort="status" id="th-status"></th>
-              <th style="width:100px"></th>
             </tr>
           </thead>
           <tbody id="ct-tbody"></tbody>
           <tfoot id="ct-tfoot" style="display:none">
             <tr style="background:#f8f8f8;font-weight:600;border-top:2px solid #e8e8e8">
-              <td colspan="5" style="text-align:right;color:#888;padding:12px 7px" id="tf-label"></td>
+              <td colspan="6" style="text-align:right;color:#888;padding:12px 7px" id="tf-label"></td>
               <td id="tf-total"></td>
               <td id="tf-paid"></td>
               <td id="tf-remaining"></td>
@@ -644,10 +643,10 @@
     async function loadContracts() {
       const tbody = document.getElementById('ct-tbody');
       if (!filterCompany) {
-        tbody.innerHTML = `<tr><td colspan="12" class="empty-state">${t('selectCompanyFirst')}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="11" class="empty-state">${t('selectCompanyFirst')}</td></tr>`;
         return;
       }
-      tbody.innerHTML = `<tr><td colspan="12" class="loading">${t('loading')}</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="11" class="loading">${t('loading')}</td></tr>`;
       try {
         let url = `/contracts?company_id=${filterCompany}&status=${filterStatus}`;
         if (filterSearch) url += `&search=${encodeURIComponent(filterSearch)}`;
@@ -657,7 +656,7 @@
         allContracts = await apiFetch(url);
         renderContracts();
       } catch(e) {
-        tbody.innerHTML = `<tr><td colspan="12" class="empty-state">${e.message}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="11" class="empty-state">${e.message}</td></tr>`;
       }
     }
 
@@ -676,7 +675,7 @@
     function renderContracts() {
       const tbody = document.getElementById('ct-tbody');
       if (!allContracts.length) {
-        tbody.innerHTML = `<tr><td colspan="12" class="empty-state">${t('noContracts')}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="11" class="empty-state">${t('noContracts')}</td></tr>`;
         const tf = document.getElementById('ct-tfoot'); if (tf) tf.style.display = 'none';
         return;
       }
@@ -734,12 +733,6 @@
           <td>${amtCell(numVal(c.total_amount) - numVal(c.paid_amount), dir)}</td>
           <td style="text-align:center"><strong>${numVal(c.progress_pct)}%</strong></td>
           <td>${statusBadge(c.status)}</td>
-          <td>
-            <div style="display:flex;gap:4px;align-items:center;justify-content:flex-end">
-              <button class="btn btn-outline" style="padding:2px 8px;font-size:0.75rem" data-action="edit-contract" data-id="${c.id}">${t('edit')}</button>
-              <button class="icon-btn" data-action="delete-contract" data-id="${c.id}" title="${t('delete')}">${ICON_TRASH}</button>
-            </div>
-          </td>
         `;
         tbody.appendChild(tr);
 
@@ -748,7 +741,7 @@
         detailTr.className = 'detail-row';
         detailTr.style.display = isExp ? '' : 'none';
         detailTr.id = `contract-detail-${c.id}`;
-        detailTr.innerHTML = `<td colspan="12"><div class="detail-inner" id="contract-inner-${c.id}">${isExp ? '<div class="loading">'+t('loading')+'</div>' : ''}</div></td>`;
+        detailTr.innerHTML = `<td colspan="11"><div class="detail-inner" id="contract-inner-${c.id}">${isExp ? '<div class="loading">'+t('loading')+'</div>' : ''}</div></td>`;
         tbody.appendChild(detailTr);
 
         if (isExp) loadContractDetail(c.id);
@@ -838,6 +831,12 @@
           <div style="font-size:0.85rem;color:#333;white-space:pre-wrap">${contract.progress_notes}</div>
         </div>`;
       }
+      // Edit/Delete buttons — top right
+      html += `<div style="display:flex;justify-content:flex-end;gap:6px;margin-bottom:8px">
+        <button class="btn btn-outline" style="padding:2px 8px;font-size:0.75rem" data-action="edit-contract" data-id="${contractId}">${t('edit')}</button>
+        <button class="icon-btn" data-action="delete-contract" data-id="${contractId}" title="${t('delete')}">${ICON_TRASH}</button>
+      </div>`;
+
       // Inline details (moved from table columns)
       const cDir = contract?.direction || 'expense';
       const cInvoiced = numVal(contract?.invoiced_total);
@@ -861,9 +860,10 @@
 
       // Direct payments (without invoice)
       const directTrx = arguments[3] || [];
-      if (directTrx.length) {
-        html += `<div style="font-size:0.75rem;color:#888;text-transform:uppercase;margin:12px 0 6px">${t('paidAmount')} (${t('noContract').replace(t('noContract'), 'Direct')})</div>`;
-        html += `<table class="trx-mini-table"><tbody>`;
+      if (directTrx.length || true) {
+        html += `<div style="background:#e8faed;border-radius:8px;padding:10px 12px;margin:10px 0">`;
+        html += `<div style="font-size:0.75rem;color:#888;text-transform:uppercase;margin-bottom:6px">${t('paidAmount')} (Direct)</div>`;
+        if (directTrx.length) { html += `<table class="trx-mini-table"><tbody>`;
         directTrx.forEach(tx => {
           const sign = tx.direction === 'expense' ? '-' : '';
           const cls = tx.direction === 'expense' ? 'expense' : 'income';
@@ -884,13 +884,15 @@
             </td>
           </tr>`;
         });
-        html += `</tbody></table>`;
+        html += `</tbody></table>`; }
+        html += `<div style="margin-top:6px"><button class="btn btn-outline" style="font-size:0.75rem;padding:3px 10px" data-action="add-direct-payment" data-contract-id="${contractId}">${t('addTransaction')}</button></div>`;
+        html += `</div>`; // close green block
       }
 
-      html += `<div style="display:flex;gap:8px;margin:10px 0">
+      html += `<div style="background:#f5f7ff;border-radius:8px;padding:10px 12px;margin:10px 0">`;
+      html += `<div style="display:flex;gap:8px;margin-bottom:8px">
         <button class="btn btn-primary" style="font-size:0.78rem;padding:4px 12px" data-action="create-inv" data-contract-id="${contractId}">${t('createInvoiceFromContract')}</button>
         <button class="btn btn-outline" style="font-size:0.78rem;padding:4px 12px" data-action="link-inv" data-contract-id="${contractId}">${t('linkInvoice')}</button>
-        <button class="btn btn-outline" style="font-size:0.78rem;padding:4px 12px" data-action="add-direct-payment" data-contract-id="${contractId}">${t('addTransaction')}</button>
       </div>`;
 
       if (!invs.length) {
@@ -923,6 +925,7 @@
         });
         html += '</tbody></table>';
       }
+      html += '</div>'; // close blue invoices block
       inner.innerHTML = html;
 
       // Load expanded invoice details
