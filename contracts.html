@@ -27,8 +27,8 @@
     .ct-wrap { background:#fff;border:1px solid #e8e8e8;border-radius:10px;overflow:hidden; }
     .ct-table { width:100%;border-collapse:collapse; }
     .ct-table thead { background:#f8f8f8;border-bottom:1px solid #e8e8e8; }
-    .ct-table th { padding:10px 14px;font-size:0.78rem;font-weight:600;color:#888;text-align:left;text-transform:uppercase;letter-spacing:0.04em; }
-    .ct-table td { padding:11px 14px;font-size:0.88rem;color:#333;border-bottom:1px solid #f0f0f0; }
+    .ct-table th { padding:6px 7px;font-size:0.75rem;font-weight:600;color:#888;text-align:left;text-transform:uppercase;letter-spacing:0.02em; }
+    .ct-table td { padding:7px 7px;font-size:0.85rem;color:#333;border-bottom:1px solid #f0f0f0; }
     .ct-table tr:last-child td { border-bottom:none; }
     .ct-table tr:hover td { background:#fafafa; }
     .ct-table tr.expanded td { background:#f0f4ff; }
@@ -119,11 +119,8 @@
               <th style="width:24px"></th>
               <th class="sortable" data-sort="name" id="th-name"></th>
               <th class="sortable" data-sort="contractor" id="th-contractor"></th>
-              <th id="th-folder"></th>
               <th class="sortable" data-sort="total_amount" id="th-total"></th>
-              <th class="sortable" data-sort="invoiced_total" id="th-invoiced"></th>
               <th class="sortable" data-sort="paid_amount" id="th-paid"></th>
-              <th class="sortable" data-sort="outstanding" id="th-outstanding"></th>
               <th class="sortable" data-sort="remaining" id="th-remaining"></th>
               <th class="sortable" data-sort="progress_pct" id="th-progress"></th>
               <th class="sortable" data-sort="status" id="th-status"></th>
@@ -133,11 +130,9 @@
           <tbody id="ct-tbody"></tbody>
           <tfoot id="ct-tfoot" style="display:none">
             <tr style="background:#f8f8f8;font-weight:600;border-top:2px solid #e8e8e8">
-              <td colspan="7" style="text-align:right;color:#888;padding:12px 14px" id="tf-label"></td>
+              <td colspan="5" style="text-align:right;color:#888;padding:12px 7px" id="tf-label"></td>
               <td id="tf-total"></td>
-              <td id="tf-invoiced"></td>
               <td id="tf-paid"></td>
-              <td id="tf-outstanding"></td>
               <td id="tf-remaining"></td>
               <td id="tf-progress"></td>
               <td colspan="2"></td>
@@ -483,11 +478,8 @@
       document.getElementById('th-date').textContent = t('date');
       document.getElementById('th-name').textContent = t('name');
       document.getElementById('th-contractor').textContent = t('contractor');
-      document.getElementById('th-folder').textContent = t('folder');
       document.getElementById('th-total').textContent = t('contractTotal');
-      document.getElementById('th-invoiced').textContent = t('contractInvoiced');
       document.getElementById('th-paid').textContent = t('paidAmount');
-      document.getElementById('th-outstanding').textContent = t('contractOutstanding');
       document.getElementById('th-remaining').textContent = t('remainingToPay');
       document.getElementById('th-progress').textContent = t('portalProgress');
       document.getElementById('th-status').textContent = t('statusLabel');
@@ -652,10 +644,10 @@
     async function loadContracts() {
       const tbody = document.getElementById('ct-tbody');
       if (!filterCompany) {
-        tbody.innerHTML = `<tr><td colspan="15" class="empty-state">${t('selectCompanyFirst')}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="12" class="empty-state">${t('selectCompanyFirst')}</td></tr>`;
         return;
       }
-      tbody.innerHTML = `<tr><td colspan="15" class="loading">${t('loading')}</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="12" class="loading">${t('loading')}</td></tr>`;
       try {
         let url = `/contracts?company_id=${filterCompany}&status=${filterStatus}`;
         if (filterSearch) url += `&search=${encodeURIComponent(filterSearch)}`;
@@ -665,7 +657,7 @@
         allContracts = await apiFetch(url);
         renderContracts();
       } catch(e) {
-        tbody.innerHTML = `<tr><td colspan="15" class="empty-state">${e.message}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="12" class="empty-state">${e.message}</td></tr>`;
       }
     }
 
@@ -684,7 +676,7 @@
     function renderContracts() {
       const tbody = document.getElementById('ct-tbody');
       if (!allContracts.length) {
-        tbody.innerHTML = `<tr><td colspan="15" class="empty-state">${t('noContracts')}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="12" class="empty-state">${t('noContracts')}</td></tr>`;
         const tf = document.getElementById('ct-tfoot'); if (tf) tf.style.display = 'none';
         return;
       }
@@ -737,11 +729,8 @@
           <td style="text-align:center">${parseInt(c.file_count) > 0 ? '<span style="font-size:1rem" title="Files">📄</span>' : ''}</td>
           <td><strong>${c.name || '—'}</strong>${c.external_ref ? `<br><span style="font-size:0.75rem;color:#999">${c.external_ref}</span>` : ''}</td>
           <td style="font-size:0.82rem">${contractorName(c)}</td>
-          <td style="font-size:0.82rem">${c.folder_name || '—'}</td>
           <td>${amtCell(c.total_amount, dir)}</td>
-          <td>${amtCell(c.invoiced_total, dir)}</td>
           <td>${amtCell(c.paid_amount, dir)}</td>
-          <td>${amtCell(outstanding, dir)}</td>
           <td>${amtCell(numVal(c.total_amount) - numVal(c.paid_amount), dir)}</td>
           <td style="text-align:center"><strong>${numVal(c.progress_pct)}%</strong></td>
           <td>${statusBadge(c.status)}</td>
@@ -759,7 +748,7 @@
         detailTr.className = 'detail-row';
         detailTr.style.display = isExp ? '' : 'none';
         detailTr.id = `contract-detail-${c.id}`;
-        detailTr.innerHTML = `<td colspan="15"><div class="detail-inner" id="contract-inner-${c.id}">${isExp ? '<div class="loading">'+t('loading')+'</div>' : ''}</div></td>`;
+        detailTr.innerHTML = `<td colspan="12"><div class="detail-inner" id="contract-inner-${c.id}">${isExp ? '<div class="loading">'+t('loading')+'</div>' : ''}</div></td>`;
         tbody.appendChild(detailTr);
 
         if (isExp) loadContractDetail(c.id);
@@ -778,9 +767,7 @@
         const dir = allContracts[0]?.direction || 'expense';
         document.getElementById('tf-label').textContent = t('totalAmount') + ':';
         document.getElementById('tf-total').innerHTML = `<div style="font-size:0.68rem;color:#888">${t('contractTotal')}</div>${amtCell(sumTotal, dir)}`;
-        document.getElementById('tf-invoiced').innerHTML = `<div style="font-size:0.68rem;color:#888">${t('contractInvoiced')}</div>${amtCell(sumInvoiced, dir)}`;
         document.getElementById('tf-paid').innerHTML = `<div style="font-size:0.68rem;color:#888">${t('paidAmount')}</div>${amtCell(sumPaid, dir)}`;
-        document.getElementById('tf-outstanding').innerHTML = `<div style="font-size:0.68rem;color:#888">${t('contractOutstanding')}</div>${amtCell(sumOutstanding, dir)}`;
         const sumRemaining = sumTotal - sumPaid;
         document.getElementById('tf-remaining').innerHTML = `<div style="font-size:0.68rem;color:#888">${t('remainingToPay')}</div>${amtCell(sumRemaining, dir)}`;
         document.getElementById('tf-progress').textContent = '';
@@ -851,6 +838,16 @@
           <div style="font-size:0.85rem;color:#333;white-space:pre-wrap">${contract.progress_notes}</div>
         </div>`;
       }
+      // Inline details (moved from table columns)
+      const cDir = contract?.direction || 'expense';
+      const cInvoiced = numVal(contract?.invoiced_total);
+      const cOutstanding = numVal(contract?.total_amount) - cInvoiced;
+      html += `<div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:10px;font-size:0.82rem">
+        <span style="color:#888">${t('folder')}: <strong style="color:#333">${contract?.folder_name || '—'}</strong></span>
+        <span style="color:#888">${t('contractInvoiced')}: <strong>${amtCell(cInvoiced, cDir)}</strong></span>
+        <span style="color:#888">${t('contractOutstanding')}: <strong>${amtCell(cOutstanding, cDir)}</strong></span>
+      </div>`;
+
       if (contract?.responsible_email) {
         html += `<div style="font-size:0.82rem;color:#555;margin-bottom:8px">${t('responsible')}: <strong>${responsibleName(contract.responsible_email)}</strong></div>`;
       }
