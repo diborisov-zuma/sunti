@@ -58,14 +58,21 @@ exports.wa_inbox = async (req, res) => {
         query: `SELECT c.id, c.phone, c.name, c.contact_type, c.contact_type_by,
                        c.notes, c.first_message_at, c.last_message_at,
                        c.message_count, c.is_new,
-                       lm.text AS last_text
+                       lm.text AS last_text,
+                       IFNULL(ur.unread_count, 0) AS unread_count
                 FROM ${contactTable} c
                 LEFT JOIN (
                   SELECT contact_id, text, ROW_NUMBER() OVER (PARTITION BY contact_id ORDER BY created_at DESC) AS rn
                   FROM ${msgTable}
                 ) lm ON lm.contact_id = c.id AND lm.rn = 1
+                LEFT JOIN (
+                  SELECT contact_id, COUNTIF(IFNULL(is_read, FALSE) = FALSE AND direction = 'incoming') AS unread_count
+                  FROM ${msgTable}
+                  GROUP BY contact_id
+                ) ur ON ur.contact_id = c.id
                 ${where}
-                ORDER BY c.last_message_at DESC
+                ORDER BY (CASE WHEN IFNULL(ur.unread_count, 0) > 0 THEN 0 ELSE 1 END) ASC,
+                         c.last_message_at DESC
                 LIMIT 100`,
         params: search ? { search: `%${search.trim()}%` } : {},
       });
@@ -83,7 +90,7 @@ exports.wa_inbox = async (req, res) => {
 
       const [rows] = await bigquery.query({
         query: `SELECT id, contact_id, phone, direction, message_type, text,
-                       media_url, media_filename, media_size, created_at
+                       media_url, media_filename, media_size, IFNULL(is_read, FALSE) AS is_read, created_at
                 FROM ${msgTable}
                 WHERE contact_id = @cid
                 ORDER BY created_at ASC, id ASC
@@ -91,7 +98,11 @@ exports.wa_inbox = async (req, res) => {
         params: { cid: contactId },
       });
 
-      // Mark as not new (we've seen it)
+      // Mark all incoming messages as read + contact as not new
+      await bigquery.query({
+        query: `UPDATE ${msgTable} SET is_read = TRUE WHERE contact_id = @cid AND direction = 'incoming' AND IFNULL(is_read, FALSE) = FALSE`,
+        params: { cid: contactId },
+      });
       await bigquery.query({
         query: `UPDATE ${contactTable} SET is_new = FALSE WHERE id = @id AND is_new = TRUE`,
         params: { id: contactId },

@@ -188,8 +188,8 @@ exports.wa_webhook = async (req, res) => {
     const msgId = uuidv4();
     await bigquery.query({
       query: `INSERT INTO ${msgTable}
-                (id, contact_id, phone, direction, message_type, text, media_url, media_filename, media_size, wa_message_id, raw_data, created_at)
-              VALUES (@id, @cid, @phone, @direction, @msg_type, @text, NULLIF(@media_url,''), NULLIF(@media_filename,''), @media_size, @wa_msg_id, @raw_data, @msg_time)`,
+                (id, contact_id, phone, direction, message_type, text, media_url, media_filename, media_size, wa_message_id, raw_data, is_read, created_at)
+              VALUES (@id, @cid, @phone, @direction, @msg_type, @text, NULLIF(@media_url,''), NULLIF(@media_filename,''), @media_size, @wa_msg_id, @raw_data, @is_read, @msg_time)`,
       params: {
         id: msgId, cid: contactId, phone, direction,
         msg_type: messageType, text: body || '',
@@ -197,6 +197,7 @@ exports.wa_webhook = async (req, res) => {
         media_size: parseInt(mediaSize || 0),
         wa_msg_id: waMessageId,
         raw_data: JSON.stringify(payload).substring(0, 10000),
+        is_read: isOutgoing, // outgoing messages are always "read"
         msg_time: msg.messageTimestamp ? new Date(parseInt(msg.messageTimestamp) * 1000).toISOString() : new Date().toISOString(),
       },
     });

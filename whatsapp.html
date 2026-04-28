@@ -27,6 +27,8 @@
     .wa-chat-item:hover { background:#f8f8f8; }
     .wa-chat-item.active { background:#e8f0fe; }
     .wa-chat-item.is-new { border-left:3px solid #c5221f; }
+    .wa-chat-item.has-unread { background:#f0f7ff; }
+    .wa-unread-badge { background:#1a73e8;color:#fff;border-radius:10px;padding:1px 6px;font-size:0.68rem;font-weight:600;min-width:18px;text-align:center;display:inline-block; }
     .wa-chat-name { font-size:0.9rem;font-weight:500;color:#222;display:flex;justify-content:space-between; }
     .wa-chat-phone { font-size:0.75rem;color:#999; }
     .wa-chat-preview { font-size:0.8rem;color:#888;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
@@ -50,6 +52,9 @@
     .wa-msg.outgoing .wa-msg-bubble { background:#dcf8c6;border-bottom-right-radius:4px; }
     .wa-msg-time { font-size:0.68rem;color:#999;margin-top:2px; }
     .wa-msg.outgoing .wa-msg-time { text-align:right; }
+    .wa-read-check { font-size:0.7rem;margin-left:4px; }
+    .wa-read-check.read { color:#53bdeb; }
+    .wa-read-check.unread { color:#999; }
     .wa-msg-media { margin-top:4px; }
     .wa-msg-media img { max-width:250px;max-height:200px;border-radius:8px;cursor:pointer; }
 
@@ -165,20 +170,27 @@
         list.innerHTML = `<div style="padding:24px;text-align:center;color:#bbb">${t('waNoChats')}</div>`;
         return;
       }
-      list.innerHTML = allContacts.map(c => `
-        <div class="wa-chat-item ${c.id === selectedContactId ? 'active' : ''} ${c.is_new ? 'is-new' : ''}" data-contact-id="${c.id}">
+      const unread = parseInt(c.unread_count) || 0;
+      list.innerHTML = allContacts.map(c => {
+        const unread = parseInt(c.unread_count) || 0;
+        const hasUnread = unread > 0;
+        return `
+        <div class="wa-chat-item ${c.id === selectedContactId ? 'active' : ''} ${c.is_new ? 'is-new' : ''} ${hasUnread ? 'has-unread' : ''}" data-contact-id="${c.id}">
           <div class="wa-chat-name">
-            <span>${c.name || c.phone}</span>
+            <span style="${hasUnread ? 'font-weight:700' : ''}">${c.name || c.phone}</span>
             <span style="font-size:0.72rem;color:#999">${formatTime(c.last_message_at)}</span>
           </div>
           <div class="wa-chat-phone">${c.phone}${c.message_count ? ' · ' + c.message_count + ' ' + t('waMessages') : ''}</div>
-          <div class="wa-chat-preview">${c.last_text || '—'}</div>
+          <div class="wa-chat-preview" style="display:flex;justify-content:space-between;align-items:center">
+            <span style="${hasUnread ? 'font-weight:600;color:#333' : ''}">${c.last_text || '—'}</span>
+            ${hasUnread ? `<span class="wa-unread-badge">${unread}</span>` : ''}
+          </div>
           <div class="wa-chat-meta">
             ${typeTag(c.contact_type)}
             ${c.is_new ? `<span class="wa-tag wa-tag-new">${t('waNewContact')}</span>` : ''}
           </div>
-        </div>
-      `).join('');
+        </div>`;
+      }).join('');
     }
 
     // Click on chat
@@ -234,7 +246,7 @@
         return `
           <div class="wa-msg ${m.direction}" style="clear:both">
             <div class="wa-msg-bubble">${content || '—'}</div>
-            <div class="wa-msg-time">${formatFullTime(m.created_at)}</div>
+            <div class="wa-msg-time">${formatFullTime(m.created_at)}${m.direction === 'incoming' ? `<span class="wa-read-check ${m.is_read ? 'read' : 'unread'}">${m.is_read ? '✓✓' : '✓'}</span>` : ''}</div>
           </div>`;
       }).join('') + '<div style="clear:both"></div>';
 
