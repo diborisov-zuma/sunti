@@ -1414,11 +1414,16 @@
         status: document.getElementById('c-status-select').value || 'estimate',
       };
 
-      // Check if folder changed in edit mode
+      // Check if folder or contractor changed in edit mode
       if (currentContractMode === 'edit' && currentContractId) {
         const existing = allContracts.find(c => c.id === currentContractId);
-        if (existing && existing.folder_id !== folder_id) {
-          if (!confirm(t('confirmChangeFolder'))) return;
+        if (existing) {
+          if (existing.folder_id !== folder_id) {
+            if (!confirm(t('confirmChangeFolder'))) return;
+          }
+          if (existing.contractor_id !== contractor_id) {
+            if (!confirm(t('confirmChangeContractor'))) return;
+          }
         }
       }
 

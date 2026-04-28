@@ -219,7 +219,7 @@ exports.contracts = async (req, res) => {
 
       // Check exists + get folder for RBAC
       const [existing] = await bigquery.query({
-        query: `SELECT folder_id FROM ${table} WHERE id = @id AND IFNULL(status, 'active') != 'deleted'`,
+        query: `SELECT folder_id, contractor_id FROM ${table} WHERE id = @id AND IFNULL(status, 'active') != 'deleted'`,
         params: { id },
       });
       if (!existing.length) { res.status(404).json({ error: 'Not found' }); return; }
@@ -231,10 +231,13 @@ exports.contracts = async (req, res) => {
 
       const oldFolderId = existing[0].folder_id;
       const newFolderId = b.folder_id || oldFolderId;
+      const oldContractorId = existing[0].contractor_id;
+      const newContractorId = b.contractor_id || oldContractorId;
 
       await bigquery.query({
         query: `UPDATE ${table}
                 SET folder_id     = @folder_id,
+                    contractor_id = @contractor_id,
                     name          = @name,
                     external_ref  = NULLIF(@external_ref,''),
                     date          = IF(@date = '', NULL, DATE(@date)),
@@ -253,6 +256,7 @@ exports.contracts = async (req, res) => {
         params: {
           id,
           folder_id:      newFolderId,
+          contractor_id:  newContractorId,
           name:           b.name,
           external_ref:   b.external_ref || '',
           date:           b.date || '',
@@ -286,6 +290,25 @@ exports.contracts = async (req, res) => {
                   WHERE invoice_id IN (SELECT id FROM ${invTable} WHERE contract_id = @cid)
                   AND IFNULL(status,'active') != 'deleted'`,
           params: { new_fid: newFolderId, cid: id },
+        });
+      }
+
+      // Cascade contractor change
+      if (newContractorId !== oldContractorId) {
+        await bigquery.query({
+          query: `UPDATE ${invTable} SET contractor_id = @new_cid WHERE contract_id = @id AND IFNULL(status,'active') != 'deleted'`,
+          params: { new_cid: newContractorId, id },
+        });
+        const trxTable2 = `\`${PROJECT}.${DATASET}.transactions\``;
+        await bigquery.query({
+          query: `UPDATE ${trxTable2} SET contractor_id = @new_cid WHERE contract_id = @id AND IFNULL(status,'active') != 'deleted'`,
+          params: { new_cid: newContractorId, id },
+        });
+        await bigquery.query({
+          query: `UPDATE ${trxTable2} SET contractor_id = @new_cid
+                  WHERE invoice_id IN (SELECT id FROM ${invTable} WHERE contract_id = @cid)
+                  AND IFNULL(status,'active') != 'deleted'`,
+          params: { new_cid: newContractorId, cid: id },
         });
       }
 
