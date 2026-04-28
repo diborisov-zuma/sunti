@@ -93,6 +93,7 @@
           <select class="filter-select" id="filter-folder"><option value="">—</option></select>
           <input type="text" class="filter-select" id="filter-search" placeholder="" style="min-width:160px">
           <select class="filter-select" id="filter-contractor"><option value="">—</option></select>
+          <select class="filter-select" id="filter-responsible"><option value="">—</option></select>
           <select class="filter-select" id="filter-status">
             <option value="active"></option>
             <option value="estimate"></option>
@@ -203,9 +204,15 @@
           <input type="number" id="c-total" min="0" step="0.01">
         </div>
       </div>
-      <div class="field-group">
-        <label id="lbl-c-terms"></label>
-        <input type="text" id="c-terms" placeholder="50/40/10">
+      <div class="fields-row">
+        <div class="field-group">
+          <label id="lbl-c-responsible"></label>
+          <select id="c-responsible"></select>
+        </div>
+        <div class="field-group">
+          <label id="lbl-c-terms"></label>
+          <input type="text" id="c-terms" placeholder="50/40/10">
+        </div>
       </div>
       <div class="fields-row">
         <div class="field-group">
@@ -400,8 +407,10 @@
     let filterFolder     = '';
     let filterContractor = '';
     let filterStatus     = 'active';
+    let filterResponsible = '';
     let filterSearch     = '';
     let searchDebounce   = null;
+    let usersCache       = [];
     let expandedContracts = {};
     let expandedInvoices  = {};
     let expandedTrx       = {};
@@ -493,6 +502,7 @@
       document.getElementById('lbl-c-subtotal').textContent = t('subtotal');
       document.getElementById('lbl-c-vat').textContent = t('vatAmount');
       document.getElementById('lbl-c-total').textContent = t('contractTotal');
+      document.getElementById('lbl-c-responsible').textContent = t('responsible');
       document.getElementById('lbl-c-terms').textContent = t('paymentTerms');
       document.getElementById('lbl-c-progress').textContent = t('portalProgress') + ' %';
       document.getElementById('lbl-c-notes').textContent = t('notes');
@@ -541,18 +551,50 @@
     // ─── Data loading ───
 
     async function loadRefs() {
-      const [companies, folders, contractors, categories, types, accounts] = await Promise.all([
+      const [companies, folders, contractors, categories, types, accounts, users] = await Promise.all([
         apiFetch('/companies').catch(() => []),
         apiFetch('/folders').catch(() => []),
         apiFetch('/contractors?active=true').catch(() => []),
         apiFetch('/categories').catch(() => []),
         apiFetch('/category_types').catch(() => []),
         apiFetch('/company_accounts').catch(() => []),
+        apiFetch('/users').catch(() => []),
       ]);
       companiesCache = companies; foldersCache = folders;
       contractorsCache = contractors; categoriesCache = categories;
-      typesCache = types; accountsCache = accounts;
+      typesCache = types; accountsCache = accounts; usersCache = users;
       fillCompanyFilter();
+      fillResponsibleFilter();
+    }
+
+    function fillResponsibleFilter() {
+      const sel = document.getElementById('filter-responsible');
+      sel.innerHTML = `<option value="">${t('allResponsible')}</option>`;
+      usersCache.forEach(u => {
+        if (!u.is_active) return;
+        const opt = document.createElement('option');
+        opt.value = u.email; opt.textContent = u.name || u.email;
+        sel.appendChild(opt);
+      });
+    }
+
+    function fillResponsibleSelect(selectId, selectedEmail) {
+      const sel = document.getElementById(selectId);
+      if (!sel) return;
+      sel.innerHTML = `<option value="">—</option>`;
+      usersCache.forEach(u => {
+        if (!u.is_active) return;
+        const opt = document.createElement('option');
+        opt.value = u.email; opt.textContent = u.name || u.email;
+        if (u.email === selectedEmail) opt.selected = true;
+        sel.appendChild(opt);
+      });
+    }
+
+    function responsibleName(email) {
+      if (!email) return '—';
+      const u = usersCache.find(x => x.email === email);
+      return u ? (u.name || u.email) : email;
     }
 
     function fillCompanyFilter() {
@@ -598,6 +640,7 @@
       searchDebounce = setTimeout(loadContracts, 300);
     });
     document.getElementById('filter-contractor').addEventListener('change', e => { filterContractor = e.target.value; loadContracts(); });
+    document.getElementById('filter-responsible').addEventListener('change', e => { filterResponsible = e.target.value; loadContracts(); });
     document.getElementById('filter-status').addEventListener('change', e => { filterStatus = e.target.value; loadContracts(); });
 
     async function loadContracts() {
@@ -612,6 +655,7 @@
         if (filterSearch) url += `&search=${encodeURIComponent(filterSearch)}`;
         if (filterFolder) url += `&folder_id=${filterFolder}`;
         if (filterContractor) url += `&contractor_id=${filterContractor}`;
+        if (filterResponsible) url += `&responsible=${encodeURIComponent(filterResponsible)}`;
         allContracts = await apiFetch(url);
         renderContracts();
       } catch(e) {
@@ -755,6 +799,9 @@
           <div style="font-size:0.75rem;color:#888;text-transform:uppercase;margin-bottom:4px">${t('progressNotes')}</div>
           <div style="font-size:0.85rem;color:#333;white-space:pre-wrap">${contract.progress_notes}</div>
         </div>`;
+      }
+      if (contract?.responsible_email) {
+        html += `<div style="font-size:0.82rem;color:#555;margin-bottom:8px">${t('responsible')}: <strong>${responsibleName(contract.responsible_email)}</strong></div>`;
       }
       if (contract?.notes) {
         html += `<div style="margin-bottom:12px;padding:10px 14px;background:#fff;border:1px solid #e8e8e8;border-radius:8px">
@@ -926,6 +973,7 @@
         document.getElementById('c-date').value = c.date ? (c.date.value || c.date).split('T')[0] : '';
         document.getElementById('c-direction').value = c.direction || 'expense';
         document.getElementById('c-status-select').value = c.status || 'estimate';
+        fillResponsibleSelect('c-responsible', c.responsible_email || '');
         document.getElementById('c-subtotal').value = numVal(c.subtotal) || '';
         document.getElementById('c-vat').value = numVal(c.vat_amount) || '';
         document.getElementById('c-total').value = numVal(c.total_amount) || '';
@@ -1240,6 +1288,7 @@
       document.getElementById('c-date').value = new Date().toISOString().split('T')[0];
       document.getElementById('c-direction').value = 'expense';
       document.getElementById('c-status-select').value = 'estimate';
+      fillResponsibleSelect('c-responsible', '');
       openModal('modal-contract');
     });
 
@@ -1273,6 +1322,7 @@
         notes: document.getElementById('c-notes').value.trim(),
         progress_pct: document.getElementById('c-progress').value || '0',
         progress_notes: document.getElementById('c-progress-notes').value.trim(),
+        responsible_email: document.getElementById('c-responsible').value || '',
         status: document.getElementById('c-status-select').value || 'estimate',
       };
 
