@@ -229,9 +229,13 @@ exports.contracts = async (req, res) => {
         if (acc !== 'editor') { res.status(403).json({ error: 'Forbidden' }); return; }
       }
 
+      const oldFolderId = existing[0].folder_id;
+      const newFolderId = b.folder_id || oldFolderId;
+
       await bigquery.query({
         query: `UPDATE ${table}
-                SET name          = @name,
+                SET folder_id     = @folder_id,
+                    name          = @name,
                     external_ref  = NULLIF(@external_ref,''),
                     date          = IF(@date = '', NULL, DATE(@date)),
                     direction     = @direction,
@@ -248,6 +252,7 @@ exports.contracts = async (req, res) => {
                 WHERE id = @id`,
         params: {
           id,
+          folder_id:      newFolderId,
           name:           b.name,
           external_ref:   b.external_ref || '',
           date:           b.date || '',
@@ -264,6 +269,26 @@ exports.contracts = async (req, res) => {
           needs_review: b.needs_review !== undefined ? !!b.needs_review : false,
         },
       });
+      // Cascade folder change to invoices and transactions
+      if (newFolderId !== oldFolderId) {
+        await bigquery.query({
+          query: `UPDATE ${invTable} SET folder_id = @new_fid WHERE contract_id = @id AND IFNULL(status,'active') != 'deleted'`,
+          params: { new_fid: newFolderId, id },
+        });
+        const trxTable = `\`${PROJECT}.${DATASET}.transactions\``;
+        await bigquery.query({
+          query: `UPDATE ${trxTable} SET folder_id = @new_fid WHERE contract_id = @id AND IFNULL(status,'active') != 'deleted'`,
+          params: { new_fid: newFolderId, id },
+        });
+        // Also update transactions linked via invoices of this contract
+        await bigquery.query({
+          query: `UPDATE ${trxTable} SET folder_id = @new_fid
+                  WHERE invoice_id IN (SELECT id FROM ${invTable} WHERE contract_id = @cid)
+                  AND IFNULL(status,'active') != 'deleted'`,
+          params: { new_fid: newFolderId, cid: id },
+        });
+      }
+
       res.json({ success: true });
       return;
     }
