@@ -43,22 +43,46 @@ async function downloadMedia(mediaUrl, phone, msgId) {
 }
 
 /**
- * Simple AI classification using keyword heuristics.
- * TODO: Replace with Claude API call for better accuracy.
+ * Deep classification: only classify when confident.
+ * Returns 'unknown' unless strong signal found.
+ * Analyzes cumulative messages, not just one.
  */
-function classifyContact(name, text) {
-  const combined = ((name || '') + ' ' + (text || '')).toLowerCase();
-  // Agent keywords
-  const agentKeywords = ['agent', 'broker', 'property', 'listing', 'commission', 'เอเจ', 'นายหน้า', 'ตัวแทน', 'co-agent'];
-  for (const kw of agentKeywords) {
-    if (combined.includes(kw)) return { type: 'agent', confidence: 0.7, reason: `Keyword match: ${kw}` };
+function classifyContact(name, allTexts) {
+  const combined = ((name || '') + ' ' + (allTexts || '')).toLowerCase();
+
+  // ── AGENT: high confidence patterns ──
+  const agentStrong = [
+    'sales kit', 'saleskit', 'sale kit',
+    'commission', 'co-agent', 'coagent',
+    'i am agent', 'i\'m an agent', 'i am a real estate', 'i\'m a broker',
+    'my client', 'i have a client', 'i have client', 'my buyer',
+    'agency', 'co-broke', 'cobroke',
+    'ผมเป็นเอเจนต์', 'เป็นเอเจ', 'เป็นนายหน้า', 'ตัวแทน',
+    'ค่าคอม', 'คอมมิชชั่น', 'sales kit',
+    'сотрудничество', 'агент', 'я агент', 'являюсь агентом',
+    'комиссия', 'комиссионн', 'клиент ищет', 'для клиента',
+  ];
+  for (const kw of agentStrong) {
+    if (combined.includes(kw)) return { type: 'agent', confidence: 0.95, reason: `Strong match: "${kw}"` };
   }
-  // Client keywords
-  const clientKeywords = ['villa', 'buy', 'interested', 'price', 'visit', 'ซื้อ', 'สนใจ', 'ราคา', 'ดูบ้าน', 'looking for'];
-  for (const kw of clientKeywords) {
-    if (combined.includes(kw)) return { type: 'client', confidence: 0.6, reason: `Keyword match: ${kw}` };
+
+  // ── CLIENT: high confidence patterns ──
+  const clientStrong = [
+    'i am looking for myself', 'for myself', 'for my family',
+    'i want to buy', 'i\'d like to buy', 'interested in buying',
+    'looking for a villa', 'looking for a house', 'looking for property',
+    'i am a buyer', 'i\'m a buyer', 'direct buyer',
+    'want to visit', 'can i visit', 'can i see', 'schedule a visit',
+    'ซื้อเอง', 'สนใจซื้อ', 'อยากดู', 'ดูบ้าน', 'สนใจบ้าน',
+    'хочу купить', 'для себя', 'хочу посмотреть', 'прямой покупатель',
+    'ищу для себя', 'присматриваю', 'хочу приехать посмотреть',
+  ];
+  for (const kw of clientStrong) {
+    if (combined.includes(kw)) return { type: 'client', confidence: 0.9, reason: `Strong match: "${kw}"` };
   }
-  return { type: 'unknown', confidence: 0.3, reason: 'No keyword match' };
+
+  // ── Not enough signal — stay unknown ──
+  return { type: 'unknown', confidence: 0, reason: 'Not enough signal to classify' };
 }
 
 exports.wa_webhook = async (req, res) => {
@@ -131,7 +155,7 @@ exports.wa_webhook = async (req, res) => {
 
     // Find or create contact
     const [contacts] = await bigquery.query({
-      query: `SELECT id, contact_type, message_count FROM ${contactTable} WHERE phone = @phone`,
+      query: `SELECT id, contact_type, contact_type_by, message_count FROM ${contactTable} WHERE phone = @phone`,
       params: { phone },
     });
 
@@ -140,8 +164,10 @@ exports.wa_webhook = async (req, res) => {
 
     if (contacts.length) {
       contactId = contacts[0].id;
+      const currentType = contacts[0].contact_type;
+      const currentTypeBy = contacts[0].contact_type_by;
+
       // Update last_message_at and count
-      // For outgoing messages, don't update name (senderName is our own name)
       await bigquery.query({
         query: `UPDATE ${contactTable}
                 SET last_message_at = CURRENT_TIMESTAMP(),
@@ -151,25 +177,46 @@ exports.wa_webhook = async (req, res) => {
                 WHERE id = @id`,
         params: { id: contactId, name: senderName, direction },
       });
+
+      // Re-classify if still unknown and not manually set
+      if ((currentType === 'unknown' || !currentType) && currentTypeBy !== 'manual') {
+        // Get all messages for context
+        const [allMsgs] = await bigquery.query({
+          query: `SELECT text FROM ${msgTable} WHERE contact_id = @cid AND direction = 'incoming' ORDER BY created_at ASC LIMIT 10`,
+          params: { cid: contactId },
+        });
+        const allTexts = allMsgs.map(m => m.text || '').join(' ') + ' ' + (body || '');
+        const reclass = classifyContact(senderName, allTexts);
+        if (reclass.type !== 'unknown' && reclass.confidence >= 0.9) {
+          await bigquery.query({
+            query: `UPDATE ${contactTable} SET contact_type = @type, contact_type_by = 'ai' WHERE id = @id`,
+            params: { id: contactId, type: reclass.type },
+          });
+          await bigquery.query({
+            query: `INSERT INTO ${aiTable} (id, contact_id, analysis_type, result, model, created_at)
+                    VALUES (@id, @cid, 'reclassification', @result, 'deep_keywords_v2', CURRENT_TIMESTAMP())`,
+            params: { id: uuidv4(), cid: contactId, result: JSON.stringify(reclass) },
+          });
+        }
+      }
     } else {
-      // New contact
+      // New contact — start as unknown, classify only if strong signal
       contactId = uuidv4();
       isNewContact = true;
 
-      // AI classification
       const classification = classifyContact(senderName, body);
 
       await bigquery.query({
         query: `INSERT INTO ${contactTable}
                   (id, phone, name, contact_type, contact_type_by, first_message_at, last_message_at, message_count, is_new, created_at)
-                VALUES (@id, @phone, NULLIF(@name,''), @contact_type, 'ai', CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP(), 1, TRUE, CURRENT_TIMESTAMP())`,
-        params: { id: contactId, phone, name: senderName, contact_type: classification.type },
+                VALUES (@id, @phone, NULLIF(@name,''), @contact_type, @type_by, CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP(), 1, TRUE, CURRENT_TIMESTAMP())`,
+        params: { id: contactId, phone, name: senderName, contact_type: classification.type, type_by: classification.confidence >= 0.9 ? 'ai' : 'ai' },
       });
 
       // Save AI analysis
       await bigquery.query({
         query: `INSERT INTO ${aiTable} (id, contact_id, analysis_type, result, model, created_at)
-                VALUES (@id, @cid, 'contact_classification', @result, 'keyword_v1', CURRENT_TIMESTAMP())`,
+                VALUES (@id, @cid, 'contact_classification', @result, 'deep_keywords_v2', CURRENT_TIMESTAMP())`,
         params: { id: uuidv4(), cid: contactId, result: JSON.stringify(classification) },
       });
     }
