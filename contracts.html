@@ -732,7 +732,7 @@
         if (isExp) tr.className = 'expanded';
         tr.innerHTML = `
           <td><button class="expand-btn${isExp?' open':''}" data-expand-contract="${c.id}">${isExp?'▼':'▶'}</button></td>
-          <td style="text-align:center;cursor:pointer" data-action="toggle-review" data-id="${c.id}">${c.needs_review ? '🔴' : ''}</td>
+          <td style="text-align:center;cursor:pointer;font-size:0.7rem" data-action="toggle-review" data-id="${c.id}">${c.needs_review ? '🔴' : '<span style="color:#ddd">○</span>'}</td>
           <td>${formatDate(c.date)}</td>
           <td style="text-align:center">${parseInt(c.file_count) > 0 ? '<span style="font-size:1rem" title="Files">📄</span>' : ''}</td>
           <td><strong>${c.name || '—'}</strong>${c.external_ref ? `<br><span style="font-size:0.75rem;color:#999">${c.external_ref}</span>` : ''}</td>
@@ -990,8 +990,9 @@
 
     document.addEventListener('click', async e => {
       // Toggle review
-      if (btn && btn.dataset.action === 'toggle-review') {
-        const id = btn.dataset.id;
+      const reviewBtn = e.target.closest('[data-action="toggle-review"]');
+      if (reviewBtn) {
+        const id = reviewBtn.dataset.id;
         const c = allContracts.find(x => x.id === id);
         if (!c) return;
         const newVal = !c.needs_review;
