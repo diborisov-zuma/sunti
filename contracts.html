@@ -462,85 +462,88 @@
       return `<span class="amount-col ${cls}">${fmt(display)}</span>`;
     }
 
+    function setText(id, val) { const el = document.getElementById(id); if (el) el.textContent = val; }
+
     function updateTexts() {
-      document.getElementById('t-guest-title').textContent = t('guestTitle');
-      document.getElementById('t-guest-sub').textContent = t('guestSub');
-      document.getElementById('t-page-title').textContent = t('contracts');
-      document.getElementById('filter-search').placeholder = t('search');
-      document.getElementById('btn-create').textContent = t('createContract');
+      setText('t-guest-title', t('guestTitle'));
+      setText('t-guest-sub', t('guestSub'));
+      setText('t-page-title', t('contracts'));
+      const searchEl = document.getElementById('filter-search');
+      if (searchEl) searchEl.placeholder = t('search');
+      setText('btn-create', t('createContract'));
 
       const fs = document.getElementById('filter-status');
-      fs.options[0].text = t('active'); fs.options[1].text = t('estimate');
-      fs.options[2].text = t('confirmed'); fs.options[3].text = t('completed');
-      fs.options[4].text = t('cancelled'); fs.options[5].text = t('allStatuses');
+      if (fs) { fs.options[0].text = t('active'); fs.options[1].text = t('estimate');
+        fs.options[2].text = t('confirmed'); fs.options[3].text = t('completed');
+        fs.options[4].text = t('cancelled'); fs.options[5].text = t('allStatuses'); }
 
-      document.getElementById('th-date').textContent = t('date');
-      document.getElementById('th-name').textContent = t('name');
-      document.getElementById('th-contractor').textContent = t('contractor');
-      document.getElementById('th-total').textContent = t('contractTotal');
-      document.getElementById('th-paid').textContent = t('paidAmount');
-      document.getElementById('th-remaining').textContent = t('remainingToPay');
-      document.getElementById('th-progress').textContent = t('portalProgress');
-      document.getElementById('th-status').textContent = t('statusLabel');
+      setText('th-date', t('date'));
+      setText('th-name', t('name'));
+      setText('th-contractor', t('contractor'));
+      setText('th-total', t('contractTotal'));
+      setText('th-paid', t('paidAmount'));
+      setText('th-remaining', t('remainingToPay'));
+      setText('th-progress', t('portalProgress'));
+      setText('th-status', t('statusLabel'));
 
       // Contract modal
-      document.getElementById('lbl-c-folder').textContent = t('folder');
-      document.getElementById('lbl-c-contractor').textContent = t('contractor');
-      document.getElementById('lbl-c-name').textContent = t('name');
-      document.getElementById('lbl-c-extref').textContent = t('externalRef');
-      document.getElementById('lbl-c-date').textContent = t('date');
-      document.getElementById('lbl-c-direction').textContent = t('direction');
-      document.getElementById('c-opt-expense').textContent = t('expense');
-      document.getElementById('c-opt-income').textContent = t('income');
-      document.getElementById('lbl-c-status').textContent = t('statusLabel');
+      setText('lbl-c-folder', t('folder'));
+      setText('lbl-c-contractor', t('contractor'));
+      setText('lbl-c-name', t('name'));
+      setText('lbl-c-extref', t('externalRef'));
+      setText('lbl-c-date', t('date'));
+      setText('lbl-c-direction', t('direction'));
+      setText('c-opt-expense', t('expense'));
+      setText('c-opt-income', t('income'));
+      setText('lbl-c-status', t('statusLabel'));
       const cs = document.getElementById('c-status-select');
-      cs.options[0].text = t('estimate'); cs.options[1].text = t('confirmed');
-      cs.options[2].text = t('completed'); cs.options[3].text = t('cancelled');
-      document.getElementById('lbl-c-subtotal').textContent = t('subtotal');
-      document.getElementById('lbl-c-vat').textContent = t('vatAmount');
-      document.getElementById('lbl-c-total').textContent = t('contractTotal');
-      document.getElementById('lbl-c-responsible').textContent = t('responsible');
-      document.getElementById('lbl-c-terms').textContent = t('paymentTerms');
-      document.getElementById('lbl-c-progress').textContent = t('portalProgress') + ' %';
-      document.getElementById('lbl-c-notes').textContent = t('notes');
-      document.getElementById('lbl-c-progress-notes').textContent = t('progressNotes');
-      document.getElementById('btn-c-cancel').textContent = t('cancel');
-      document.getElementById('btn-c-save').textContent = t('save');
+      if (cs) { cs.options[0].text = t('estimate'); cs.options[1].text = t('confirmed');
+        cs.options[2].text = t('completed'); cs.options[3].text = t('cancelled'); }
+      setText('lbl-c-subtotal', t('subtotal'));
+      setText('lbl-c-vat', t('vatAmount'));
+      setText('lbl-c-total', t('contractTotal'));
+      setText('lbl-c-responsible', t('responsible'));
+      setText('lbl-c-terms', t('paymentTerms'));
+      setText('lbl-c-progress', t('portalProgress') + ' %');
+      setText('lbl-c-notes', t('notes'));
+      setText('lbl-c-progress-notes', t('progressNotes'));
+      setText('btn-c-cancel', t('cancel'));
+      setText('btn-c-save', t('save'));
 
       // Invoice modal
-      document.getElementById('lbl-i-name').textContent = t('name');
-      document.getElementById('lbl-i-date').textContent = t('date');
-      document.getElementById('lbl-i-direction').textContent = t('direction');
-      document.getElementById('lbl-i-category').textContent = t('category');
-      document.getElementById('lbl-i-subtotal').textContent = t('subtotal');
-      document.getElementById('lbl-i-vat-rate').textContent = t('vatRate');
-      document.getElementById('lbl-i-vat-amount').textContent = t('vatAmount');
-      document.getElementById('lbl-i-wht-rate').textContent = t('whtRate');
-      document.getElementById('lbl-i-wht-amount').textContent = t('whtAmount');
-      document.getElementById('lbl-i-total').textContent = t('totalAmount');
-      document.getElementById('lbl-i-payable').textContent = t('amountPayable');
-      document.getElementById('btn-i-cancel').textContent = t('cancel');
-      document.getElementById('btn-i-save').textContent = t('save');
-      document.getElementById('i-direction').options[0].textContent = t('expense');
-      document.getElementById('i-direction').options[1].textContent = t('income');
+      setText('lbl-i-name', t('name'));
+      setText('lbl-i-date', t('date'));
+      setText('lbl-i-direction', t('direction'));
+      setText('lbl-i-category', t('category'));
+      setText('lbl-i-subtotal', t('subtotal'));
+      setText('lbl-i-vat-rate', t('vatRate'));
+      setText('lbl-i-vat-amount', t('vatAmount'));
+      setText('lbl-i-wht-rate', t('whtRate'));
+      setText('lbl-i-wht-amount', t('whtAmount'));
+      setText('lbl-i-total', t('totalAmount'));
+      setText('lbl-i-payable', t('amountPayable'));
+      setText('btn-i-cancel', t('cancel'));
+      setText('btn-i-save', t('save'));
+      const iDir = document.getElementById('i-direction');
+      if (iDir) { iDir.options[0].textContent = t('expense'); iDir.options[1].textContent = t('income'); }
 
       // Trx modal
-      document.getElementById('lbl-tx-date').textContent = t('date');
-      document.getElementById('lbl-tx-direction').textContent = t('direction');
-      document.getElementById('lbl-tx-amount').textContent = t('amount');
-      document.getElementById('lbl-tx-account').textContent = t('account');
-      document.getElementById('lbl-tx-category').textContent = t('category');
-      document.getElementById('lbl-tx-desc').textContent = t('description');
-      document.getElementById('btn-tx-cancel').textContent = t('cancel');
-      document.getElementById('btn-tx-save').textContent = t('save');
-      document.getElementById('tx-direction').options[0].textContent = t('expense');
-      document.getElementById('tx-direction').options[1].textContent = t('income');
+      setText('lbl-tx-date', t('date'));
+      setText('lbl-tx-direction', t('direction'));
+      setText('lbl-tx-amount', t('amount'));
+      setText('lbl-tx-account', t('account'));
+      setText('lbl-tx-category', t('category'));
+      setText('lbl-tx-desc', t('description'));
+      setText('btn-tx-cancel', t('cancel'));
+      setText('btn-tx-save', t('save'));
+      const txDir = document.getElementById('tx-direction');
+      if (txDir) { txDir.options[0].textContent = t('expense'); txDir.options[1].textContent = t('income'); }
 
-      document.getElementById('btn-link-inv-cancel').textContent = t('cancel');
-      document.getElementById('t-file-title').textContent = t('addFile');
-      document.getElementById('lbl-file-input').textContent = t('file');
-      document.getElementById('btn-file-cancel').textContent = t('cancel');
-      document.getElementById('btn-file-save').textContent = t('save');
+      setText('btn-link-inv-cancel', t('cancel'));
+      setText('t-file-title', t('addFile'));
+      setText('lbl-file-input', t('file'));
+      setText('btn-file-cancel', t('cancel'));
+      setText('btn-file-save', t('save'));
 
       updateHeaderTexts();
     }
