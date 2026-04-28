@@ -26,13 +26,16 @@ async function recalcContractPaid(contractId) {
   if (!contractId) return;
   const cTable = `\`${PROJECT}.${DATASET}.contracts\``;
   const iTable = `\`${PROJECT}.${DATASET}.invoices\``;
+  const tTable = `\`${PROJECT}.${DATASET}.${TABLE}\``;
+  // paid = SUM(invoice paid amounts) + SUM(direct contract transactions without invoice)
   await bigquery.query({
     query: `UPDATE ${cTable}
-            SET paid_amount = CAST(COALESCE((
-              SELECT SUM(paid_amount)
-              FROM ${iTable}
-              WHERE contract_id = @id AND IFNULL(status, 'active') != 'deleted'
-            ), 0) AS NUMERIC)
+            SET paid_amount = CAST((
+              COALESCE((SELECT SUM(paid_amount) FROM ${iTable}
+                WHERE contract_id = @id AND IFNULL(status, 'active') != 'deleted'), 0)
+              + COALESCE((SELECT SUM(amount) FROM ${tTable}
+                WHERE contract_id = @id AND invoice_id IS NULL AND IFNULL(status, 'active') != 'deleted'), 0)
+            ) AS NUMERIC)
             WHERE id = @id`,
     params: { id: contractId },
   });
@@ -100,7 +103,11 @@ exports.transactions = async (req, res) => {
       if (search) { extras.push(`LOWER(t.description) LIKE LOWER(@search)`); params.search = `%${search.trim()}%`; }
       const extraClause = extras.length ? ' AND ' + extras.join(' AND ') : '';
 
-      if (invoiceId) {
+      const contractId = req.query.contract_id;
+      if (contractId) {
+        where = `WHERE t.contract_id = @contract_id AND t.invoice_id IS NULL AND ${statusClause}` + extraClause;
+        params.contract_id = contractId;
+      } else if (invoiceId) {
         where = `WHERE t.invoice_id = @invoice_id AND ${statusClause}` + extraClause;
         params.invoice_id = invoiceId;
       } else if (folderId) {
@@ -137,7 +144,7 @@ exports.transactions = async (req, res) => {
 
     // POST — создать транзакцию
     if (req.method === 'POST') {
-      const { date, amount, direction, account_id, counterparty_id, category_id, invoice_id, folder_id, contractor_id, description } = req.body;
+      const { date, amount, direction, account_id, counterparty_id, category_id, invoice_id, folder_id, contractor_id, contract_id, description } = req.body;
       if (!date || !amount || !direction) {
         res.status(400).json({ error: 'date, amount and direction are required' });
         return;
@@ -156,8 +163,8 @@ exports.transactions = async (req, res) => {
       }
       const id = uuidv4();
       await bigquery.query({
-        query: `INSERT INTO ${table} (id, date, amount, direction, account_id, counterparty_id, category_id, invoice_id, folder_id, contractor_id, description, created_at)
-                VALUES (@id, @date, CAST(@amount AS NUMERIC), @direction, NULLIF(@account_id,''), NULLIF(@counterparty_id,''), NULLIF(@category_id,''), NULLIF(@invoice_id,''), NULLIF(@folder_id,''), NULLIF(@contractor_id,''), @description, CURRENT_TIMESTAMP())`,
+        query: `INSERT INTO ${table} (id, date, amount, direction, account_id, counterparty_id, category_id, invoice_id, folder_id, contractor_id, contract_id, description, created_at)
+                VALUES (@id, @date, CAST(@amount AS NUMERIC), @direction, NULLIF(@account_id,''), NULLIF(@counterparty_id,''), NULLIF(@category_id,''), NULLIF(@invoice_id,''), NULLIF(@folder_id,''), NULLIF(@contractor_id,''), NULLIF(@contract_id,''), @description, CURRENT_TIMESTAMP())`,
         params: {
           id,
           date,
@@ -169,10 +176,12 @@ exports.transactions = async (req, res) => {
           invoice_id:      invoice_id      || '',
           folder_id:       folder_id       || '',
           contractor_id:   contractor_id   || '',
+          contract_id:     contract_id     || '',
           description:     description     || '',
         },
       });
       if (invoice_id) await recalcInvoicePaid(invoice_id);
+      if (contract_id) await recalcContractPaid(contract_id);
       res.json({ success: true, id });
       return;
     }

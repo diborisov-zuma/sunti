@@ -12,7 +12,7 @@
   <script src="_auth.js"></script>
   <script src="_header.js"></script>
   <style>
-    .page-wrap { padding:24px;max-width:1400px;margin:0 auto; }
+    .page-wrap { padding:16px 24px; }
     .page-toolbar { display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap; }
     .page-toolbar h2 { font-size:1.1rem;color:#222;flex:1; }
     .toolbar-right { display:flex;align-items:center;gap:8px;flex-wrap:wrap; }
@@ -676,10 +676,10 @@
         const sumOutstanding = sumTotal - sumInvoiced;
         const dir = allContracts[0]?.direction || 'expense';
         document.getElementById('tf-label').textContent = t('totalAmount') + ':';
-        document.getElementById('tf-total').innerHTML = amtCell(sumTotal, dir);
-        document.getElementById('tf-invoiced').innerHTML = amtCell(sumInvoiced, dir);
-        document.getElementById('tf-paid').innerHTML = amtCell(sumPaid, dir);
-        document.getElementById('tf-outstanding').innerHTML = amtCell(sumOutstanding, dir);
+        document.getElementById('tf-total').innerHTML = `<div style="font-size:0.68rem;color:#888">${t('contractTotal')}</div>${amtCell(sumTotal, dir)}`;
+        document.getElementById('tf-invoiced').innerHTML = `<div style="font-size:0.68rem;color:#888">${t('contractInvoiced')}</div>${amtCell(sumInvoiced, dir)}`;
+        document.getElementById('tf-paid').innerHTML = `<div style="font-size:0.68rem;color:#888">${t('paidAmount')}</div>${amtCell(sumPaid, dir)}`;
+        document.getElementById('tf-outstanding').innerHTML = `<div style="font-size:0.68rem;color:#888">${t('contractOutstanding')}</div>${amtCell(sumOutstanding, dir)}`;
         document.getElementById('tf-progress').textContent = '';
         tfoot.style.display = '';
       } else if (tfoot) {
@@ -693,12 +693,13 @@
       const inner = document.getElementById(`contract-inner-${contractId}`);
       if (!inner) return;
       try {
-        const [invs, cFiles] = await Promise.all([
+        const [invs, cFiles, directTrx] = await Promise.all([
           apiFetch(`/contracts/${contractId}/invoices`),
           apiFetch(`/contract_files?contract_id=${contractId}`),
+          apiFetch(`/transactions?contract_id=${contractId}`),
         ]);
         contractInvoices[contractId] = invs;
-        renderContractDetail(contractId, invs, cFiles);
+        renderContractDetail(contractId, invs, cFiles, directTrx);
       } catch(e) {
         inner.innerHTML = `<div style="color:#c33">${e.message}</div>`;
       }
@@ -753,9 +754,28 @@
       }
       html += renderFileList(cFiles, 'contract', contractId, contractId);
 
+      // Direct payments (without invoice)
+      const directTrx = arguments[3] || [];
+      if (directTrx.length) {
+        html += `<div style="font-size:0.75rem;color:#888;text-transform:uppercase;margin:12px 0 6px">${t('paidAmount')} (${t('noContract').replace(t('noContract'), 'Direct')})</div>`;
+        html += `<table class="trx-mini-table"><tbody>`;
+        directTrx.forEach(tx => {
+          const sign = tx.direction === 'expense' ? '-' : '';
+          const cls = tx.direction === 'expense' ? 'expense' : 'income';
+          html += `<tr>
+            <td>${formatDate(tx.date)}</td>
+            <td><span class="amount-col ${cls}">${sign}${fmt(tx.amount)}</span></td>
+            <td style="font-size:0.78rem">${tx.account_name || '—'}</td>
+            <td style="font-size:0.78rem;color:#666">${tx.description || '—'}</td>
+          </tr>`;
+        });
+        html += `</tbody></table>`;
+      }
+
       html += `<div style="display:flex;gap:8px;margin:10px 0">
         <button class="btn btn-primary" style="font-size:0.78rem;padding:4px 12px" data-action="create-inv" data-contract-id="${contractId}">${t('createInvoiceFromContract')}</button>
         <button class="btn btn-outline" style="font-size:0.78rem;padding:4px 12px" data-action="link-inv" data-contract-id="${contractId}">${t('linkInvoice')}</button>
+        <button class="btn btn-outline" style="font-size:0.78rem;padding:4px 12px" data-action="add-direct-payment" data-contract-id="${contractId}">${t('addTransaction')}</button>
       </div>`;
 
       if (!invs.length) {
@@ -978,6 +998,22 @@
         } catch(err) { showToast(err.message, 'error'); btn.disabled = false; }
       }
 
+      if (action === 'add-direct-payment') {
+        const contractId = btn.dataset.contractId;
+        const contract = allContracts.find(c => c.id === contractId);
+        currentTrxMode = 'create'; currentTrxId = null; currentTrxInvoiceId = null;
+        // Store contract_id for save
+        window._directPaymentContractId = contractId;
+        document.getElementById('t-modal-trx-title').textContent = t('addTransaction');
+        document.getElementById('tx-date').value = new Date().toISOString().split('T')[0];
+        document.getElementById('tx-direction').value = contract?.direction || 'expense';
+        document.getElementById('tx-amount').value = '';
+        document.getElementById('tx-desc').value = contract?.name ? `Payment: ${contract.name}` : '';
+        fillAccountSelect(contract?.folder_id);
+        fillCategorySelect('tx-category', '');
+        openModal('modal-trx');
+      }
+
       if (action === 'add-trx') {
         const invoiceId = btn.dataset.invId;
         const contractId = btn.dataset.contractId;
@@ -985,6 +1021,7 @@
         const invs = contractInvoices[contractId] || [];
         const inv = invs.find(i => i.id === invoiceId);
         currentTrxMode = 'create'; currentTrxId = null; currentTrxInvoiceId = invoiceId;
+        window._directPaymentContractId = null;
         document.getElementById('t-modal-trx-title').textContent = t('addTransaction');
         document.getElementById('tx-date').value = new Date().toISOString().split('T')[0];
         document.getElementById('tx-direction').value = inv?.direction || 'expense';
@@ -1016,7 +1053,8 @@
           const r = await apiFetch(`/${endpoint}/${fileId}/signed-download-url?view=true`);
           if (r.url) {
             document.getElementById('pdf-title').textContent = fileName;
-            document.getElementById('pdf-iframe').src = r.url + '#toolbar=1&navpanes=0';
+            // Use Google Docs Viewer for reliable PDF rendering in iframe
+            document.getElementById('pdf-iframe').src = `https://docs.google.com/gview?url=${encodeURIComponent(r.url)}&embedded=true`;
             openModal('modal-pdf');
           }
         } catch(err) { showToast(err.message, 'error'); }
@@ -1276,12 +1314,19 @@
         showToast(t('fillAllFields'), 'error'); return;
       }
 
-      // Get invoice to find folder + contractor
+      // Get context: invoice-linked or direct contract payment
       const invId = currentTrxInvoiceId;
-      let folderId = '', contractorId = '';
-      for (const [cId, invs] of Object.entries(contractInvoices)) {
-        const inv = invs.find(i => i.id === invId);
-        if (inv) { folderId = inv.folder_id; contractorId = inv.contractor_id; break; }
+      const directContractId = window._directPaymentContractId || null;
+      let folderId = '', contractorId = '', reloadContractId = '';
+
+      if (invId) {
+        for (const [cId, invs] of Object.entries(contractInvoices)) {
+          const inv = invs.find(i => i.id === invId);
+          if (inv) { folderId = inv.folder_id; contractorId = inv.contractor_id; reloadContractId = cId; break; }
+        }
+      } else if (directContractId) {
+        const contract = allContracts.find(c => c.id === directContractId);
+        if (contract) { folderId = contract.folder_id; contractorId = contract.contractor_id; reloadContractId = directContractId; }
       }
 
       closeModal('modal-trx');
@@ -1289,16 +1334,14 @@
         await apiFetch('/transactions', { method: 'POST', body: JSON.stringify({
           date, amount, direction: document.getElementById('tx-direction').value,
           category_id, description: document.getElementById('tx-desc').value,
-          invoice_id: invId, folder_id: folderId, account_id, contractor_id: contractorId,
+          invoice_id: invId || '', folder_id: folderId, account_id, contractor_id: contractorId,
+          contract_id: directContractId || '',
         })});
         showToast(t('saved'), 'success');
-        // Reload the contract that contains this invoice
-        for (const [cId, invs] of Object.entries(contractInvoices)) {
-          if (invs.find(i => i.id === invId)) {
-            loadContractDetail(cId);
-            loadContracts(); // refresh paid totals
-            break;
-          }
+        window._directPaymentContractId = null;
+        if (reloadContractId) {
+          loadContractDetail(reloadContractId);
+          loadContracts();
         }
       } catch(e) { showToast(e.message, 'error'); }
     });
