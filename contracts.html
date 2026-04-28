@@ -114,6 +114,7 @@
           <thead>
             <tr>
               <th style="width:30px"></th>
+              <th style="width:24px"></th>
               <th class="sortable" data-sort="date" id="th-date"></th>
               <th style="width:24px"></th>
               <th class="sortable" data-sort="name" id="th-name"></th>
@@ -132,7 +133,7 @@
           <tbody id="ct-tbody"></tbody>
           <tfoot id="ct-tfoot" style="display:none">
             <tr style="background:#f8f8f8;font-weight:600;border-top:2px solid #e8e8e8">
-              <td colspan="6" style="text-align:right;color:#888;padding:12px 14px" id="tf-label"></td>
+              <td colspan="7" style="text-align:right;color:#888;padding:12px 14px" id="tf-label"></td>
               <td id="tf-total"></td>
               <td id="tf-invoiced"></td>
               <td id="tf-paid"></td>
@@ -651,10 +652,10 @@
     async function loadContracts() {
       const tbody = document.getElementById('ct-tbody');
       if (!filterCompany) {
-        tbody.innerHTML = `<tr><td colspan="14" class="empty-state">${t('selectCompanyFirst')}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="15" class="empty-state">${t('selectCompanyFirst')}</td></tr>`;
         return;
       }
-      tbody.innerHTML = `<tr><td colspan="14" class="loading">${t('loading')}</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="15" class="loading">${t('loading')}</td></tr>`;
       try {
         let url = `/contracts?company_id=${filterCompany}&status=${filterStatus}`;
         if (filterSearch) url += `&search=${encodeURIComponent(filterSearch)}`;
@@ -664,7 +665,7 @@
         allContracts = await apiFetch(url);
         renderContracts();
       } catch(e) {
-        tbody.innerHTML = `<tr><td colspan="14" class="empty-state">${e.message}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="15" class="empty-state">${e.message}</td></tr>`;
       }
     }
 
@@ -683,7 +684,7 @@
     function renderContracts() {
       const tbody = document.getElementById('ct-tbody');
       if (!allContracts.length) {
-        tbody.innerHTML = `<tr><td colspan="14" class="empty-state">${t('noContracts')}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="15" class="empty-state">${t('noContracts')}</td></tr>`;
         const tf = document.getElementById('ct-tfoot'); if (tf) tf.style.display = 'none';
         return;
       }
@@ -731,6 +732,7 @@
         if (isExp) tr.className = 'expanded';
         tr.innerHTML = `
           <td><button class="expand-btn${isExp?' open':''}" data-expand-contract="${c.id}">${isExp?'▼':'▶'}</button></td>
+          <td style="text-align:center;cursor:pointer" data-action="toggle-review" data-id="${c.id}">${c.needs_review ? '🔴' : ''}</td>
           <td>${formatDate(c.date)}</td>
           <td style="text-align:center">${parseInt(c.file_count) > 0 ? '<span style="font-size:1rem" title="Files">📄</span>' : ''}</td>
           <td><strong>${c.name || '—'}</strong>${c.external_ref ? `<br><span style="font-size:0.75rem;color:#999">${c.external_ref}</span>` : ''}</td>
@@ -757,7 +759,7 @@
         detailTr.className = 'detail-row';
         detailTr.style.display = isExp ? '' : 'none';
         detailTr.id = `contract-detail-${c.id}`;
-        detailTr.innerHTML = `<td colspan="14"><div class="detail-inner" id="contract-inner-${c.id}">${isExp ? '<div class="loading">'+t('loading')+'</div>' : ''}</div></td>`;
+        detailTr.innerHTML = `<td colspan="15"><div class="detail-inner" id="contract-inner-${c.id}">${isExp ? '<div class="loading">'+t('loading')+'</div>' : ''}</div></td>`;
         tbody.appendChild(detailTr);
 
         if (isExp) loadContractDetail(c.id);
@@ -987,6 +989,31 @@
     // ─── Actions ───
 
     document.addEventListener('click', async e => {
+      // Toggle review
+      if (btn && btn.dataset.action === 'toggle-review') {
+        const id = btn.dataset.id;
+        const c = allContracts.find(x => x.id === id);
+        if (!c) return;
+        const newVal = !c.needs_review;
+        try {
+          await apiFetch(`/contracts/${id}`, { method: 'PUT', body: JSON.stringify({
+            name: c.name, needs_review: newVal, status: c.status,
+            direction: c.direction || 'expense',
+            total_amount: String(numVal(c.total_amount)),
+            subtotal: String(numVal(c.subtotal)),
+            vat_amount: String(numVal(c.vat_amount)),
+            progress_pct: String(numVal(c.progress_pct)),
+            progress_notes: c.progress_notes || '',
+            responsible_email: c.responsible_email || '',
+            payment_terms: c.payment_terms || '',
+            notes: c.notes || '',
+          })});
+          c.needs_review = newVal;
+          renderContracts();
+        } catch(err) { showToast(err.message, 'error'); }
+        return;
+      }
+
       // Sort header click
       const sortTh = e.target.closest('.sortable');
       if (sortTh) {
