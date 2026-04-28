@@ -75,10 +75,13 @@ exports.contract_files = async (req, res) => {
       if (!rows.length) { res.status(404).json({ error: 'Not found' }); return; }
       const parsed = parseKey(rows[0].file_url);
       if (!parsed) { res.status(500).json({ error: 'Bad file_url' }); return; }
-      const [url] = await storage.bucket(parsed.bucket).file(parsed.key).getSignedUrl({
+      const isView = req.query.view === 'true';
+      const signOpts = {
         version: 'v4', action: 'read',
         expires: Date.now() + SIGN_TTL_MS,
-        responseDisposition: `attachment; filename="${encodeURIComponent(rows[0].file_name || 'file')}"`,
+      };
+      if (!isView) signOpts.responseDisposition = `attachment; filename="${encodeURIComponent(rows[0].file_name || 'file')}"`;
+      const [url] = await storage.bucket(parsed.bucket).file(parsed.key).getSignedUrl(signOpts);
       });
       res.json({ url });
       return;
