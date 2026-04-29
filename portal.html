@@ -118,11 +118,11 @@
           <tbody id="ct-tbody"></tbody>
           <tfoot id="ct-tfoot" style="display:none">
             <tr style="background:#f8f8f8;font-weight:600;border-top:2px solid #e8e8e8">
-              <td colspan="6" style="text-align:right;color:#888;padding:12px 14px" id="ptf-label"></td>
+              <td colspan="4" style="text-align:right;color:#888;padding:12px 14px" id="ptf-label"></td>
               <td id="ptf-total"></td>
-              <td id="ptf-invoiced"></td>
               <td id="ptf-paid"></td>
               <td id="ptf-outstanding"></td>
+              <td></td>
               <td></td>
             </tr>
           </tfoot>
@@ -359,7 +359,7 @@
       const field = th.dataset.sort;
       if (sortField === field) sortDir = sortDir === 'asc' ? 'desc' : 'asc';
       else { sortField = field; sortDir = 'asc'; }
-      const colCount = accessLevel === 'full' ? 11 : 8;
+      const colCount = accessLevel === 'full' ? 9 : 6;
       renderContracts(colCount);
     });
 
@@ -374,11 +374,11 @@
       const thead = document.getElementById('contracts-thead');
       if (!thead) return;
       const amtHeaders = accessLevel === 'full'
-        ? `${sortHeader('total_amount',t('contractTotal'))}${sortHeader('invoiced_total',t('contractInvoiced'))}${sortHeader('paid_amount',t('paidAmount'))}${sortHeader('outstanding',t('contractOutstanding'))}`
-        : `<th>${t('portalProgress')}</th>`;
+        ? `${sortHeader('total_amount',t('contractTotal'))}${sortHeader('paid_amount',t('paidAmount'))}${sortHeader('outstanding',t('remainingToPay'))}${sortHeader('progress',t('portalProgress'))}`
+        : `${sortHeader('progress',t('portalProgress'))}`;
       thead.innerHTML = `<tr>
-        <th style="width:30px"></th><th style="width:24px"></th>${sortHeader('date',t('date'))}${sortHeader('name',t('name'))}
-        ${sortHeader('contractor',t('contractor'))}<th>${t('folder')}</th>
+        <th style="width:30px"></th><th style="width:24px"></th>${sortHeader('name',t('name'))}
+        ${sortHeader('contractor',t('contractor'))}
         ${amtHeaders}
         ${sortHeader('status',t('statusLabel'))}
       </tr>`;
@@ -386,7 +386,7 @@
 
     async function loadContracts() {
       const tbody = document.getElementById('ct-tbody');
-      const colCount = accessLevel === 'full' ? 11 : 8;
+      const colCount = accessLevel === 'full' ? 9 : 6;
       tbody.innerHTML = `<tr><td colspan="10" class="loading">${t('loading')}</td></tr>`;
       updateTableHeaders();
 
@@ -432,9 +432,9 @@
           case 'name': va = (a.name || '').toLowerCase(); vb = (b.name || '').toLowerCase(); break;
           case 'contractor': va = (a.contractor_name_en || a.contractor_name_th || '').toLowerCase(); vb = (b.contractor_name_en || b.contractor_name_th || '').toLowerCase(); break;
           case 'total_amount': va = numVal(a.total_amount); vb = numVal(b.total_amount); break;
-          case 'invoiced_total': va = numVal(a.invoiced_total); vb = numVal(b.invoiced_total); break;
           case 'paid_amount': va = numVal(a.paid_amount); vb = numVal(b.paid_amount); break;
           case 'outstanding': va = numVal(a.total_amount) - numVal(a.paid_amount); vb = numVal(b.total_amount) - numVal(b.paid_amount); break;
+          case 'progress': va = numVal(a.paid_pct); vb = numVal(b.paid_pct); break;
           case 'status': va = a.status || ''; vb = b.status || ''; break;
           default: va = ''; vb = '';
         }
@@ -466,9 +466,9 @@
           const outstanding = numVal(c.total_amount) - numVal(c.paid_amount);
           amtCells = `
             <td>${amtCell(c.total_amount, dir)}</td>
-            <td>${amtCell(c.invoiced_total, dir)}</td>
             <td>${amtCell(c.paid_amount, dir)}</td>
-            <td>${amtCell(outstanding, dir)}</td>`;
+            <td>${amtCell(outstanding, dir)}</td>
+            <td>${progressBar(c.paid_pct)}</td>`;
         } else {
           amtCells = `<td>${progressBar(c.paid_pct)}</td>`;
         }
@@ -476,10 +476,8 @@
         tr.innerHTML = `
           <td><button class="expand-btn${isExp?' open':''}" data-expand-contract="${c.id}">${isExp?'▼':'▶'}</button></td>
           <td style="text-align:center;font-size:0.7rem">${c.needs_review ? '🔴' : ''}</td>
-          <td>${formatDate(c.date)}</td>
           <td><strong>${c.name || '—'}</strong>${c.external_ref ? `<br><span style="font-size:0.75rem;color:#999">${c.external_ref}</span>` : ''}</td>
           <td style="font-size:0.82rem">${c.contractor_name_en || c.contractor_name_th || '—'}</td>
-          <td style="font-size:0.82rem">${c.folder_name || '—'}</td>
           ${amtCells}
           <td>${statusBadge(c.status)}</td>
         `;
@@ -496,17 +494,15 @@
 
       // Totals footer (only for full access)
       if (tfoot && accessLevel === 'full' && allContracts.length) {
-        let sumTotal = 0, sumInvoiced = 0, sumPaid = 0;
+        let sumTotal = 0, sumPaid = 0;
         allContracts.forEach(c => {
           sumTotal += numVal(c.total_amount);
-          sumInvoiced += numVal(c.invoiced_total);
           sumPaid += numVal(c.paid_amount);
         });
         const sumOutstanding = sumTotal - sumPaid;
         const dir = allContracts[0]?.direction || 'expense';
         document.getElementById('ptf-label').textContent = t('totalAmount') + ':';
         document.getElementById('ptf-total').innerHTML = amtCell(sumTotal, dir);
-        document.getElementById('ptf-invoiced').innerHTML = amtCell(sumInvoiced, dir);
         document.getElementById('ptf-paid').innerHTML = amtCell(sumPaid, dir);
         document.getElementById('ptf-outstanding').innerHTML = amtCell(sumOutstanding, dir);
         tfoot.style.display = '';
@@ -774,7 +770,7 @@
 
     document.addEventListener('click', async e => {
       const expC = e.target.closest('[data-expand-contract]');
-      if (expC) { const id = expC.dataset.expandContract; expandedContracts[id] = !expandedContracts[id]; renderContracts(accessLevel === 'full' ? 11 : 8); return; }
+      if (expC) { const id = expC.dataset.expandContract; expandedContracts[id] = !expandedContracts[id]; renderContracts(accessLevel === 'full' ? 9 : 6); return; }
 
       const expI = e.target.closest('[data-expand-invoice]');
       if (expI) {
@@ -782,8 +778,8 @@
         expandedInvoices[id] = !expandedInvoices[id];
         const cId = expI.dataset.contractId;
         const invs = contractInvoices[cId];
-        if (invs) renderContractDetail(cId, invs, accessLevel === 'full' ? 11 : 8);
-        else loadContractDetail(cId, accessLevel === 'full' ? 11 : 8);
+        if (invs) renderContractDetail(cId, invs, accessLevel === 'full' ? 9 : 6);
+        else loadContractDetail(cId, accessLevel === 'full' ? 9 : 6);
         return;
       }
 
@@ -1041,7 +1037,7 @@
     window.onLangChange = () => {
       updateTexts();
       updateTableHeaders();
-      if (selectedFolder && allContracts.length) renderContracts(accessLevel === 'full' ? 11 : 8);
+      if (selectedFolder && allContracts.length) renderContracts(accessLevel === 'full' ? 9 : 6);
       if (matSelectedFolder && portalMaterials.length) renderPortalMaterials();
     };
 
