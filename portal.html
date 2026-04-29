@@ -118,7 +118,7 @@
           <tbody id="ct-tbody"></tbody>
           <tfoot id="ct-tfoot" style="display:none">
             <tr style="background:#f8f8f8;font-weight:600;border-top:2px solid #e8e8e8">
-              <td colspan="4" style="text-align:right;color:#888;padding:12px 14px" id="ptf-label"></td>
+              <td colspan="5" style="text-align:right;color:#888;padding:12px 14px" id="ptf-label"></td>
               <td id="ptf-total"></td>
               <td id="ptf-paid"></td>
               <td id="ptf-outstanding"></td>
@@ -359,7 +359,7 @@
       const field = th.dataset.sort;
       if (sortField === field) sortDir = sortDir === 'asc' ? 'desc' : 'asc';
       else { sortField = field; sortDir = 'asc'; }
-      const colCount = accessLevel === 'full' ? 9 : 6;
+      const colCount = accessLevel === 'full' ? 10 : 7;
       renderContracts(colCount);
     });
 
@@ -377,7 +377,7 @@
         ? `${sortHeader('total_amount',t('contractTotal'))}${sortHeader('paid_amount',t('paidAmount'))}${sortHeader('outstanding',t('remainingToPay'))}${sortHeader('progress',t('portalProgress'))}`
         : `${sortHeader('progress',t('portalProgress'))}`;
       thead.innerHTML = `<tr>
-        <th style="width:30px"></th><th style="width:24px"></th>${sortHeader('name',t('name'))}
+        <th style="width:30px"></th><th style="width:24px"></th>${sortHeader('date',t('date'))}${sortHeader('name',t('name'))}
         ${sortHeader('contractor',t('contractor'))}
         ${amtHeaders}
         ${sortHeader('status',t('statusLabel'))}
@@ -386,7 +386,7 @@
 
     async function loadContracts() {
       const tbody = document.getElementById('ct-tbody');
-      const colCount = accessLevel === 'full' ? 9 : 6;
+      const colCount = accessLevel === 'full' ? 10 : 7;
       tbody.innerHTML = `<tr><td colspan="10" class="loading">${t('loading')}</td></tr>`;
       updateTableHeaders();
 
@@ -476,6 +476,7 @@
         tr.innerHTML = `
           <td><button class="expand-btn${isExp?' open':''}" data-expand-contract="${c.id}">${isExp?'▼':'▶'}</button></td>
           <td style="text-align:center;font-size:0.7rem">${c.needs_review ? '🔴' : ''}</td>
+          <td>${formatDate(c.date)}</td>
           <td><strong>${c.name || '—'}</strong>${c.external_ref ? `<br><span style="font-size:0.75rem;color:#999">${c.external_ref}</span>` : ''}</td>
           <td style="font-size:0.82rem">${c.contractor_name_en || c.contractor_name_th || '—'}</td>
           ${amtCells}
@@ -770,7 +771,7 @@
 
     document.addEventListener('click', async e => {
       const expC = e.target.closest('[data-expand-contract]');
-      if (expC) { const id = expC.dataset.expandContract; expandedContracts[id] = !expandedContracts[id]; renderContracts(accessLevel === 'full' ? 9 : 6); return; }
+      if (expC) { const id = expC.dataset.expandContract; expandedContracts[id] = !expandedContracts[id]; renderContracts(accessLevel === 'full' ? 10 : 7); return; }
 
       const expI = e.target.closest('[data-expand-invoice]');
       if (expI) {
@@ -778,8 +779,8 @@
         expandedInvoices[id] = !expandedInvoices[id];
         const cId = expI.dataset.contractId;
         const invs = contractInvoices[cId];
-        if (invs) renderContractDetail(cId, invs, accessLevel === 'full' ? 9 : 6);
-        else loadContractDetail(cId, accessLevel === 'full' ? 9 : 6);
+        if (invs) renderContractDetail(cId, invs, accessLevel === 'full' ? 10 : 7);
+        else loadContractDetail(cId, accessLevel === 'full' ? 10 : 7);
         return;
       }
 
@@ -1037,7 +1038,7 @@
     window.onLangChange = () => {
       updateTexts();
       updateTableHeaders();
-      if (selectedFolder && allContracts.length) renderContracts(accessLevel === 'full' ? 9 : 6);
+      if (selectedFolder && allContracts.length) renderContracts(accessLevel === 'full' ? 10 : 7);
       if (matSelectedFolder && portalMaterials.length) renderPortalMaterials();
     };
 
