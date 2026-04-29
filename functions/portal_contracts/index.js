@@ -270,7 +270,7 @@ exports.portal_contracts = async (req, res) => {
 
     const [rows] = await bigquery.query({
       query: `SELECT c.id, c.name, c.external_ref, c.date, c.direction, c.status,
-                     c.payment_terms, c.notes, c.contractor_id, c.needs_review,
+                     c.payment_terms, c.notes, c.contractor_id, c.needs_review, c.progress_pct,
                      ${amountFields},
                      IFNULL(inv_agg.invoice_count, 0) AS invoice_count,
                      SAFE_DIVIDE(c.paid_amount, NULLIF(c.total_amount, 0)) AS paid_pct,
