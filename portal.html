@@ -239,54 +239,33 @@
     // ─── Auth ───
 
     let _portalAccessToken = null;
+    let _portalLoginHint = null;
+    let _tokenRefreshTimer = null;
 
     async function handlePortalCredential(response) {
-      // Exchange ID token for access token via Google
-      // For portal, we use the ID token's email to look up portal_users
-      // We need an access token for API calls — use the same GSI flow
-      _portalAccessToken = response.credential;
-      // Decode JWT to get email
       const payload = JSON.parse(atob(response.credential.split('.')[1]));
-      await portalLogin(payload.email, response.credential);
+      await portalLogin(payload.email);
     }
 
-    async function portalLogin(email, idToken) {
+    async function portalLogin(loginHint) {
       try {
-        // For portal auth we need an access token. Let's request one.
         const tokenClient = google.accounts.oauth2.initTokenClient({
           client_id: '6445860840-9bfshkstrc2vra49qi847ie9od38614t.apps.googleusercontent.com',
           scope: 'email profile',
+          hint: loginHint,
           callback: async (tokenResponse) => {
-            _portalAccessToken = tokenResponse.access_token;
-            try {
-              const me = await portalFetch('/portal_contracts/me');
-              portalUser = me.user;
-              portalSections = me.sections;
-              portalFolders = me.folders;
-              accessLevel = portalSections.contracts || 'full';
-
-              document.getElementById('guest-view').style.display = 'none';
-              document.getElementById('app-view').style.display = 'block';
-              document.getElementById('portal-header').style.display = 'flex';
-              document.getElementById('portal-user-name').textContent = portalUser.name || portalUser.email;
-
-              fillFolderSelect();
-
-              // Show/hide nav tabs based on sections
-              const navContracts = document.getElementById('portal-nav-contracts');
-              const navMaterials = document.getElementById('portal-nav-materials');
-              if (navContracts) navContracts.style.display = portalSections.contracts ? '' : 'none';
-              if (navMaterials) navMaterials.style.display = portalSections.materials ? '' : 'none';
-
-              // Default to first available section
-              if (portalSections.contracts) switchPortalSection('contracts');
-              else if (portalSections.materials) switchPortalSection('materials');
-
-              fillMatFolderSelect();
-              updateTexts();
-            } catch(e) {
-              showToast(e.message, 'error');
+            if (tokenResponse.error) {
+              sessionStorage.removeItem('portal_token');
+              sessionStorage.removeItem('portal_hint');
+              showToast('Auth error', 'error');
+              return;
             }
+            _portalAccessToken = tokenResponse.access_token;
+            _portalLoginHint = loginHint;
+            sessionStorage.setItem('portal_token', _portalAccessToken);
+            sessionStorage.setItem('portal_hint', loginHint);
+            scheduleTokenRefresh();
+            await initApp();
           },
         });
         tokenClient.requestAccessToken();
@@ -295,8 +274,68 @@
       }
     }
 
+    function scheduleTokenRefresh() {
+      if (_tokenRefreshTimer) clearTimeout(_tokenRefreshTimer);
+      // Refresh token every 50 minutes (Google access tokens expire in 60 min)
+      _tokenRefreshTimer = setTimeout(() => {
+        if (_portalLoginHint) portalLogin(_portalLoginHint);
+      }, 50 * 60 * 1000);
+    }
+
+    async function initApp() {
+      try {
+        const me = await portalFetch('/portal_contracts/me');
+        portalUser = me.user;
+        portalSections = me.sections;
+        portalFolders = me.folders;
+        accessLevel = portalSections.contracts || 'full';
+
+        document.getElementById('guest-view').style.display = 'none';
+        document.getElementById('app-view').style.display = 'block';
+        document.getElementById('portal-header').style.display = 'flex';
+        document.getElementById('portal-user-name').textContent = portalUser.name || portalUser.email;
+
+        fillFolderSelect();
+
+        const navContracts = document.getElementById('portal-nav-contracts');
+        const navMaterials = document.getElementById('portal-nav-materials');
+        if (navContracts) navContracts.style.display = portalSections.contracts ? '' : 'none';
+        if (navMaterials) navMaterials.style.display = portalSections.materials ? '' : 'none';
+
+        if (portalSections.contracts) switchPortalSection('contracts');
+        else if (portalSections.materials) switchPortalSection('materials');
+
+        fillMatFolderSelect();
+        updateTexts();
+      } catch(e) {
+        // Token expired or invalid — clear and show login
+        sessionStorage.removeItem('portal_token');
+        sessionStorage.removeItem('portal_hint');
+        _portalAccessToken = null;
+        document.getElementById('guest-view').style.display = 'block';
+        document.getElementById('app-view').style.display = 'none';
+        document.getElementById('portal-header').style.display = 'none';
+      }
+    }
+
+    // Try to restore session on page load
+    async function tryRestoreSession() {
+      const savedToken = sessionStorage.getItem('portal_token');
+      const savedHint = sessionStorage.getItem('portal_hint');
+      if (savedToken) {
+        _portalAccessToken = savedToken;
+        _portalLoginHint = savedHint;
+        scheduleTokenRefresh();
+        await initApp();
+      }
+    }
+
     function portalLogout() {
       _portalAccessToken = null;
+      _portalLoginHint = null;
+      if (_tokenRefreshTimer) clearTimeout(_tokenRefreshTimer);
+      sessionStorage.removeItem('portal_token');
+      sessionStorage.removeItem('portal_hint');
       portalUser = null;
       document.getElementById('guest-view').style.display = 'block';
       document.getElementById('app-view').style.display = 'none';
@@ -1043,6 +1082,7 @@
     };
 
     updateTexts();
+    tryRestoreSession();
   </script>
 </body>
 </html>
