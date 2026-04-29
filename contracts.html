@@ -105,6 +105,7 @@
             <option value="cancelled"></option>
             <option value="all"></option>
           </select>
+          <button class="btn btn-outline" id="btn-print" onclick="printContracts()" style="padding:6px 12px;font-size:0.82rem">🖨</button>
           <button class="btn btn-primary" id="btn-create"></button>
         </div>
       </div>
@@ -1625,6 +1626,91 @@
     };
     window.onLogout = () => { updateTexts(); };
     window.onLangChange = () => { updateTexts(); renderContracts(); };
+
+    function printContracts() {
+      if (!allContracts.length) return;
+
+      const sorted = [...allContracts].sort((a, b) => {
+        let va, vb;
+        switch(sortField) {
+          case 'date': va = a.date?.value || a.date || ''; vb = b.date?.value || b.date || ''; break;
+          case 'name': va = (a.name || '').toLowerCase(); vb = (b.name || '').toLowerCase(); break;
+          default: va = ''; vb = '';
+        }
+        if (va < vb) return sortDir === 'asc' ? -1 : 1;
+        if (va > vb) return sortDir === 'asc' ? 1 : -1;
+        return 0;
+      });
+
+      const company = companiesCache.find(c => c.id === filterCompany);
+      const dir = sorted[0]?.direction || 'expense';
+      let sumTotal = 0, sumPaid = 0;
+      sorted.forEach(c => { sumTotal += numVal(c.total_amount); sumPaid += numVal(c.paid_amount); });
+
+      const rows = sorted.map(c => {
+        const total = numVal(c.total_amount);
+        const paid = numVal(c.paid_amount);
+        const toPay = total - paid;
+        const dTotal = dir === 'expense' ? -total : total;
+        const dPaid = dir === 'expense' ? -paid : paid;
+        const dToPay = dir === 'expense' ? -toPay : toPay;
+        return `<tr>
+          <td>${formatDate(c.date)}</td>
+          <td>${c.name || '—'}${c.external_ref ? '<br><small style="color:#999">'+c.external_ref+'</small>' : ''}</td>
+          <td>${c.contractor_name_en || c.contractor_name_th || '—'}</td>
+          <td style="text-align:right">${fmt(dTotal)}</td>
+          <td style="text-align:right">${fmt(dPaid)}</td>
+          <td style="text-align:right">${fmt(dToPay)}</td>
+          <td style="text-align:center">${numVal(c.progress_pct)}%</td>
+          <td>${c.status || '—'}</td>
+        </tr>`;
+      }).join('');
+
+      const dSumTotal = dir === 'expense' ? -sumTotal : sumTotal;
+      const dSumPaid = dir === 'expense' ? -sumPaid : sumPaid;
+      const dSumToPay = dir === 'expense' ? -(sumTotal - sumPaid) : (sumTotal - sumPaid);
+
+      const html = `<!DOCTYPE html><html><head><meta charset="UTF-8">
+        <title>Contracts — ${company?.name || ''}</title>
+        <style>
+          body { font-family: Arial, sans-serif; font-size: 11px; margin: 20px; }
+          h2 { font-size: 14px; margin-bottom: 4px; }
+          .meta { font-size: 10px; color: #888; margin-bottom: 12px; }
+          table { width: 100%; border-collapse: collapse; }
+          th { background: #f0f0f0; padding: 5px 6px; font-size: 10px; text-align: left; border-bottom: 2px solid #ccc; }
+          td { padding: 4px 6px; border-bottom: 1px solid #eee; }
+          tfoot td { font-weight: bold; border-top: 2px solid #333; padding-top: 6px; }
+          .neg { color: #c00; }
+          @media print { body { margin: 10px; } }
+        </style>
+      </head><body>
+        <h2>Contracts — ${company?.name || 'All'}</h2>
+        <div class="meta">${new Date().toLocaleDateString()} · ${sorted.length} contracts</div>
+        <table>
+          <thead><tr>
+            <th>Date</th><th>Name</th><th>Contractor</th>
+            <th style="text-align:right">Total</th>
+            <th style="text-align:right">Paid</th>
+            <th style="text-align:right">To Pay</th>
+            <th style="text-align:center">Progress</th>
+            <th>Status</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+          <tfoot><tr>
+            <td colspan="3" style="text-align:right">Total:</td>
+            <td style="text-align:right">${fmt(dSumTotal)}</td>
+            <td style="text-align:right">${fmt(dSumPaid)}</td>
+            <td style="text-align:right">${fmt(dSumToPay)}</td>
+            <td colspan="2"></td>
+          </tr></tfoot>
+        </table>
+      </body></html>`;
+
+      const win = window.open('', '_blank');
+      win.document.write(html);
+      win.document.close();
+      setTimeout(() => win.print(), 300);
+    }
 
     renderHeader('contracts');
     updateTexts();
