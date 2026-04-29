@@ -51,6 +51,7 @@
     .badge-green { background:#e6f4ea;color:#1e8e3e; }
     .badge-gray { background:#f0f0f0;color:#888; }
     .badge-red { background:#fce8e6;color:#c5221f; }
+    .badge-yellow { background:#fef7e0;color:#e37400; }
 
     .progress-bar-wrap { width:100px;height:8px;background:#e8e8e8;border-radius:4px;overflow:hidden;display:inline-block;vertical-align:middle; }
     .progress-bar-fill { height:100%;background:#1e8e3e;border-radius:4px;transition:width 0.3s; }
@@ -188,7 +189,10 @@
     function pct(v) { const n = numVal(v); return isNaN(n) ? 0 : Math.round(n * 100); }
 
     function statusBadge(s) {
+      if (s === 'estimate')  return `<span class="badge badge-yellow">${t('estimate')}</span>`;
+      if (s === 'confirmed') return `<span class="badge badge-green">${t('confirmed')}</span>`;
       if (s === 'active')    return `<span class="badge badge-green">${t('active')}</span>`;
+      if (s === 'delivered') return `<span class="badge badge-green">${t('delivered')}</span>`;
       if (s === 'completed') return `<span class="badge badge-gray">${t('completed')}</span>`;
       if (s === 'cancelled') return `<span class="badge badge-red">${t('cancelled')}</span>`;
       return `<span class="badge badge-gray">${s || '—'}</span>`;
@@ -224,6 +228,9 @@
       const sVal = sSel.value;
       sSel.innerHTML = `<option value="">${t('allStatuses')}</option>
         <option value="active">${t('active')}</option>
+        <option value="estimate">${t('estimate')}</option>
+        <option value="confirmed">${t('confirmed')}</option>
+        <option value="delivered">${t('delivered')}</option>
         <option value="completed">${t('completed')}</option>
         <option value="cancelled">${t('cancelled')}</option>`;
       sSel.value = sVal;

@@ -101,6 +101,7 @@
             <option value="active"></option>
             <option value="estimate"></option>
             <option value="confirmed"></option>
+            <option value="delivered"></option>
             <option value="completed"></option>
             <option value="cancelled"></option>
             <option value="all"></option>
@@ -184,6 +185,7 @@
           <select id="c-status-select">
             <option value="estimate"></option>
             <option value="confirmed"></option>
+            <option value="delivered"></option>
             <option value="completed"></option>
             <option value="cancelled"></option>
           </select>
@@ -453,6 +455,7 @@
       if (s === 'estimate')  return `<span class="badge badge-yellow">${t('estimate')}</span>`;
       if (s === 'confirmed') return `<span class="badge badge-green">${t('confirmed')}</span>`;
       if (s === 'active')    return `<span class="badge badge-green">${t('active')}</span>`;
+      if (s === 'delivered') return `<span class="badge badge-green">${t('delivered')}</span>`;
       if (s === 'completed') return `<span class="badge badge-gray">${t('completed')}</span>`;
       if (s === 'cancelled') return `<span class="badge badge-red">${t('cancelled')}</span>`;
       return `<span class="badge badge-gray">${s || '—'}</span>`;
@@ -476,8 +479,9 @@
 
       const fs = document.getElementById('filter-status');
       if (fs) { fs.options[0].text = t('active'); fs.options[1].text = t('estimate');
-        fs.options[2].text = t('confirmed'); fs.options[3].text = t('completed');
-        fs.options[4].text = t('cancelled'); fs.options[5].text = t('allStatuses'); }
+        fs.options[2].text = t('confirmed'); fs.options[3].text = t('delivered');
+        fs.options[4].text = t('completed'); fs.options[5].text = t('cancelled');
+        fs.options[6].text = t('allStatuses'); }
 
       setText('th-date', t('date'));
       setText('th-name', t('name'));
@@ -500,7 +504,8 @@
       setText('lbl-c-status', t('statusLabel'));
       const cs = document.getElementById('c-status-select');
       if (cs) { cs.options[0].text = t('estimate'); cs.options[1].text = t('confirmed');
-        cs.options[2].text = t('completed'); cs.options[3].text = t('cancelled'); }
+        cs.options[2].text = t('delivered'); cs.options[3].text = t('completed');
+        cs.options[4].text = t('cancelled'); }
       setText('lbl-c-subtotal', t('subtotal'));
       setText('lbl-c-vat', t('vatAmount'));
       setText('lbl-c-total', t('contractTotal'));
