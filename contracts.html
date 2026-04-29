@@ -418,6 +418,7 @@
     let contractInvoices  = {}; // contractId → [invoices]
     let contractFilesCache = {}; // contractId → [files]
     let contractDirectTrx  = {}; // contractId → [transactions]
+    let contractDirectTrxFiles = {}; // contractId → { txId → [files] }
     let invoiceTrx        = {}; // invoiceId → [transactions]
     let fileUploadCtx     = null; // { type:'contract'|'invoice'|'transaction', id, folderId, contractId }
 
@@ -785,9 +786,14 @@
           apiFetch(`/contract_files?contract_id=${contractId}`),
           apiFetch(`/transactions?contract_id=${contractId}`),
         ]);
+        // Load files for each direct transaction
+        const dtfArr = await Promise.all(directTrx.map(tx => apiFetch(`/transaction_files?transaction_id=${tx.id}`).catch(() => [])));
+        const dtfMap = {};
+        directTrx.forEach((tx, i) => { dtfMap[tx.id] = dtfArr[i] || []; });
         contractInvoices[contractId] = invs;
         contractFilesCache[contractId] = cFiles;
         contractDirectTrx[contractId] = directTrx;
+        contractDirectTrxFiles[contractId] = dtfMap;
         renderContractDetail(contractId, invs, cFiles, directTrx);
       } catch(e) {
         inner.innerHTML = `<div style="color:#c33">${e.message}</div>`;
@@ -864,6 +870,7 @@
 
       // Direct payments (without invoice)
       const directTrx = arguments[3] || [];
+      const dtfMap = contractDirectTrxFiles[contractId] || {};
       if (directTrx.length || true) {
         html += `<div style="background:#e8faed;border-radius:8px;padding:10px 12px;margin:10px 0">`;
         html += `<div style="font-size:0.75rem;color:#888;text-transform:uppercase;margin-bottom:6px">${t('paidAmount')} (Direct)</div>`;
@@ -871,12 +878,15 @@
         directTrx.forEach(tx => {
           const sign = tx.direction === 'expense' ? '-' : '';
           const cls = tx.direction === 'expense' ? 'expense' : 'income';
+          const txFiles = dtfMap[tx.id] || [];
           html += `<tr>
             <td>${formatDate(tx.date)}</td>
             <td><span class="amount-col ${cls}">${sign}${fmt(tx.amount)}</span></td>
             <td style="font-size:0.78rem">${tx.account_name || '—'}</td>
             <td style="font-size:0.78rem;color:#666">${tx.description || '—'}</td>
             <td style="white-space:nowrap">
+              <button class="btn btn-outline" style="padding:1px 6px;font-size:0.72rem"
+                data-action="add-file" data-entity-type="transaction" data-entity-id="${tx.id}" data-contract-id="${contractId}" data-folder-id="${tx.folder_id || ''}">📎</button>
               <button class="btn btn-outline" style="padding:1px 6px;font-size:0.72rem"
                 data-action="edit-direct-trx" data-id="${tx.id}" data-contract-id="${contractId}"
                 data-date="${tx.date ? (tx.date.value || tx.date) : ''}"
@@ -887,6 +897,24 @@
                 data-action="delete-direct-trx" data-id="${tx.id}" data-contract-id="${contractId}">×</button>
             </td>
           </tr>`;
+          if (txFiles.length) {
+            html += `<tr><td colspan="5" style="padding:2px 0 6px 16px">`;
+            txFiles.forEach(f => {
+              const size = f.file_size > 1048576 ? (f.file_size/1048576).toFixed(1)+' MB' : Math.round((f.file_size||0)/1024)+' KB';
+              const isPdf = (f.file_name || '').toLowerCase().endsWith('.pdf');
+              html += `<div style="display:flex;align-items:center;gap:6px;font-size:0.78rem;padding:1px 0">
+                ${isPdf ? `<button style="background:none;border:none;cursor:pointer;font-size:0.85rem;padding:0" title="View PDF"
+                  data-action="view-pdf" data-entity-type="transaction" data-file-id="${f.id}" data-file-name="${(f.file_name||'').replace(/"/g,'&quot;')}">👁</button>` : '<span style="width:0.85rem;display:inline-block"></span>'}
+                <span style="flex:1;color:#333">${isPdf ? '📄' : '📎'} ${f.file_name || '—'} <span style="color:#999">(${size})</span></span>
+                <button class="btn btn-outline" style="padding:0px 5px;font-size:0.68rem"
+                  data-action="download-file" data-entity-type="transaction" data-file-id="${f.id}">${t('download')}</button>
+                <button class="btn btn-outline" style="padding:0px 5px;font-size:0.68rem;color:#c5221f;border-color:#c5221f"
+                  data-action="delete-file" data-entity-type="transaction" data-file-id="${f.id}"
+                  data-entity-id="${tx.id}" data-contract-id="${contractId}">×</button>
+              </div>`;
+            });
+            html += `</td></tr>`;
+          }
         });
         html += `</tbody></table>`; }
         html += `<div style="margin-top:6px"><button class="btn btn-outline" style="font-size:0.75rem;padding:3px 10px" data-action="add-direct-payment" data-contract-id="${contractId}">${t('addTransaction')}</button></div>`;
@@ -1275,6 +1303,8 @@
             for (const [cId, invs] of Object.entries(contractInvoices)) {
               if (invs.find(i => i.id === entityId)) { loadInvoiceTrx(entityId, cId); break; }
             }
+          } else if (entityType === 'transaction' && contractId) {
+            loadContractDetail(contractId);
           }
         } catch(err) { showToast(err.message, 'error'); btn.disabled = false; }
       }
@@ -1602,6 +1632,8 @@
           for (const [cId, invs] of Object.entries(contractInvoices)) {
             if (invs.find(i => i.id === ctx.id)) { loadInvoiceTrx(ctx.id, cId); break; }
           }
+        } else if (ctx.type === 'transaction' && ctx.contractId) {
+          loadContractDetail(ctx.contractId);
         }
       } catch(e) { showToast(e.message, 'error'); }
     });
