@@ -865,6 +865,9 @@
       if (contract?.responsible_email) {
         html += `<div style="font-size:0.82rem;color:#555;margin-bottom:8px">${t('responsible')}: <strong>${responsibleName(contract.responsible_email)}</strong></div>`;
       }
+      if (contract?.updated_by) {
+        html += `<div style="font-size:0.78rem;color:#999;margin-bottom:8px">${t('lastModified')}: ${contract.updated_by} · ${formatDate(contract.updated_at)}</div>`;
+      }
       if (contract?.notes) {
         html += `<div style="margin-bottom:12px;padding:10px 14px;background:#fff;border:1px solid #e8e8e8;border-radius:8px">
           <div style="font-size:0.75rem;color:#888;text-transform:uppercase;margin-bottom:4px">${t('notes')}</div>

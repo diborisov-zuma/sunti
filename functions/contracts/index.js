@@ -129,7 +129,7 @@ exports.contracts = async (req, res) => {
                        c.date, c.direction, c.total_amount, c.subtotal, c.vat_amount,
                        c.paid_amount, c.payment_terms, c.status, c.notes,
                        c.progress_pct, c.progress_notes, c.responsible_email, c.needs_review,
-                       c.created_by, c.created_at,
+                       c.created_by, c.created_at, c.updated_by, c.updated_at,
                        f.name AS folder_name,
                        ct.name_en AS contractor_name_en, ct.name_th AS contractor_name_th,
                        IFNULL(inv_agg.invoiced_total, CAST(0 AS NUMERIC)) AS invoiced_total,
@@ -251,7 +251,9 @@ exports.contracts = async (req, res) => {
                     progress_pct   = CAST(@progress_pct AS NUMERIC),
                     progress_notes = NULLIF(@progress_notes,''),
                     responsible_email = NULLIF(@responsible_email,''),
-                    needs_review = @needs_review
+                    needs_review = @needs_review,
+                    updated_by = @updated_by,
+                    updated_at = CURRENT_TIMESTAMP()
                 WHERE id = @id`,
         params: {
           id,
@@ -271,6 +273,7 @@ exports.contracts = async (req, res) => {
           progress_notes: b.progress_notes || '',
           responsible_email: b.responsible_email || '',
           needs_review: b.needs_review !== undefined ? !!b.needs_review : false,
+          updated_by: email,
         },
       });
       // Cascade folder change to invoices and transactions
