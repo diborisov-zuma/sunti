@@ -92,6 +92,7 @@ exports.portal_contracts = async (req, res) => {
   const catTable = `\`${PROJECT}.${DATASET}.categories\``;
   const cfTable  = `\`${PROJECT}.${DATASET}.contract_files\``;
   const ifTable  = `\`${PROJECT}.${DATASET}.invoice_files\``;
+  const tfTable  = `\`${PROJECT}.${DATASET}.transaction_files\``;
 
   try {
     // GET /portal_contracts/me — portal user info + folders + sections
@@ -110,13 +111,17 @@ exports.portal_contracts = async (req, res) => {
       const fileId = parts[parts.length - 2];
       const fileType = parts[parts.indexOf('files') - 1]; // 'contract' or 'invoice'
 
-      // Try contract_files first, then invoice_files
+      // Try contract_files, invoice_files, then transaction_files
       let fileRow = null;
       const [cf] = await bigquery.query({ query: `SELECT file_url, file_name FROM ${cfTable} WHERE id = @id`, params: { id: fileId } });
       if (cf.length) fileRow = cf[0];
       if (!fileRow) {
         const [inf] = await bigquery.query({ query: `SELECT file_url, file_name FROM ${ifTable} WHERE id = @id`, params: { id: fileId } });
         if (inf.length) fileRow = inf[0];
+      }
+      if (!fileRow) {
+        const [tf] = await bigquery.query({ query: `SELECT file_url, file_name FROM ${tfTable} WHERE id = @id`, params: { id: fileId } });
+        if (tf.length) fileRow = tf[0];
       }
       if (!fileRow) { res.status(404).json({ error: 'File not found' }); return; }
 
@@ -150,51 +155,96 @@ exports.portal_contracts = async (req, res) => {
         query: `SELECT i.id, i.name, i.date, i.status, i.direction, i.category_id, i.contract_id,
                        ${amountFields},
                        c.name AS category_name,
-                       ${accessLevel === 'full' ? `
                        SAFE_DIVIDE(i.paid_amount, NULLIF(i.total_amount, 0)) AS paid_pct
-                       ` : `
-                       SAFE_DIVIDE(i.paid_amount, NULLIF(i.total_amount, 0)) AS paid_pct
-                       `}
                 FROM ${invTable} i
                 LEFT JOIN ${catTable} c ON i.category_id = c.id
                 WHERE i.contract_id = @cid AND IFNULL(i.status,'active') != 'deleted'
                 ORDER BY i.date DESC`,
         params: { cid: contractId },
       });
-      res.json({ rows, access_level: accessLevel });
+
+      // Load invoice files (only for full access)
+      let invFilesMap = {};
+      if (accessLevel === 'full' && rows.length) {
+        const invIds = rows.map(r => r.id);
+        const [iFiles] = await bigquery.query({
+          query: `SELECT id, invoice_id, file_name, file_size FROM ${ifTable} WHERE invoice_id IN UNNEST(@ids) ORDER BY uploaded_at DESC`,
+          params: { ids: invIds },
+        });
+        iFiles.forEach(f => {
+          if (!invFilesMap[f.invoice_id]) invFilesMap[f.invoice_id] = [];
+          invFilesMap[f.invoice_id].push(f);
+        });
+      }
+
+      res.json({ rows, files: invFilesMap, access_level: accessLevel });
       return;
     }
 
-    // GET /portal_contracts/:id/transactions?invoice_id=X — transactions for an invoice
+    // GET /portal_contracts/:id/transactions?invoice_id=X or ?contract_id=X — transactions
     if (path.endsWith('/transactions')) {
       const invoiceId = req.query.invoice_id;
-      if (!invoiceId) { res.status(400).json({ error: 'invoice_id required' }); return; }
+      const contractId = req.query.contract_id;
+      if (!invoiceId && !contractId) { res.status(400).json({ error: 'invoice_id or contract_id required' }); return; }
 
-      // Verify invoice → contract → folder is allowed
-      const [invCheck] = await bigquery.query({
-        query: `SELECT i.contract_id, c.folder_id
-                FROM ${invTable} i
-                JOIN ${cTable} c ON i.contract_id = c.id
-                WHERE i.id = @iid AND c.folder_id IN UNNEST(@fids)`,
-        params: { iid: invoiceId, fids: folderIds },
-      });
-      if (!invCheck.length) { res.status(403).json({ error: 'Forbidden' }); return; }
+      if (invoiceId) {
+        // Verify invoice → contract → folder is allowed
+        const [invCheck] = await bigquery.query({
+          query: `SELECT i.contract_id, c.folder_id
+                  FROM ${invTable} i
+                  JOIN ${cTable} c ON i.contract_id = c.id
+                  WHERE i.id = @iid AND c.folder_id IN UNNEST(@fids)`,
+          params: { iid: invoiceId, fids: folderIds },
+        });
+        if (!invCheck.length) { res.status(403).json({ error: 'Forbidden' }); return; }
+      } else {
+        // Verify contract → folder is allowed
+        const [cCheck] = await bigquery.query({
+          query: `SELECT folder_id FROM ${cTable} WHERE id = @id AND folder_id IN UNNEST(@fids) AND IFNULL(status,'active') != 'deleted'`,
+          params: { id: contractId, fids: folderIds },
+        });
+        if (!cCheck.length) { res.status(403).json({ error: 'Forbidden' }); return; }
+      }
 
       const amountFields = accessLevel === 'full'
         ? 't.amount'
         : 'CAST(0 AS NUMERIC) AS amount';
 
+      const whereClause = invoiceId
+        ? 't.invoice_id = @iid'
+        : 't.contract_id = @cid AND t.invoice_id IS NULL';
+      const trxParams = invoiceId ? { iid: invoiceId } : { cid: contractId };
+
+      const acctTable = `\`${PROJECT}.${DATASET}.company_accounts\``;
       const [rows] = await bigquery.query({
-        query: `SELECT t.id, t.date, t.direction, t.description, t.category_id,
+        query: `SELECT t.id, t.date, t.direction, t.description, t.category_id, t.folder_id,
+                       t.account_id,
                        ${amountFields},
-                       cat.name AS category_name
+                       cat.name AS category_name,
+                       a.name AS account_name
                 FROM ${trxTable} t
                 LEFT JOIN ${catTable} cat ON t.category_id = cat.id
-                WHERE t.invoice_id = @iid AND IFNULL(t.status,'active') != 'deleted'
+                LEFT JOIN ${acctTable} a ON t.account_id = a.id
+                WHERE ${whereClause} AND IFNULL(t.status,'active') != 'deleted'
                 ORDER BY t.date DESC`,
-        params: { iid: invoiceId },
+        params: trxParams,
       });
-      res.json({ rows, access_level: accessLevel });
+
+      // Load transaction files (only for full access)
+      let trxFilesMap = {};
+      if (accessLevel === 'full' && rows.length) {
+        const trxIds = rows.map(r => r.id);
+        const [tFiles] = await bigquery.query({
+          query: `SELECT id, transaction_id, file_name, file_size FROM ${tfTable} WHERE transaction_id IN UNNEST(@ids) ORDER BY uploaded_at DESC`,
+          params: { ids: trxIds },
+        });
+        tFiles.forEach(f => {
+          if (!trxFilesMap[f.transaction_id]) trxFilesMap[f.transaction_id] = [];
+          trxFilesMap[f.transaction_id].push(f);
+        });
+      }
+
+      res.json({ rows, files: trxFilesMap, access_level: accessLevel });
       return;
     }
 
@@ -211,16 +261,18 @@ exports.portal_contracts = async (req, res) => {
       : `CAST(0 AS NUMERIC) AS total_amount, CAST(0 AS NUMERIC) AS subtotal, CAST(0 AS NUMERIC) AS vat_amount, CAST(0 AS NUMERIC) AS paid_amount,
          CAST(0 AS NUMERIC) AS invoiced_total`;
 
+    let extraWhere = '';
+    const params = { fid: folderId };
+    if (req.query.search) { extraWhere += ' AND LOWER(c.name) LIKE LOWER(@search)'; params.search = `%${req.query.search.trim()}%`; }
+    if (req.query.contractor_id) { extraWhere += ' AND c.contractor_id = @contractor_id'; params.contractor_id = req.query.contractor_id; }
+    if (req.query.status) { extraWhere += ' AND c.status = @status'; params.status = req.query.status; }
+
     const [rows] = await bigquery.query({
       query: `SELECT c.id, c.name, c.external_ref, c.date, c.direction, c.status,
-                     c.payment_terms, c.notes,
+                     c.payment_terms, c.notes, c.contractor_id,
                      ${amountFields},
                      IFNULL(inv_agg.invoice_count, 0) AS invoice_count,
-                     ${accessLevel === 'full' ? `
-                     SAFE_DIVIDE(c.paid_amount, NULLIF(c.total_amount, 0)) AS paid_pct
-                     ` : `
-                     SAFE_DIVIDE(c.paid_amount, NULLIF(c.total_amount, 0)) AS paid_pct
-                     `},
+                     SAFE_DIVIDE(c.paid_amount, NULLIF(c.total_amount, 0)) AS paid_pct,
                      f.name AS folder_name,
                      ct.name_en AS contractor_name_en, ct.name_th AS contractor_name_th
               FROM ${cTable} c
@@ -235,9 +287,9 @@ exports.portal_contracts = async (req, res) => {
                 GROUP BY contract_id
               ) inv_agg ON inv_agg.contract_id = c.id
               WHERE c.folder_id = @fid AND IFNULL(c.status,'active') != 'deleted'
-              ${req.query.search ? 'AND LOWER(c.name) LIKE LOWER(@search)' : ''}
+              ${extraWhere}
               ORDER BY c.date DESC NULLS LAST`,
-      params: { fid: folderId, ...(req.query.search ? { search: `%${req.query.search.trim()}%` } : {}) },
+      params,
     });
 
     // Load contract files
@@ -254,7 +306,16 @@ exports.portal_contracts = async (req, res) => {
       });
     }
 
-    res.json({ rows, files: filesMap, access_level: accessLevel });
+    // Load contractors for filter dropdown
+    const [contractors] = await bigquery.query({
+      query: `SELECT DISTINCT ct.id, ct.name_en, ct.name_th
+              FROM ${cTable} c JOIN ${ctrTable} ct ON c.contractor_id = ct.id
+              WHERE c.folder_id = @fid AND IFNULL(c.status,'active') != 'deleted'
+              ORDER BY ct.name_en`,
+      params: { fid: folderId },
+    });
+
+    res.json({ rows, files: filesMap, contractors, access_level: accessLevel });
     return;
 
   } catch(e) {

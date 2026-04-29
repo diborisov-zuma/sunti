@@ -77,6 +77,10 @@
     <div class="modal" style="width:400px;max-width:95vw">
       <h3 id="t-snap-title"></h3>
       <div class="field-group">
+        <label id="lbl-snap-date"></label>
+        <input type="date" id="snap-date">
+      </div>
+      <div class="field-group">
         <label id="lbl-snap-name"></label>
         <input type="text" id="snap-name">
       </div>
@@ -136,6 +140,7 @@
       document.getElementById('t-page-title').textContent = t('ctcReport');
       document.getElementById('btn-snapshot').textContent = t('saveSnapshot');
       document.getElementById('t-snap-title').textContent = t('saveSnapshot');
+      document.getElementById('lbl-snap-date').textContent = t('snapshotDate');
       document.getElementById('lbl-snap-name').textContent = t('snapshotName');
       document.getElementById('btn-snap-cancel').textContent = t('cancel');
       document.getElementById('btn-snap-save').textContent = t('save');
