@@ -206,8 +206,8 @@
       return `<span class="amount-col ${cls}">${sign}${fmt(n)}</span>`;
     }
 
-    function progressBar(val) {
-      const p = Math.round(numVal(val));
+    function progressBar(val, isFraction) {
+      const p = isFraction ? pct(val) : Math.round(numVal(val));
       return `<div class="progress-bar-wrap"><div class="progress-bar-fill" style="width:${Math.min(p, 100)}%"></div></div> <span style="font-size:0.78rem;color:#666">${p}%</span>`;
     }
 
@@ -660,7 +660,7 @@
               <td>${amtCell(inv.total_amount, dir)}</td>
               <td>${amtCell(inv.paid_amount, dir)}</td>`;
           } else {
-            amtCells = `<td>${progressBar(inv.paid_pct)}</td>`;
+            amtCells = `<td>${progressBar(inv.paid_pct, true)}</td>`;
           }
           html += `<tr class="${invExp ? 'expanded' : ''}">
             <td><button class="expand-btn${invExp?' open':''}" data-expand-invoice="${inv.id}" data-contract-id="${contractId}">${invExp?'▼':'▶'}</button></td>
