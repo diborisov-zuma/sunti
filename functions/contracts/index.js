@@ -119,7 +119,7 @@ exports.contracts = async (req, res) => {
       if (req.query.responsible) { where += ' AND c.responsible_email = @responsible'; params.responsible = req.query.responsible; }
       if (folder_id)     { where += ' AND c.folder_id = @folder_id'; params.folder_id = folder_id; }
       if (contractor_id) { where += ' AND c.contractor_id = @contractor_id'; params.contractor_id = contractor_id; }
-      if (status === 'active') { where += " AND c.status IN ('estimate','confirmed','active')"; }
+      if (status === 'active') { where += " AND c.status IN ('estimate','confirmed','active','delivered')"; }
       else if (status && status !== 'all') { where += ' AND c.status = @status'; params.status = status; }
       if (date_from) { where += ' AND c.date >= @date_from'; params.date_from = date_from; }
       if (date_to)   { where += ' AND c.date <= @date_to';   params.date_to   = date_to; }

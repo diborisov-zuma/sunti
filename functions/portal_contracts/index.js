@@ -265,7 +265,8 @@ exports.portal_contracts = async (req, res) => {
     const params = { fid: folderId };
     if (req.query.search) { extraWhere += ' AND LOWER(c.name) LIKE LOWER(@search)'; params.search = `%${req.query.search.trim()}%`; }
     if (req.query.contractor_id) { extraWhere += ' AND c.contractor_id = @contractor_id'; params.contractor_id = req.query.contractor_id; }
-    if (req.query.status) { extraWhere += ' AND c.status = @status'; params.status = req.query.status; }
+    if (req.query.status === 'active') { extraWhere += " AND c.status IN ('estimate','confirmed','active','delivered')"; }
+    else if (req.query.status) { extraWhere += ' AND c.status = @status'; params.status = req.query.status; }
 
     const [rows] = await bigquery.query({
       query: `SELECT c.id, c.name, c.external_ref, c.date, c.direction, c.status,
