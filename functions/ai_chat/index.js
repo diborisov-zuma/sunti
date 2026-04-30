@@ -205,7 +205,7 @@ exports.ai_chat = async (req, res) => {
 
     // Step 1: Generate SQL
     const sqlResponse = await client.messages.create({
-      model: 'claude-sonnet-4-5-20241022',
+      model: 'claude-haiku-4-5-20251001',
       max_tokens: 2048,
       system: SYSTEM_PROMPT,
       messages,
@@ -295,7 +295,7 @@ exports.ai_chat = async (req, res) => {
     // Step 3: Format answer with Claude
     const dataPreview = JSON.stringify(normalizedRows.slice(0, 50), null, 2);
     const answerResponse = await client.messages.create({
-      model: 'claude-sonnet-4-5-20241022',
+      model: 'claude-haiku-4-5-20251001',
       max_tokens: 4096,
       system: ANSWER_PROMPT,
       messages: [
