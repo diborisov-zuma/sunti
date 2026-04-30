@@ -264,43 +264,49 @@
     }
 
     async function handlePortalCredential(response) {
-      const payload = JSON.parse(atob(response.credential.split('.')[1]));
-      await portalLogin(payload.email);
+      const credential = response.credential;
+      const payload = JSON.parse(atob(credential.split('.')[1]));
+      const loginHint = payload.email;
+
+      // Use ID token directly (works in in-app browsers where popup is blocked)
+      _portalAccessToken = credential;
+      _portalLoginHint = loginHint;
+      sessionStorage.setItem('portal_token', credential);
+      sessionStorage.setItem('portal_hint', loginHint);
+
+      try {
+        await initApp();
+        // Try to upgrade to access token in background (for longer session)
+        upgradeToAccessToken(loginHint);
+      } catch(e) {
+        logAuthError(loginHint, e.message, 'initApp_idtoken');
+        showToast('Error: ' + e.message, 'error');
+      }
     }
 
-    async function portalLogin(loginHint) {
+    function upgradeToAccessToken(loginHint) {
       try {
         const tokenClient = google.accounts.oauth2.initTokenClient({
           client_id: '6445860840-9bfshkstrc2vra49qi847ie9od38614t.apps.googleusercontent.com',
           scope: 'email profile',
           hint: loginHint,
-          callback: async (tokenResponse) => {
-            if (tokenResponse.error) {
-              logAuthError(loginHint, tokenResponse.error_description || tokenResponse.error, 'oauth_token');
-              sessionStorage.removeItem('portal_token');
-              sessionStorage.removeItem('portal_hint');
-              showToast('Auth error: ' + (tokenResponse.error_description || tokenResponse.error), 'error');
-              return;
+          callback: (tokenResponse) => {
+            if (!tokenResponse.error) {
+              _portalAccessToken = tokenResponse.access_token;
+              sessionStorage.setItem('portal_token', tokenResponse.access_token);
+              scheduleTokenRefresh();
             }
-            _portalAccessToken = tokenResponse.access_token;
-            _portalLoginHint = loginHint;
-            sessionStorage.setItem('portal_token', _portalAccessToken);
-            sessionStorage.setItem('portal_hint', loginHint);
-            scheduleTokenRefresh();
-            await initApp();
           },
         });
         tokenClient.requestAccessToken();
-      } catch(e) {
-        showToast(e.message, 'error');
-      }
+      } catch(_) { /* popup blocked — ID token still works */ }
     }
 
     function scheduleTokenRefresh() {
       if (_tokenRefreshTimer) clearTimeout(_tokenRefreshTimer);
       // Refresh token every 50 minutes (Google access tokens expire in 60 min)
       _tokenRefreshTimer = setTimeout(() => {
-        if (_portalLoginHint) portalLogin(_portalLoginHint);
+        if (_portalLoginHint) upgradeToAccessToken(_portalLoginHint);
       }, 50 * 60 * 1000);
     }
 
