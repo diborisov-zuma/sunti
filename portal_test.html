@@ -1,0 +1,1211 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sunti — Portal</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="stylesheet" href="style.css">
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <script src="_i18n.js"></script>
+  <script src="_config.js"></script>
+  <style>
+    .portal-header { background:#fff;border-bottom:1px solid #e8e8e8;padding:0 24px;height:56px;display:flex;align-items:center;gap:16px;position:sticky;top:0;z-index:100; }
+    .portal-header .logo { font-size:1.1rem;font-weight:600;color:#222;text-decoration:none; }
+    .portal-header .nav { display:flex;align-items:center;gap:4px;flex:1;padding-left:24px; }
+    .portal-header .nav-link { padding:6px 14px;border-radius:6px;font-size:0.88rem;color:#555;text-decoration:none;cursor:default; }
+    .portal-header .nav-link.active { background:#e8f0fe;color:#1a73e8;font-weight:500; }
+    .portal-header .header-right { display:flex;align-items:center;gap:12px; }
+
+    .page-wrap { padding:24px;max-width:1400px;margin:0 auto; }
+    .page-toolbar { display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap; }
+    .page-toolbar h2 { font-size:1.1rem;color:#222;flex:1; }
+
+    select.filter-select { border:1px solid #ddd;border-radius:6px;padding:6px 10px;font-size:0.85rem;color:#333;outline:none;background:#fff; }
+
+    .ct-wrap { background:#fff;border:1px solid #e8e8e8;border-radius:10px;overflow:hidden; }
+    .ct-table { width:100%;border-collapse:collapse; }
+    .ct-table thead { background:#f8f8f8;border-bottom:1px solid #e8e8e8; }
+    .ct-table th { padding:10px 14px;font-size:0.78rem;font-weight:600;color:#888;text-align:left;text-transform:uppercase; }
+    .ct-table td { padding:11px 14px;font-size:0.88rem;color:#333;border-bottom:1px solid #f0f0f0; }
+    .ct-table tr:last-child td { border-bottom:none; }
+    .ct-table tr:hover td { background:#fafafa; }
+    .ct-table tr.expanded td { background:#f0f4ff; }
+
+    .detail-row td { padding:0!important;border-bottom:1px solid #e8e8e8!important; }
+    .detail-inner { padding:16px 16px 16px 44px;background:#fafcff; }
+
+    .inv-mini-table, .trx-mini-table { width:100%;border-collapse:collapse;margin-top:8px; }
+    .inv-mini-table th, .trx-mini-table th { padding:6px 10px;font-size:0.72rem;font-weight:600;color:#888;text-align:left;text-transform:uppercase;border-bottom:1px solid #e8e8e8; }
+    .inv-mini-table td, .trx-mini-table td { padding:8px 10px;font-size:0.84rem;color:#333;border-bottom:1px solid #f0f0f0; }
+
+    .empty-state { text-align:center;padding:48px 24px;color:#bbb; }
+    .loading { text-align:center;padding:32px;color:#bbb; }
+    .expand-btn { background:none;border:none;cursor:pointer;font-size:0.7rem;color:#888;padding:4px; }
+
+    .amount-col { font-weight:500;font-variant-numeric:tabular-nums; }
+    .amount-col.expense { color:#c5221f; }
+    .amount-col.income { color:#1e8e3e; }
+
+    .badge { display:inline-block;padding:2px 8px;border-radius:10px;font-size:0.72rem;font-weight:600; }
+    .badge-green { background:#e6f4ea;color:#1e8e3e; }
+    .badge-gray { background:#f0f0f0;color:#888; }
+    .badge-red { background:#fce8e6;color:#c5221f; }
+    .badge-yellow { background:#fef7e0;color:#e37400; }
+
+    .progress-bar-wrap { width:100px;height:8px;background:#e8e8e8;border-radius:4px;overflow:hidden;display:inline-block;vertical-align:middle; }
+    .progress-bar-fill { height:100%;background:#1e8e3e;border-radius:4px;transition:width 0.3s; }
+
+    .section-title { font-size:0.78rem;font-weight:600;color:#888;text-transform:uppercase;margin:12px 0 6px; }
+    .file-row { display:flex;align-items:center;gap:8px;padding:4px 0;font-size:0.82rem; }
+
+    #guest-view { text-align:center;padding:100px 24px; }
+    #guest-view h2 { font-size:1.4rem;color:#333;margin-bottom:8px; }
+    #guest-view p { color:#999;margin-bottom:32px; }
+  </style>
+</head>
+<body>
+
+  <!-- Портальная шапка (не _header.js) -->
+  <div class="portal-header" id="portal-header" style="display:none">
+    <a class="logo" href="portal.html">Sunti</a>
+    <div class="nav">
+      <a class="nav-link active" id="portal-nav-contracts" href="#" onclick="switchPortalSection('contracts');return false"></a>
+      <a class="nav-link" id="portal-nav-materials" href="#" onclick="switchPortalSection('materials');return false" style="display:none"></a>
+    </div>
+    <div class="header-right">
+      <div class="lang-switcher">
+        <button class="lang-btn" data-lang="ru" onclick="setLang('ru')">RU</button>
+        <button class="lang-btn" data-lang="en" onclick="setLang('en')">EN</button>
+        <button class="lang-btn" data-lang="th" onclick="setLang('th')">TH</button>
+      </div>
+      <div id="portal-user-info" style="display:flex;align-items:center;gap:8px">
+        <span id="portal-user-name" style="font-size:0.85rem;color:#333"></span>
+        <button class="btn btn-outline" onclick="portalLogout()" id="portal-logout-btn"></button>
+      </div>
+    </div>
+  </div>
+
+  <div id="guest-view">
+    <h2 id="t-portal-welcome"></h2>
+    <p id="t-portal-login-hint"></p>
+    <div id="portal-signin">
+      <div id="g_id_onload"
+        data-client_id="6445860840-9bfshkstrc2vra49qi847ie9od38614t.apps.googleusercontent.com"
+        data-callback="handlePortalCredential"
+        data-auto_prompt="false"
+        data-itp_support="true">
+      </div>
+      <div class="g_id_signin"
+        data-type="standard" data-size="large" data-theme="outline"
+        data-text="signin_with" data-shape="rectangular">
+      </div>
+    </div>
+    <div id="auth-error-display" style="display:none;margin-top:24px;padding:12px 16px;background:#fce8e6;border-radius:8px;color:#c5221f;font-size:0.85rem;max-width:400px;margin-left:auto;margin-right:auto;text-align:left"></div>
+  </div>
+
+  <div id="app-view" style="display:none">
+    <div class="page-wrap">
+      <div class="page-toolbar">
+        <h2 id="t-page-title"></h2>
+        <select class="filter-select" id="filter-folder"></select>
+        <select class="filter-select" id="filter-contractor" style="display:none"><option value=""></option></select>
+        <select class="filter-select" id="filter-status" style="display:none"><option value=""></option></select>
+        <input type="text" class="filter-select" id="portal-search" placeholder="" style="min-width:150px">
+        <button class="btn btn-outline" id="btn-print" style="display:none;padding:4px 10px;font-size:0.85rem" title="Print">🖨</button>
+      </div>
+      <div class="ct-wrap">
+        <table class="ct-table" id="contracts-table">
+          <thead id="contracts-thead"></thead>
+          <tbody id="ct-tbody"></tbody>
+          <tfoot id="ct-tfoot" style="display:none">
+            <tr style="background:#f8f8f8;font-weight:600;border-top:2px solid #e8e8e8">
+              <td colspan="5" style="text-align:right;color:#888;padding:12px 14px" id="ptf-label"></td>
+              <td id="ptf-total"></td>
+              <td id="ptf-paid"></td>
+              <td id="ptf-outstanding"></td>
+              <td></td>
+              <td></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+
+    <!-- Materials section -->
+    <div id="materials-section" style="display:none">
+      <div class="page-wrap">
+        <div class="page-toolbar">
+          <h2 id="t-mat-title"></h2>
+          <select class="filter-select" id="mat-filter-folder"></select>
+        </div>
+        <div id="portal-mat-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Lightbox for images -->
+  <div class="lightbox" id="lightbox" onclick="this.classList.remove('open')" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:500;align-items:center;justify-content:center;cursor:pointer">
+    <img id="lightbox-img" src="" style="max-width:90vw;max-height:90vh;border-radius:8px">
+  </div>
+
+  <!-- PDF viewer modal -->
+  <div class="modal-overlay" id="modal-pdf" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:300;align-items:center;justify-content:center">
+    <div style="background:#fff;border-radius:12px;width:90vw;height:90vh;max-width:1200px;display:flex;flex-direction:column;overflow:hidden">
+      <div style="padding:10px 16px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #e8e8e8">
+        <span id="pdf-title" style="font-size:0.9rem;font-weight:500;color:#222"></span>
+        <button class="btn btn-outline" id="btn-close-pdf" style="padding:2px 10px">✕</button>
+      </div>
+      <iframe id="pdf-iframe" style="flex:1;border:none" src=""></iframe>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    let portalUser = null;
+    let portalSections = {};
+    let portalFolders = [];
+    let accessLevel = 'full';
+    let allContracts = [];
+    let expandedContracts = {};
+    let expandedInvoices = {};
+    let contractInvoices = {};
+    let invoiceTrx = {};
+    let contractFiles = {};
+    let selectedFolder = '';
+    let selectedContractor = '';
+    let selectedStatus = '';
+    let portalSearchText = '';
+    let portalSearchDebounce = null;
+    let portalContractors = [];
+    let sortField = 'date';
+    let sortDir = 'desc';
+
+    function fmt(v) {
+      const n = typeof v === 'object' ? parseFloat(v?.value || v) : parseFloat(v);
+      if (isNaN(n)) return '—';
+      return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+    function formatDate(val) {
+      if (!val) return '—';
+      const d = new Date(val.value || val);
+      if (isNaN(d)) return '—';
+      return `${String(d.getUTCDate()).padStart(2,'0')}.${String(d.getUTCMonth()+1).padStart(2,'0')}.${d.getUTCFullYear()}`;
+    }
+    function showToast(msg, type) {
+      const el = document.getElementById('toast');
+      el.textContent = msg; el.className = 'toast show' + (type ? ' ' + type : '');
+      clearTimeout(el._t); el._t = setTimeout(() => el.className = 'toast', 3000);
+    }
+    function numVal(v) { return typeof v === 'object' ? parseFloat(v?.value || 0) : parseFloat(v || 0); }
+    function pct(v) { const n = numVal(v); return isNaN(n) ? 0 : Math.round(n * 100); }
+
+    function statusBadge(s) {
+      if (s === 'estimate')  return `<span class="badge badge-yellow">${t('estimate')}</span>`;
+      if (s === 'confirmed') return `<span class="badge badge-green">${t('confirmed')}</span>`;
+      if (s === 'active')    return `<span class="badge badge-green">${t('active')}</span>`;
+      if (s === 'delivered') return `<span class="badge badge-green">${t('delivered')}</span>`;
+      if (s === 'completed') return `<span class="badge badge-gray">${t('completed')}</span>`;
+      if (s === 'cancelled') return `<span class="badge badge-red">${t('cancelled')}</span>`;
+      return `<span class="badge badge-gray">${s || '—'}</span>`;
+    }
+
+    function amtCell(val, dir) {
+      if (accessLevel === 'no_amounts') return '';
+      const n = numVal(val);
+      const cls = dir === 'expense' ? 'expense' : 'income';
+      const sign = dir === 'expense' ? '-' : '';
+      return `<span class="amount-col ${cls}">${sign}${fmt(n)}</span>`;
+    }
+
+    function progressBar(val, isFraction) {
+      const p = isFraction ? pct(val) : Math.round(numVal(val));
+      return `<div class="progress-bar-wrap"><div class="progress-bar-fill" style="width:${Math.min(p, 100)}%"></div></div> <span style="font-size:0.78rem;color:#666">${p}%</span>`;
+    }
+
+    function updateTexts() {
+      document.getElementById('t-portal-welcome').textContent = t('portalWelcome');
+      document.getElementById('t-portal-login-hint').textContent = t('guestSub');
+      document.getElementById('portal-nav-contracts').textContent = t('portalContracts');
+      const ps = document.getElementById('portal-search');
+      if (ps) ps.placeholder = t('search');
+      document.getElementById('portal-nav-materials').textContent = t('navMaterials');
+      const matTitle = document.getElementById('t-mat-title');
+      if (matTitle) matTitle.textContent = t('materials');
+      document.getElementById('portal-logout-btn').textContent = t('logout');
+      document.getElementById('t-page-title').textContent = t('portalContracts');
+      document.querySelectorAll('.lang-btn').forEach(b => b.classList.toggle('active', b.dataset.lang === currentLang));
+      // Status filter options
+      const sSel = document.getElementById('filter-status');
+      const sVal = sSel.value;
+      sSel.innerHTML = `<option value="">${t('allStatuses')}</option>
+        <option value="active">${t('active')}</option>
+        <option value="estimate">${t('estimate')}</option>
+        <option value="confirmed">${t('confirmed')}</option>
+        <option value="delivered">${t('delivered')}</option>
+        <option value="completed">${t('completed')}</option>
+        <option value="cancelled">${t('cancelled')}</option>`;
+      sSel.value = sVal;
+    }
+
+    // ─── Auth ───
+
+    let _portalAccessToken = null;
+    let _portalLoginHint = null;
+    let _tokenRefreshTimer = null;
+
+    function showAuthError(email, error, step) {
+      const msg = `${error} [${step}, ${email || '?'}]`;
+      sessionStorage.setItem('portal_last_error', msg);
+      const el = document.getElementById('auth-error-display');
+      if (el) {
+        el.style.display = 'block';
+        el.innerHTML = `<strong>Login error:</strong> ${error}<br><small>Step: ${step} | Account: ${email || '?'}</small>`;
+      }
+    }
+    // Show auth debug info on page load
+    (function() {
+      const prev = sessionStorage.getItem('portal_last_error');
+      const step = sessionStorage.getItem('portal_auth_step');
+      const el = document.getElementById('auth-error-display');
+      if (el && (prev || step)) {
+        el.style.display = 'block';
+        let msg = '';
+        if (prev) msg += `<strong>Error:</strong> ${prev}<br>`;
+        if (step === 'clicked') {
+          msg += `<strong>Debug:</strong> Google Sign-In was clicked but callback never fired. Your browser may be blocking the sign-in popup.`;
+          logAuthError('', 'Callback never fired after click', 'popup_blocked');
+        }
+        if (step === 'callback') msg += `<strong>Debug:</strong> Callback received but login failed.`;
+        el.innerHTML = msg;
+        sessionStorage.removeItem('portal_last_error');
+        sessionStorage.removeItem('portal_auth_step');
+      }
+    })();
+
+    function logAuthError(email, error, step) {
+      try {
+        fetch(`${API_URL}/portal_contracts/log-error`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: email || 'unknown', error: String(error), step }),
+        }).catch(() => {});
+      } catch(_) {}
+    }
+
+    // Track Google Sign-In button click
+    document.getElementById('portal-signin').addEventListener('click', () => {
+      sessionStorage.setItem('portal_auth_step', 'clicked');
+    });
+
+    async function handlePortalCredential(response) {
+      sessionStorage.setItem('portal_auth_step', 'callback');
+      const credential = response.credential;
+      if (!credential) {
+        showAuthError('', 'No credential in response: ' + JSON.stringify(response), 'callback_empty');
+        logAuthError('', 'No credential: ' + JSON.stringify(response), 'callback_empty');
+        return;
+      }
+      const payload = JSON.parse(atob(credential.split('.')[1]));
+      const loginHint = payload.email;
+
+      // Use ID token directly (works in in-app browsers where popup is blocked)
+      _portalAccessToken = credential;
+      _portalLoginHint = loginHint;
+      sessionStorage.setItem('portal_token', credential);
+      sessionStorage.setItem('portal_hint', loginHint);
+
+      try {
+        await initApp();
+        // Try to upgrade to access token in background (for longer session)
+        upgradeToAccessToken(loginHint);
+      } catch(e) {
+        logAuthError(loginHint, e.message, 'initApp_idtoken');
+        showAuthError(loginHint, e.message, 'initApp_idtoken');
+      }
+    }
+
+    function upgradeToAccessToken(loginHint) {
+      try {
+        const tokenClient = google.accounts.oauth2.initTokenClient({
+          client_id: '6445860840-9bfshkstrc2vra49qi847ie9od38614t.apps.googleusercontent.com',
+          scope: 'email profile',
+          hint: loginHint,
+          callback: (tokenResponse) => {
+            if (!tokenResponse.error) {
+              _portalAccessToken = tokenResponse.access_token;
+              sessionStorage.setItem('portal_token', tokenResponse.access_token);
+              scheduleTokenRefresh();
+            }
+          },
+        });
+        tokenClient.requestAccessToken();
+      } catch(_) { /* popup blocked — ID token still works */ }
+    }
+
+    function scheduleTokenRefresh() {
+      if (_tokenRefreshTimer) clearTimeout(_tokenRefreshTimer);
+      // Refresh token every 50 minutes (Google access tokens expire in 60 min)
+      _tokenRefreshTimer = setTimeout(() => {
+        if (_portalLoginHint) upgradeToAccessToken(_portalLoginHint);
+      }, 50 * 60 * 1000);
+    }
+
+    async function initApp() {
+      try {
+        const me = await portalFetch('/portal_contracts/me');
+        portalUser = me.user;
+        portalSections = me.sections;
+        portalFolders = me.folders;
+        accessLevel = portalSections.contracts || 'full';
+
+        document.getElementById('guest-view').style.display = 'none';
+        document.getElementById('app-view').style.display = 'block';
+        document.getElementById('portal-header').style.display = 'flex';
+        document.getElementById('portal-user-name').textContent = portalUser.name || portalUser.email;
+
+        fillFolderSelect();
+
+        const navContracts = document.getElementById('portal-nav-contracts');
+        const navMaterials = document.getElementById('portal-nav-materials');
+        if (navContracts) navContracts.style.display = portalSections.contracts ? '' : 'none';
+        if (navMaterials) navMaterials.style.display = portalSections.materials ? '' : 'none';
+
+        if (portalSections.contracts) switchPortalSection('contracts');
+        else if (portalSections.materials) switchPortalSection('materials');
+
+        fillMatFolderSelect();
+        updateTexts();
+      } catch(e) {
+        console.error('Portal initApp error:', e);
+        logAuthError(_portalLoginHint, e.message, 'initApp');
+        sessionStorage.removeItem('portal_token');
+        sessionStorage.removeItem('portal_hint');
+        _portalAccessToken = null;
+        document.getElementById('guest-view').style.display = 'block';
+        document.getElementById('app-view').style.display = 'none';
+        document.getElementById('portal-header').style.display = 'none';
+        showAuthError(_portalLoginHint, e.message, 'initApp');
+      }
+    }
+
+    // Try to restore session on page load
+    async function tryRestoreSession() {
+      const savedToken = sessionStorage.getItem('portal_token');
+      const savedHint = sessionStorage.getItem('portal_hint');
+      if (savedToken) {
+        _portalAccessToken = savedToken;
+        _portalLoginHint = savedHint;
+        scheduleTokenRefresh();
+        await initApp();
+      }
+    }
+
+    function portalLogout() {
+      _portalAccessToken = null;
+      _portalLoginHint = null;
+      if (_tokenRefreshTimer) clearTimeout(_tokenRefreshTimer);
+      sessionStorage.removeItem('portal_token');
+      sessionStorage.removeItem('portal_hint');
+      portalUser = null;
+      document.getElementById('guest-view').style.display = 'block';
+      document.getElementById('app-view').style.display = 'none';
+      document.getElementById('portal-header').style.display = 'none';
+    }
+
+    async function portalFetch(path, options = {}) {
+      const res = await fetch(`${API_URL}${path}`, {
+        ...options,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${_portalAccessToken}`,
+          ...(options.headers || {}),
+        },
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: res.statusText }));
+        throw new Error(err.error || res.statusText);
+      }
+      return res.json();
+    }
+
+    // ─── Data ───
+
+    function fillFolderSelect() {
+      const sel = document.getElementById('filter-folder');
+      sel.innerHTML = `<option value="">${t('portalSelectProject')}</option>`;
+      portalFolders.forEach(f => {
+        const opt = document.createElement('option');
+        opt.value = f.id; opt.textContent = f.name;
+        sel.appendChild(opt);
+      });
+    }
+
+    document.getElementById('filter-folder').addEventListener('change', e => {
+      selectedFolder = e.target.value;
+      if (selectedFolder) loadContracts();
+      else document.getElementById('ct-tbody').innerHTML = `<tr><td colspan="10" class="empty-state">${t('portalSelectProject')}</td></tr>`;
+    });
+
+    document.getElementById('portal-search').addEventListener('input', e => {
+      portalSearchText = e.target.value.trim();
+      clearTimeout(portalSearchDebounce);
+      portalSearchDebounce = setTimeout(() => { if (selectedFolder) loadContracts(); }, 300);
+    });
+
+    document.getElementById('filter-contractor').addEventListener('change', e => {
+      selectedContractor = e.target.value;
+      if (selectedFolder) loadContracts();
+    });
+
+    document.getElementById('filter-status').addEventListener('change', e => {
+      selectedStatus = e.target.value;
+      if (selectedFolder) loadContracts();
+    });
+
+    document.getElementById('contracts-thead').addEventListener('click', e => {
+      const th = e.target.closest('[data-sort]');
+      if (!th) return;
+      const field = th.dataset.sort;
+      if (sortField === field) sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+      else { sortField = field; sortDir = 'asc'; }
+      const colCount = accessLevel === 'full' ? 10 : 7;
+      renderContracts(colCount);
+    });
+
+    function sortArrow(field) {
+      if (sortField !== field) return '';
+      return sortDir === 'asc' ? ' ▲' : ' ▼';
+    }
+    function sortHeader(field, label) {
+      return `<th style="cursor:pointer;user-select:none" data-sort="${field}">${label}${sortArrow(field)}</th>`;
+    }
+    function updateTableHeaders() {
+      const thead = document.getElementById('contracts-thead');
+      if (!thead) return;
+      const amtHeaders = accessLevel === 'full'
+        ? `${sortHeader('total_amount',t('contractTotal'))}${sortHeader('paid_amount',t('paidAmount'))}${sortHeader('outstanding',t('remainingToPay'))}${sortHeader('progress',t('portalProgress'))}`
+        : `${sortHeader('progress',t('portalProgress'))}`;
+      thead.innerHTML = `<tr>
+        <th style="width:30px"></th><th style="width:24px"></th>${sortHeader('date',t('date'))}${sortHeader('name',t('name'))}
+        ${sortHeader('contractor',t('contractor'))}
+        ${amtHeaders}
+        ${sortHeader('status',t('statusLabel'))}
+      </tr>`;
+    }
+
+    async function loadContracts() {
+      const tbody = document.getElementById('ct-tbody');
+      const colCount = accessLevel === 'full' ? 10 : 7;
+      tbody.innerHTML = `<tr><td colspan="10" class="loading">${t('loading')}</td></tr>`;
+      updateTableHeaders();
+
+      try {
+        let portalUrl = `/portal_contracts?folder_id=${selectedFolder}`;
+        if (portalSearchText) portalUrl += `&search=${encodeURIComponent(portalSearchText)}`;
+        if (selectedContractor) portalUrl += `&contractor_id=${encodeURIComponent(selectedContractor)}`;
+        if (selectedStatus) portalUrl += `&status=${encodeURIComponent(selectedStatus)}`;
+        const data = await portalFetch(portalUrl);
+        allContracts = data.rows;
+        contractFiles = data.files || {};
+        accessLevel = data.access_level || accessLevel;
+
+        // Populate contractor filter
+        if (data.contractors) {
+          portalContractors = data.contractors;
+          const cSel = document.getElementById('filter-contractor');
+          const curVal = cSel.value;
+          cSel.innerHTML = `<option value="">${t('allContractors')}</option>`;
+          data.contractors.forEach(c => {
+            const opt = document.createElement('option');
+            opt.value = c.id; opt.textContent = c.name_en || c.name_th || '—';
+            cSel.appendChild(opt);
+          });
+          cSel.value = curVal;
+          cSel.style.display = '';
+        }
+        // Show status filter and print button
+        document.getElementById('filter-status').style.display = '';
+        document.getElementById('btn-print').style.display = '';
+
+        renderContracts(colCount);
+      } catch(e) {
+        tbody.innerHTML = `<tr><td colspan="${colCount}" class="empty-state">${e.message}</td></tr>`;
+      }
+    }
+
+    function sortContracts() {
+      allContracts.sort((a, b) => {
+        let va, vb;
+        switch (sortField) {
+          case 'date': va = a.date?.value || a.date || ''; vb = b.date?.value || b.date || ''; break;
+          case 'name': va = (a.name || '').toLowerCase(); vb = (b.name || '').toLowerCase(); break;
+          case 'contractor': va = (a.contractor_name_en || a.contractor_name_th || '').toLowerCase(); vb = (b.contractor_name_en || b.contractor_name_th || '').toLowerCase(); break;
+          case 'total_amount': va = numVal(a.total_amount); vb = numVal(b.total_amount); break;
+          case 'paid_amount': va = numVal(a.paid_amount); vb = numVal(b.paid_amount); break;
+          case 'outstanding': va = numVal(a.total_amount) - numVal(a.paid_amount); vb = numVal(b.total_amount) - numVal(b.paid_amount); break;
+          case 'progress': va = numVal(a.progress_pct); vb = numVal(b.progress_pct); break;
+          case 'status': va = a.status || ''; vb = b.status || ''; break;
+          default: va = ''; vb = '';
+        }
+        if (va < vb) return sortDir === 'asc' ? -1 : 1;
+        if (va > vb) return sortDir === 'asc' ? 1 : -1;
+        return 0;
+      });
+    }
+
+    function renderContracts(colCount) {
+      updateTableHeaders();
+      sortContracts();
+      const tbody = document.getElementById('ct-tbody');
+      const tfoot = document.getElementById('ct-tfoot');
+      if (!allContracts.length) {
+        tbody.innerHTML = `<tr><td colspan="${colCount}" class="empty-state">${t('noContracts')}</td></tr>`;
+        if (tfoot) tfoot.style.display = 'none';
+        return;
+      }
+      tbody.innerHTML = '';
+      allContracts.forEach(c => {
+        const isExp = expandedContracts[c.id];
+        const dir = c.direction || 'expense';
+        const tr = document.createElement('tr');
+        if (isExp) tr.className = 'expanded';
+
+        let amtCells = '';
+        if (accessLevel === 'full') {
+          const outstanding = numVal(c.total_amount) - numVal(c.paid_amount);
+          amtCells = `
+            <td>${amtCell(c.total_amount, dir)}</td>
+            <td>${amtCell(c.paid_amount, dir)}</td>
+            <td>${amtCell(outstanding, dir)}</td>
+            <td>${progressBar(c.progress_pct)}</td>`;
+        } else {
+          amtCells = `<td>${progressBar(c.progress_pct)}</td>`;
+        }
+
+        tr.innerHTML = `
+          <td><button class="expand-btn${isExp?' open':''}" data-expand-contract="${c.id}">${isExp?'▼':'▶'}</button></td>
+          <td style="text-align:center;font-size:0.7rem">${c.needs_review ? '🔴' : ''}</td>
+          <td>${formatDate(c.date)}</td>
+          <td><strong>${c.name || '—'}</strong>${c.external_ref ? `<br><span style="font-size:0.75rem;color:#999">${c.external_ref}</span>` : ''}</td>
+          <td style="font-size:0.82rem">${c.contractor_name_en || c.contractor_name_th || '—'}</td>
+          ${amtCells}
+          <td>${statusBadge(c.status)}</td>
+        `;
+        tbody.appendChild(tr);
+
+        const detailTr = document.createElement('tr');
+        detailTr.className = 'detail-row';
+        detailTr.style.display = isExp ? '' : 'none';
+        detailTr.innerHTML = `<td colspan="${colCount}"><div class="detail-inner" id="portal-contract-${c.id}">${isExp?'<div class="loading">'+t('loading')+'</div>':''}</div></td>`;
+        tbody.appendChild(detailTr);
+
+        if (isExp) loadContractDetail(c.id, colCount);
+      });
+
+      // Totals footer (only for full access)
+      if (tfoot && accessLevel === 'full' && allContracts.length) {
+        let sumTotal = 0, sumPaid = 0;
+        allContracts.forEach(c => {
+          sumTotal += numVal(c.total_amount);
+          sumPaid += numVal(c.paid_amount);
+        });
+        const sumOutstanding = sumTotal - sumPaid;
+        const dir = allContracts[0]?.direction || 'expense';
+        document.getElementById('ptf-label').textContent = t('totalAmount') + ':';
+        document.getElementById('ptf-total').innerHTML = amtCell(sumTotal, dir);
+        document.getElementById('ptf-paid').innerHTML = amtCell(sumPaid, dir);
+        document.getElementById('ptf-outstanding').innerHTML = amtCell(sumOutstanding, dir);
+        tfoot.style.display = '';
+      } else if (tfoot) {
+        tfoot.style.display = 'none';
+      }
+    }
+
+    let contractInvFiles = {};
+    let contractDirectTrxData = {};
+    let contractDirectTrxFiles = {};
+
+    async function loadContractDetail(contractId, colCount) {
+      const inner = document.getElementById(`portal-contract-${contractId}`);
+      if (!inner) return;
+      try {
+        const fetches = [portalFetch(`/portal_contracts/${contractId}/invoices`)];
+        if (accessLevel === 'full') fetches.push(portalFetch(`/portal_contracts/0/transactions?contract_id=${contractId}`));
+        const [invData, directData] = await Promise.all(fetches);
+        contractInvoices[contractId] = invData.rows || invData;
+        contractInvFiles[contractId] = invData.files || {};
+        if (directData) {
+          contractDirectTrxData[contractId] = directData.rows || [];
+          contractDirectTrxFiles[contractId] = directData.files || {};
+        }
+        renderContractDetail(contractId, contractInvoices[contractId], colCount);
+      } catch(e) { inner.innerHTML = `<div style="color:#c33">${e.message}</div>`; }
+    }
+
+    function fileType(fn) {
+      if (!fn) return 'other';
+      if (/\.pdf$/i.test(fn)) return 'pdf';
+      if (/\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i.test(fn)) return 'image';
+      return 'other';
+    }
+
+    function renderPortalFileList(files, indent) {
+      if (!files || !files.length) return '';
+      const ml = indent ? 'margin-left:24px;' : '';
+      let html = '';
+      files.forEach(f => {
+        const size = f.file_size > 1048576 ? (f.file_size/1048576).toFixed(1)+' MB' : Math.round((f.file_size||0)/1024)+' KB';
+        const ft = fileType(f.file_name);
+        const icon = ft === 'pdf' ? '📄' : ft === 'image' ? '🖼️' : '📎';
+        const canPreview = ft === 'pdf' || ft === 'image';
+        const viewAction = ft === 'pdf' ? 'view-pdf' : 'view-image';
+        html += `<div style="display:flex;align-items:center;gap:8px;padding:4px 0;font-size:0.85rem;${ml}">
+          <span style="font-size:1.2rem;flex-shrink:0">${icon}</span>
+          <span style="flex:1;color:#333">${f.file_name || '—'} <span style="color:#999">(${size})</span></span>
+          ${canPreview ? `<button class="btn btn-outline" style="padding:1px 8px;font-size:0.75rem" data-action="${viewAction}" data-file-id="${f.id}" data-file-name="${(f.file_name||'').replace(/"/g,'&quot;')}">👁 ${t('view')}</button>` : ''}
+          <button class="btn btn-outline" style="padding:1px 8px;font-size:0.75rem" data-action="download" data-file-id="${f.id}">⬇ ${t('download')}</button>
+        </div>`;
+      });
+      return html;
+    }
+
+    function renderContractDetail(contractId, invs, colCount) {
+      const inner = document.getElementById(`portal-contract-${contractId}`);
+      if (!inner) return;
+      const files = contractFiles[contractId] || [];
+      const contract = allContracts.find(c => c.id === contractId);
+
+      let html = '';
+      // Notes
+      if (contract?.notes) {
+        html += `<div style="margin-bottom:10px;padding:8px 12px;background:#fff;border:1px solid #e8e8e8;border-radius:8px">
+          <div style="font-size:0.72rem;color:#888;text-transform:uppercase;margin-bottom:3px">${t('notes')}</div>
+          <div style="font-size:0.84rem;color:#333;white-space:pre-wrap">${contract.notes}</div>
+        </div>`;
+      }
+
+      // Contract files (only for full access)
+      if (accessLevel === 'full' && files.length) {
+        html += `<div class="section-title">${t('file')}</div>`;
+        html += renderPortalFileList(files);
+      }
+
+      // Direct payments (only for full access)
+      if (accessLevel === 'full') {
+        const directTrx = contractDirectTrxData[contractId] || [];
+        const dtfMap = contractDirectTrxFiles[contractId] || {};
+        html += `<div style="background:#e8faed;border-radius:8px;padding:10px 12px;margin:10px 0">`;
+        html += `<div style="font-size:0.75rem;color:#888;text-transform:uppercase;margin-bottom:6px">${t('paidAmount')} (Direct)</div>`;
+        if (directTrx.length) {
+          html += `<table class="trx-mini-table"><tbody>`;
+          directTrx.forEach(tx => {
+            const sign = tx.direction === 'expense' ? '-' : '';
+            const cls = tx.direction === 'expense' ? 'expense' : 'income';
+            const txFiles = dtfMap[tx.id] || [];
+            html += `<tr>
+              <td>${formatDate(tx.date)}</td>
+              <td><span class="amount-col ${cls}">${sign}${fmt(tx.amount)}</span></td>
+              <td style="font-size:0.78rem">${tx.account_name || '—'}</td>
+              <td style="font-size:0.78rem;color:#666">${tx.description || '—'}</td>
+            </tr>`;
+            if (txFiles.length) {
+              html += `<tr><td colspan="4" style="padding:2px 0 6px 0">`;
+              html += renderPortalFileList(txFiles, true);
+              html += `</td></tr>`;
+            }
+          });
+          html += `</tbody></table>`;
+        } else {
+          html += `<div style="color:#bbb;font-size:0.82rem">—</div>`;
+        }
+        html += `</div>`;
+      }
+
+      // Invoices
+      if (!invs.length) {
+        html += `<div style="color:#bbb;font-size:0.85rem;padding:8px 0">${t('noInvoices')}</div>`;
+      } else {
+        const amtHeaders = accessLevel === 'full'
+          ? `<th>${t('subtotal')}</th><th>VAT</th><th>WHT</th><th>${t('totalAmount')}</th><th>${t('paidAmount')}</th>`
+          : `<th>${t('portalProgress')}</th>`;
+        html += `<table class="inv-mini-table"><thead><tr>
+          <th style="width:24px"></th><th>${t('date')}</th><th>${t('name')}</th>
+          ${amtHeaders}<th>${t('statusLabel')}</th>
+        </tr></thead><tbody>`;
+        invs.forEach(inv => {
+          const invExp = expandedInvoices[inv.id];
+          const dir = inv.direction || 'expense';
+          let amtCells = '';
+          if (accessLevel === 'full') {
+            amtCells = `
+              <td>${amtCell(inv.subtotal, dir)}</td>
+              <td style="font-size:0.78rem">${fmt(numVal(inv.vat_amount))}</td>
+              <td style="font-size:0.78rem">${fmt(numVal(inv.wht_amount))}</td>
+              <td>${amtCell(inv.total_amount, dir)}</td>
+              <td>${amtCell(inv.paid_amount, dir)}</td>`;
+          } else {
+            amtCells = `<td>${progressBar(inv.paid_pct, true)}</td>`;
+          }
+          html += `<tr class="${invExp ? 'expanded' : ''}">
+            <td><button class="expand-btn${invExp?' open':''}" data-expand-invoice="${inv.id}" data-contract-id="${contractId}">${invExp?'▼':'▶'}</button></td>
+            <td>${formatDate(inv.date)}</td>
+            <td>${inv.name || '—'}</td>
+            ${amtCells}
+            <td>${statusBadge(inv.status)}</td>
+          </tr>`;
+          html += `<tr class="detail-row" style="display:${invExp?'':'none'}" id="portal-inv-${inv.id}">
+            <td colspan="10"><div style="padding:10px 10px 10px 30px;background:#f4f7fb" id="portal-inv-inner-${inv.id}">${invExp?'<div class="loading">'+t('loading')+'</div>':''}</div></td>
+          </tr>`;
+        });
+        html += '</tbody></table>';
+      }
+      inner.innerHTML = html;
+
+      invs.forEach(inv => {
+        if (expandedInvoices[inv.id]) loadInvoiceTrx(inv.id, contractId);
+      });
+    }
+
+    let invoiceTrxFiles = {};
+
+    async function loadInvoiceTrx(invoiceId, contractId) {
+      const inner = document.getElementById(`portal-inv-inner-${invoiceId}`);
+      if (!inner) return;
+      try {
+        const data = await portalFetch(`/portal_contracts/0/transactions?invoice_id=${invoiceId}`);
+        invoiceTrx[invoiceId] = data.rows || data;
+        invoiceTrxFiles[invoiceId] = data.files || {};
+        renderTrx(invoiceId, contractId);
+      } catch(e) { inner.innerHTML = `<div style="color:#c33">${e.message}</div>`; }
+    }
+
+    function renderTrx(invoiceId, contractId) {
+      const inner = document.getElementById(`portal-inv-inner-${invoiceId}`);
+      if (!inner) return;
+      const trxs = invoiceTrx[invoiceId] || [];
+      const trxFilesMap = invoiceTrxFiles[invoiceId] || {};
+      const invFiles = (contractInvFiles[contractId] || {})[invoiceId] || [];
+
+      let html = '';
+
+      // Invoice files (only for full access)
+      if (accessLevel === 'full' && invFiles.length) {
+        html += `<div class="section-title">${t('file')}</div>`;
+        html += renderPortalFileList(invFiles);
+      }
+
+      if (!trxs.length) {
+        html += `<div style="color:#bbb;font-size:0.82rem;margin-top:8px">${t('noTransactions')}</div>`;
+        inner.innerHTML = html;
+        return;
+      }
+
+      html += `<table class="trx-mini-table"><thead><tr>
+        <th>${t('date')}</th>
+        ${accessLevel === 'full' ? `<th>${t('amount')}</th>` : ''}
+        <th>${t('category')}</th><th>${t('description')}</th>
+      </tr></thead><tbody>`;
+      trxs.forEach(tx => {
+        const sign = tx.direction === 'expense' ? '-' : '';
+        const cls = tx.direction === 'expense' ? 'expense' : 'income';
+        const txFiles = trxFilesMap[tx.id] || [];
+        html += `<tr>
+          <td>${formatDate(tx.date)}</td>
+          ${accessLevel === 'full' ? `<td><span class="amount-col ${cls}">${sign}${fmt(tx.amount)}</span></td>` : ''}
+          <td style="font-size:0.78rem">${tx.category_name || '—'}</td>
+          <td style="font-size:0.78rem;color:#666">${tx.description || '—'}</td>
+        </tr>`;
+        if (accessLevel === 'full' && txFiles.length) {
+          const colSpan = 4;
+          html += `<tr><td colspan="${colSpan}" style="padding:2px 0 6px 0">`;
+          html += renderPortalFileList(txFiles, true);
+          html += `</td></tr>`;
+        }
+      });
+      html += '</tbody></table>';
+      inner.innerHTML = html;
+    }
+
+    // ─── Print ───
+    document.getElementById('btn-print').addEventListener('click', () => {
+      if (!allContracts.length) return;
+      const dir = allContracts[0]?.direction || 'expense';
+      let sumTotal = 0, sumPaid = 0;
+      allContracts.forEach(c => { sumTotal += numVal(c.total_amount); sumPaid += numVal(c.paid_amount); });
+      const rows = allContracts.map(c => {
+        const total = numVal(c.total_amount); const paid = numVal(c.paid_amount); const toPay = total - paid;
+        const dTotal = dir === 'expense' ? -total : total;
+        const dPaid = dir === 'expense' ? -paid : paid;
+        const dToPay = dir === 'expense' ? -toPay : toPay;
+        return `<tr>
+          <td>${formatDate(c.date)}</td>
+          <td>${c.name || '—'}${c.external_ref ? '<br><small style="color:#999">'+c.external_ref+'</small>' : ''}</td>
+          <td>${c.contractor_name_en || c.contractor_name_th || '—'}</td>
+          ${accessLevel === 'full' ? `
+            <td style="text-align:right">${fmt(dTotal)}</td>
+            <td style="text-align:right">${fmt(dPaid)}</td>
+            <td style="text-align:right">${fmt(dToPay)}</td>
+          ` : ''}
+          <td>${c.status || '—'}</td>
+        </tr>`;
+      }).join('');
+      const dSumTotal = dir === 'expense' ? -sumTotal : sumTotal;
+      const dSumPaid = dir === 'expense' ? -sumPaid : sumPaid;
+      const dSumToPay = dir === 'expense' ? -(sumTotal - sumPaid) : (sumTotal - sumPaid);
+      const folder = portalFolders.find(f => f.id === selectedFolder);
+      const html = `<!DOCTYPE html><html><head><meta charset="UTF-8">
+        <title>Contracts — ${folder?.name || ''}</title>
+        <style>
+          body { font-family: Arial, sans-serif; font-size: 11px; margin: 20px; }
+          h2 { font-size: 14px; margin-bottom: 4px; }
+          .meta { font-size: 10px; color: #888; margin-bottom: 12px; }
+          table { width: 100%; border-collapse: collapse; }
+          th { background: #f0f0f0; padding: 5px 6px; font-size: 10px; text-align: left; border-bottom: 2px solid #ccc; }
+          td { padding: 4px 6px; border-bottom: 1px solid #eee; }
+          tfoot td { font-weight: bold; border-top: 2px solid #333; padding-top: 6px; }
+          @media print { body { margin: 10px; } }
+        </style>
+      </head><body>
+        <h2>Contracts — ${folder?.name || ''}</h2>
+        <div class="meta">${new Date().toLocaleDateString()} · ${allContracts.length} contracts</div>
+        <table>
+          <thead><tr>
+            <th>Date</th><th>Name</th><th>Contractor</th>
+            ${accessLevel === 'full' ? '<th style="text-align:right">Total</th><th style="text-align:right">Paid</th><th style="text-align:right">To Pay</th>' : ''}
+            <th>Status</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+          ${accessLevel === 'full' ? `<tfoot><tr>
+            <td colspan="3" style="text-align:right">Total:</td>
+            <td style="text-align:right">${fmt(dSumTotal)}</td>
+            <td style="text-align:right">${fmt(dSumPaid)}</td>
+            <td style="text-align:right">${fmt(dSumToPay)}</td>
+            <td></td>
+          </tr></tfoot>` : ''}
+        </table>
+      </body></html>`;
+      const win = window.open('', '_blank');
+      win.document.write(html);
+      win.document.close();
+      setTimeout(() => win.print(), 300);
+    });
+
+    // ─── Actions ───
+
+    document.addEventListener('click', async e => {
+      const expC = e.target.closest('[data-expand-contract]');
+      if (expC) { const id = expC.dataset.expandContract; expandedContracts[id] = !expandedContracts[id]; renderContracts(accessLevel === 'full' ? 10 : 7); return; }
+
+      const expI = e.target.closest('[data-expand-invoice]');
+      if (expI) {
+        const id = expI.dataset.expandInvoice;
+        expandedInvoices[id] = !expandedInvoices[id];
+        const cId = expI.dataset.contractId;
+        const invs = contractInvoices[cId];
+        if (invs) renderContractDetail(cId, invs, accessLevel === 'full' ? 10 : 7);
+        else loadContractDetail(cId, accessLevel === 'full' ? 10 : 7);
+        return;
+      }
+
+      const dlBtn = e.target.closest('[data-action="download"]');
+      if (dlBtn) {
+        try {
+          const r = await portalFetch(`/portal_contracts/files/${dlBtn.dataset.fileId}/download`);
+          if (r.url) window.open(r.url, '_blank');
+        } catch(err) { showToast(err.message, 'error'); }
+      }
+
+      const pdfBtn = e.target.closest('[data-action="view-pdf"]');
+      if (pdfBtn) {
+        const fileId = pdfBtn.dataset.fileId;
+        const fileName = pdfBtn.dataset.fileName || 'PDF';
+        try {
+          const r = await portalFetch(`/portal_contracts/files/${fileId}/download?view=true`);
+          if (r.url) {
+            document.getElementById('pdf-title').textContent = fileName;
+            document.getElementById('pdf-iframe').src = `https://docs.google.com/gview?url=${encodeURIComponent(r.url)}&embedded=true`;
+            document.getElementById('modal-pdf').style.display = 'flex';
+          }
+        } catch(err) { showToast(err.message, 'error'); }
+      }
+
+      const imgBtn = e.target.closest('[data-action="view-image"]');
+      if (imgBtn) {
+        const fileId = imgBtn.dataset.fileId;
+        try {
+          const r = await portalFetch(`/portal_contracts/files/${fileId}/download?view=true`);
+          if (r.url) {
+            document.getElementById('lightbox-img').src = r.url;
+            const lb = document.getElementById('lightbox');
+            lb.style.display = 'flex'; lb.classList.add('open');
+          }
+        } catch(err) { showToast(err.message, 'error'); }
+      }
+    });
+
+    // Close PDF modal
+    document.getElementById('btn-close-pdf').addEventListener('click', () => {
+      document.getElementById('modal-pdf').style.display = 'none';
+      document.getElementById('pdf-iframe').src = '';
+    });
+
+    // ─── Materials section ───
+
+    let portalMaterials = [];
+    let matSelectedFolder = '';
+    let matAccessLevel = 'viewer';
+    let matExpandedIds = {};
+    let matFilesCache = {};
+    let matCommentsCache = {};
+
+    function switchPortalSection(section) {
+      document.getElementById('app-view').querySelector('.page-wrap').style.display = section === 'contracts' ? '' : 'none';
+      document.getElementById('materials-section').style.display = section === 'materials' ? '' : 'none';
+      document.querySelectorAll('.portal-header .nav-link').forEach(el => el.classList.remove('active'));
+      const nav = document.getElementById(section === 'materials' ? 'portal-nav-materials' : 'portal-nav-contracts');
+      if (nav) nav.classList.add('active');
+    }
+
+    function fillMatFolderSelect() {
+      const sel = document.getElementById('mat-filter-folder');
+      if (!sel) return;
+      sel.innerHTML = `<option value="">${t('portalSelectProject')}</option>`;
+      portalFolders.forEach(f => {
+        const opt = document.createElement('option');
+        opt.value = f.id; opt.textContent = f.name;
+        sel.appendChild(opt);
+      });
+    }
+
+    document.getElementById('mat-filter-folder')?.addEventListener('change', e => {
+      matSelectedFolder = e.target.value;
+      matExpandedIds = {}; matFilesCache = {}; matCommentsCache = {};
+      if (matSelectedFolder) loadPortalMaterials();
+      else document.getElementById('portal-mat-list').innerHTML = `<div class="empty-state">${t('portalSelectProject')}</div>`;
+    });
+
+    async function loadPortalMaterials() {
+      const list = document.getElementById('portal-mat-list');
+      list.innerHTML = `<div class="loading">${t('loading')}</div>`;
+      try {
+        const data = await portalFetch(`/materials?folder_id=${matSelectedFolder}`);
+        portalMaterials = data.rows || [];
+        matAccessLevel = data.access_level || 'viewer';
+        renderPortalMaterials();
+      } catch(e) { list.innerHTML = `<div class="empty-state">${e.message}</div>`; }
+    }
+
+    function matStatusBadge(s) {
+      const map = {
+        pending_approval: ['status-pending', t('statusPending')],
+        approved: ['status-approved', t('statusApproved')],
+        rejected: ['status-rejected', t('statusRejected')],
+        archived: ['status-archived', t('statusArchived')],
+      };
+      const [cls, label] = map[s] || ['status-archived', s || '—'];
+      return `<span class="status-badge ${cls}">${label}</span>`;
+    }
+
+    function isImage(ct, fn) {
+      if (ct && ct.startsWith('image/')) return true;
+      return /\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i.test(fn || '');
+    }
+
+    function renderPortalMaterials() {
+      const list = document.getElementById('portal-mat-list');
+      if (!portalMaterials.length) { list.innerHTML = `<div class="empty-state">${t('noMaterials')}</div>`; return; }
+
+      list.innerHTML = portalMaterials.map(m => {
+        const isExp = matExpandedIds[m.id];
+        return `
+        <div style="background:#fff;border:1px solid #e8e8e8;border-radius:10px;padding:14px 18px;margin-bottom:10px">
+          <div style="display:flex;align-items:flex-start;gap:10px">
+            <button style="background:none;border:none;cursor:pointer;font-size:1.1rem;color:#1a73e8;padding:2px 6px;flex-shrink:0"
+              data-action="mat-toggle" data-id="${m.id}">${isExp ? '▼' : '▶'}</button>
+            <div style="flex:1">
+              <div style="font-size:1rem;font-weight:500;color:#222">${m.name || '—'}</div>
+              ${m.description ? `<div style="font-size:0.84rem;color:#666;margin-top:4px">${m.description}</div>` : ''}
+              <div style="font-size:0.78rem;color:#999;margin-top:4px">
+                ${matStatusBadge(m.status)}
+                ${m.status_date ? ` · ${formatDate(m.status_date)}` : ''}
+                · ${m.file_count || 0} files · ${m.comment_count || 0} comments
+              </div>
+            </div>
+            ${matAccessLevel === 'editor' && m.status === 'pending_approval' ? `
+              <div style="display:flex;gap:4px">
+                <button class="btn btn-primary" style="padding:3px 10px;font-size:0.75rem;background:#1e8e3e" data-action="mat-approve" data-id="${m.id}">${t('approve')}</button>
+                <button class="btn btn-outline" style="padding:3px 10px;font-size:0.75rem;color:#c5221f;border-color:#c5221f" data-action="mat-reject" data-id="${m.id}">${t('reject')}</button>
+              </div>
+            ` : ''}
+          </div>
+          ${isExp ? `<div id="portal-mat-detail-${m.id}" style="margin-top:12px"><div class="loading">${t('loading')}</div></div>` : ''}
+        </div>`;
+      }).join('');
+
+      portalMaterials.forEach(m => { if (matExpandedIds[m.id]) loadPortalMatDetail(m.id); });
+    }
+
+    async function loadPortalMatDetail(matId) {
+      const inner = document.getElementById(`portal-mat-detail-${matId}`);
+      if (!inner) return;
+      try {
+        const [files, comments] = await Promise.all([
+          portalFetch(`/materials/${matId}/files`),
+          portalFetch(`/materials/${matId}/comments`),
+        ]);
+        matFilesCache[matId] = files;
+        matCommentsCache[matId] = comments;
+        renderPortalMatDetail(matId);
+      } catch(e) { inner.innerHTML = `<div style="color:#c33">${e.message}</div>`; }
+    }
+
+    function renderPortalMatDetail(matId) {
+      const inner = document.getElementById(`portal-mat-detail-${matId}`);
+      if (!inner) return;
+      const files = matFilesCache[matId] || [];
+      const comments = matCommentsCache[matId] || [];
+
+      let html = '<div style="display:flex;flex-wrap:wrap;gap:10px">';
+      files.forEach(f => {
+        if (isImage(f.content_type, f.file_name)) {
+          html += `<div style="width:200px;border:1px solid #e8e8e8;border-radius:8px;overflow:hidden;cursor:pointer" data-action="mat-view-image" data-file-id="${f.id}">
+            <img src="" data-mat-lazy="${f.id}" style="width:100%;height:auto;max-height:150px;object-fit:cover;display:block" alt="${f.file_name}">
+            <div style="padding:4px 6px;font-size:0.7rem;color:#666;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${f.file_name}
+              <button class="btn btn-outline" style="padding:0 4px;font-size:0.65rem;float:right" data-action="mat-download" data-file-id="${f.id}">⬇</button>
+            </div>
+          </div>`;
+        } else {
+          html += `<div style="width:200px;border:1px solid #e8e8e8;border-radius:8px;overflow:hidden">
+            <div style="width:100%;height:80px;display:flex;align-items:center;justify-content:center;background:#f8f8f8;font-size:2rem;color:#c5221f">📄</div>
+            <div style="padding:4px 6px;font-size:0.7rem;color:#666">${f.file_name}
+              <button class="btn btn-outline" style="padding:0 4px;font-size:0.65rem;float:right" data-action="mat-download" data-file-id="${f.id}">⬇</button>
+            </div>
+          </div>`;
+        }
+      });
+      if (!files.length) html += `<div style="color:#ccc;font-size:0.82rem">—</div>`;
+      html += '</div>';
+
+      // Comments
+      html += `<div style="margin-top:14px;border-top:1px solid #f0f0f0;padding-top:10px">
+        <div style="font-size:0.78rem;font-weight:600;color:#888;text-transform:uppercase;margin-bottom:6px">${t('comments')} (${comments.length})</div>`;
+      comments.forEach(c => {
+        html += `<div style="padding:5px 0;border-bottom:1px solid #f8f8f8">
+          <span style="font-size:0.78rem;font-weight:500;color:#333">${c.author_name || c.author_email}</span>
+          <span style="font-size:0.72rem;color:#999;margin-left:8px">${formatDate(c.created_at)}</span>
+          <div style="font-size:0.84rem;color:#444;margin-top:2px">${c.text}</div>
+        </div>`;
+      });
+      if (matAccessLevel === 'editor') {
+        html += `<div style="display:flex;gap:8px;margin-top:8px">
+          <input type="text" id="mat-comment-${matId}" placeholder="${t('addComment')}..." style="flex:1;border:1px solid #ddd;border-radius:6px;padding:6px 10px;font-size:0.85rem;outline:none">
+          <button class="btn btn-primary" style="padding:4px 12px;font-size:0.78rem" data-action="mat-add-comment" data-id="${matId}">${t('addComment')}</button>
+        </div>`;
+      }
+      html += '</div>';
+      inner.innerHTML = html;
+
+      // Lazy load thumbnails
+      files.forEach(f => {
+        if (isImage(f.content_type, f.file_name)) {
+          const img = inner.querySelector(`[data-mat-lazy="${f.id}"]`);
+          if (img) {
+            portalFetch(`/materials/files/${f.id}/signed-view-url`).then(r => {
+              img.src = r.thumb_url || r.url;
+            }).catch(() => {});
+          }
+        }
+      });
+    }
+
+    // Materials actions in click handler
+    document.addEventListener('click', async e2 => {
+      const btn2 = e2.target.closest('[data-action]');
+      if (!btn2) return;
+      const act = btn2.dataset.action;
+
+      if (act === 'mat-toggle') {
+        const id = btn2.dataset.id;
+        matExpandedIds[id] = !matExpandedIds[id];
+        renderPortalMaterials();
+        return;
+      }
+
+      if (act === 'mat-approve' || act === 'mat-reject') {
+        btn2.disabled = true;
+        const status = act === 'mat-approve' ? 'approved' : 'rejected';
+        try {
+          await portalFetch(`/materials/${btn2.dataset.id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) });
+          showToast(t('saved'), 'success');
+          loadPortalMaterials();
+        } catch(err) { showToast(err.message, 'error'); btn2.disabled = false; }
+        return;
+      }
+
+      if (act === 'mat-view-image') {
+        const fileId = btn2.dataset.fileId || btn2.closest('[data-file-id]')?.dataset.fileId;
+        if (!fileId) return;
+        try {
+          const r = await portalFetch(`/materials/files/${fileId}/signed-view-url`);
+          document.getElementById('lightbox-img').src = r.url; // full size
+          const lb = document.getElementById('lightbox');
+          lb.style.display = 'flex'; lb.classList.add('open');
+        } catch(err) { showToast(err.message, 'error'); }
+        return;
+      }
+
+      if (act === 'mat-download') {
+        e2.stopPropagation();
+        try {
+          const r = await portalFetch(`/materials/files/${btn2.dataset.fileId}/signed-download-url`);
+          if (r.url) window.open(r.url, '_blank');
+        } catch(err) { showToast(err.message, 'error'); }
+        return;
+      }
+
+      if (act === 'mat-add-comment') {
+        const matId = btn2.dataset.id;
+        const input = document.getElementById(`mat-comment-${matId}`);
+        const text = input?.value?.trim();
+        if (!text) return;
+        btn2.disabled = true;
+        try {
+          await portalFetch(`/materials/${matId}/comments`, {
+            method: 'POST',
+            body: JSON.stringify({ text, author_name: portalUser?.name || portalUser?.email || '' }),
+          });
+          input.value = '';
+          loadPortalMatDetail(matId);
+        } catch(err) { showToast(err.message, 'error'); }
+        btn2.disabled = false;
+        return;
+      }
+    });
+
+    // Close lightbox on Escape
+    document.addEventListener('keydown', e3 => {
+      if (e3.key === 'Escape') {
+        const lb = document.getElementById('lightbox');
+        if (lb) { lb.style.display = 'none'; lb.classList.remove('open'); }
+        const pm = document.getElementById('modal-pdf');
+        if (pm) { pm.style.display = 'none'; document.getElementById('pdf-iframe').src = ''; }
+      }
+    });
+
+    // ─── Init ───
+    window.onLangChange = () => {
+      updateTexts();
+      updateTableHeaders();
+      if (selectedFolder && allContracts.length) renderContracts(accessLevel === 'full' ? 10 : 7);
+      if (matSelectedFolder && portalMaterials.length) renderPortalMaterials();
+    };
+
+    // Default to English for portal if user hasn't chosen a language
+    if (!localStorage.getItem('lang')) setLang('en');
+    updateTexts();
+    tryRestoreSession();
+  </script>
+</body>
+</html>

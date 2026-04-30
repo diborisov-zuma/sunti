@@ -21,7 +21,8 @@
         "firebase.json",
         "**/.*",
         "**/node_modules/**",
-        "portal.html"
+        "portal.html",
+        "portal_test.html"
       ]
     },
     {
@@ -66,6 +67,10 @@
         "_firebase.js"
       ],
       "rewrites": [
+        {
+          "source": "/test",
+          "destination": "/portal_test.html"
+        },
         {
           "source": "**",
           "destination": "/portal.html"
