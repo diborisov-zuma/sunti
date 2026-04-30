@@ -9,6 +9,14 @@
     {
       "target": "cabinet",
       "public": ".",
+      "headers": [
+        {
+          "source": "**",
+          "headers": [
+            { "key": "Cross-Origin-Opener-Policy", "value": "same-origin-allow-popups" }
+          ]
+        }
+      ],
       "ignore": [
         "firebase.json",
         "**/.*",
@@ -19,6 +27,14 @@
     {
       "target": "customer",
       "public": ".",
+      "headers": [
+        {
+          "source": "**",
+          "headers": [
+            { "key": "Cross-Origin-Opener-Policy", "value": "same-origin-allow-popups" }
+          ]
+        }
+      ],
       "ignore": [
         "firebase.json",
         "**/.*",
