@@ -238,7 +238,7 @@
   <header id="header"></header>
   <div id="guest-view"></div>
 
-  <div class="chat-wrap" id="main-view" style="display:none">
+  <div class="chat-wrap" id="app-view" style="display:none">
     <div class="chat-toolbar">
       <h2 id="t-ai-chat-title">AI Chat</h2>
       <button class="btn btn-outline" onclick="clearChat()" id="t-ai-chat-clear">Clear</button>
@@ -275,12 +275,12 @@
       document.getElementById('guest-view').style.display = 'none';
       const me = typeof currentMe !== 'undefined' ? currentMe : null;
       if (!me || !me.is_admin) {
-        document.getElementById('main-view').style.display = 'none';
+        document.getElementById('app-view').style.display = 'none';
         document.getElementById('guest-view').innerHTML = '<div style="padding:40px;text-align:center;color:#c5221f">Admin access required</div>';
         document.getElementById('guest-view').style.display = 'block';
         return;
       }
-      document.getElementById('main-view').style.display = 'flex';
+      document.getElementById('app-view').style.display = 'flex';
       updateTexts();
       document.getElementById('chat-input').focus();
     }
