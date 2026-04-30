@@ -152,10 +152,14 @@ exports.portal_contracts = async (req, res) => {
 
       const parsed = parseKey(fileRow.file_url);
       if (!parsed) { res.status(500).json({ error: 'Bad file URL' }); return; }
+      const isView = req.query.view === 'true';
+      const disposition = isView
+        ? `inline; filename="${encodeURIComponent(fileRow.file_name || 'file')}"`
+        : `attachment; filename="${encodeURIComponent(fileRow.file_name || 'file')}"`;
       const [url] = await storage.bucket(parsed.bucket).file(parsed.key).getSignedUrl({
         version: 'v4', action: 'read',
         expires: Date.now() + SIGN_TTL_MS,
-        responseDisposition: `attachment; filename="${encodeURIComponent(fileRow.file_name || 'file')}"`,
+        responseDisposition: disposition,
       });
       res.json({ url });
       return;

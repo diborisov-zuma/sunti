@@ -922,7 +922,7 @@
         const fileId = pdfBtn.dataset.fileId;
         const fileName = pdfBtn.dataset.fileName || 'PDF';
         try {
-          const r = await portalFetch(`/portal_contracts/files/${fileId}/download`);
+          const r = await portalFetch(`/portal_contracts/files/${fileId}/download?view=true`);
           if (r.url) {
             document.getElementById('pdf-title').textContent = fileName;
             document.getElementById('pdf-iframe').src = `https://docs.google.com/gview?url=${encodeURIComponent(r.url)}&embedded=true`;
@@ -935,7 +935,7 @@
       if (imgBtn) {
         const fileId = imgBtn.dataset.fileId;
         try {
-          const r = await portalFetch(`/portal_contracts/files/${fileId}/download`);
+          const r = await portalFetch(`/portal_contracts/files/${fileId}/download?view=true`);
           if (r.url) {
             document.getElementById('lightbox-img').src = r.url;
             const lb = document.getElementById('lightbox');
