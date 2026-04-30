@@ -62,6 +62,45 @@
     #guest-view { text-align:center;padding:100px 24px; }
     #guest-view h2 { font-size:1.4rem;color:#333;margin-bottom:8px; }
     #guest-view p { color:#999;margin-bottom:32px; }
+
+    /* ─── Mobile card layout ─── */
+    .contract-cards { display:none; }
+    .contract-card {
+      background:#fff;border:1px solid #e8e8e8;border-radius:10px;padding:12px 14px;margin-bottom:8px;
+    }
+    .contract-card.expanded { background:#f0f4ff;border-color:#c5d5ff; }
+    .card-header { display:flex;align-items:flex-start;gap:8px;cursor:pointer; }
+    .card-header .expand-btn { flex-shrink:0;margin-top:2px; }
+    .card-main { flex:1;min-width:0; }
+    .card-title { font-weight:600;font-size:0.92rem;color:#222; }
+    .card-sub { font-size:0.78rem;color:#999;margin-top:2px; }
+    .card-meta { display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:8px;font-size:0.82rem;color:#555; }
+    .card-meta .label { color:#999;font-size:0.72rem;text-transform:uppercase; }
+    .card-detail { margin-top:10px;padding-top:10px;border-top:1px solid #e8e8e8; }
+
+    @media (max-width: 768px) {
+      .portal-header { padding:0 12px;gap:8px; }
+      .portal-header .nav { padding-left:8px; }
+      .portal-header .nav-link { padding:4px 8px;font-size:0.8rem; }
+      .portal-header .header-right { gap:6px; }
+      .portal-header .lang-switcher .lang-btn { font-size:0.7rem;padding:2px 5px; }
+      #portal-user-name { display:none; }
+
+      .page-wrap { padding:12px; }
+      .page-toolbar { gap:6px; }
+      .page-toolbar h2 { font-size:0.95rem;flex:none;width:100%; }
+      .page-toolbar select, .page-toolbar input { font-size:0.8rem;padding:5px 8px; }
+      .page-toolbar #btn-print { padding:3px 8px;font-size:0.8rem; }
+
+      .ct-wrap { display:none; }
+      .contract-cards { display:block; }
+
+      .detail-inner { padding:10px 8px 10px 8px !important; }
+      .inv-mini-table th, .inv-mini-table td,
+      .trx-mini-table th, .trx-mini-table td { padding:5px 6px;font-size:0.78rem; }
+
+      .progress-bar-wrap { width:60px; }
+    }
   </style>
 </head>
 <body>
@@ -114,6 +153,7 @@
         <input type="text" class="filter-select" id="portal-search" placeholder="" style="min-width:150px">
         <button class="btn btn-outline" id="btn-print" style="display:none;padding:4px 10px;font-size:0.85rem" title="Print">🖨</button>
       </div>
+      <!-- Desktop table -->
       <div class="ct-wrap">
         <table class="ct-table" id="contracts-table">
           <thead id="contracts-thead"></thead>
@@ -129,6 +169,11 @@
             </tr>
           </tfoot>
         </table>
+      </div>
+      <!-- Mobile cards -->
+      <div class="contract-cards" id="contract-cards"></div>
+      <!-- Mobile totals -->
+      <div id="mobile-totals" style="display:none;background:#f8f8f8;border:1px solid #e8e8e8;border-radius:10px;padding:12px 14px;margin-top:8px;font-size:0.85rem">
       </div>
     </div>
 
@@ -605,8 +650,8 @@
       });
 
       // Totals footer (only for full access)
+      let sumTotal = 0, sumPaid = 0;
       if (tfoot && accessLevel === 'full' && allContracts.length) {
-        let sumTotal = 0, sumPaid = 0;
         allContracts.forEach(c => {
           sumTotal += numVal(c.total_amount);
           sumPaid += numVal(c.paid_amount);
@@ -621,6 +666,63 @@
       } else if (tfoot) {
         tfoot.style.display = 'none';
       }
+
+      // ─── Mobile cards ───
+      const cardsEl = document.getElementById('contract-cards');
+      const mobileTotals = document.getElementById('mobile-totals');
+      if (!cardsEl) return;
+      if (!allContracts.length) {
+        cardsEl.innerHTML = `<div class="empty-state">${t('noContracts')}</div>`;
+        if (mobileTotals) mobileTotals.style.display = 'none';
+        return;
+      }
+      cardsEl.innerHTML = allContracts.map(c => {
+        const isExp = expandedContracts[c.id];
+        const dir = c.direction || 'expense';
+        const outstanding = numVal(c.total_amount) - numVal(c.paid_amount);
+        let amtHtml = '';
+        if (accessLevel === 'full') {
+          amtHtml = `
+            <div><span class="label">${t('contractTotal')}</span><br>${amtCell(c.total_amount, dir)}</div>
+            <div><span class="label">${t('paidAmount')}</span><br>${amtCell(c.paid_amount, dir)}</div>
+            <div><span class="label">${t('remainingToPay')}</span><br>${amtCell(outstanding, dir)}</div>`;
+        }
+        return `
+        <div class="contract-card${isExp ? ' expanded' : ''}">
+          <div class="card-header" data-expand-contract="${c.id}">
+            <button class="expand-btn${isExp?' open':''}">${isExp?'▼':'▶'}</button>
+            <div class="card-main">
+              <div class="card-title">${c.needs_review ? '🔴 ' : ''}${c.name || '—'}</div>
+              <div class="card-sub">${formatDate(c.date)} · ${c.contractor_name_en || c.contractor_name_th || '—'}</div>
+              <div class="card-meta">
+                ${amtHtml}
+                <div><span class="label">${t('portalProgress')}</span><br>${progressBar(c.progress_pct)}</div>
+                <div>${statusBadge(c.status)}</div>
+              </div>
+            </div>
+          </div>
+          ${isExp ? `<div class="card-detail" id="portal-contract-m-${c.id}"><div class="loading">${t('loading')}</div></div>` : ''}
+        </div>`;
+      }).join('');
+
+      // Mobile totals
+      if (mobileTotals && accessLevel === 'full' && allContracts.length) {
+        const dir = allContracts[0]?.direction || 'expense';
+        const sumOutstanding = sumTotal - sumPaid;
+        mobileTotals.innerHTML = `
+          <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:4px">
+            <span><strong>${t('contractTotal')}:</strong> ${amtCell(sumTotal, dir)}</span>
+            <span><strong>${t('paidAmount')}:</strong> ${amtCell(sumPaid, dir)}</span>
+            <span><strong>${t('remainingToPay')}:</strong> ${amtCell(sumOutstanding, dir)}</span>
+          </div>`;
+        mobileTotals.style.display = '';
+      } else if (mobileTotals) {
+        mobileTotals.style.display = 'none';
+      }
+
+      allContracts.forEach(c => {
+        if (expandedContracts[c.id]) loadContractDetail(c.id, colCount);
+      });
     }
 
     let contractInvFiles = {};
@@ -628,7 +730,7 @@
     let contractDirectTrxFiles = {};
 
     async function loadContractDetail(contractId, colCount) {
-      const inner = document.getElementById(`portal-contract-${contractId}`);
+      const inner = document.getElementById(`portal-contract-${contractId}`) || document.getElementById(`portal-contract-m-${contractId}`);
       if (!inner) return;
       try {
         const fetches = [portalFetch(`/portal_contracts/${contractId}/invoices`)];
@@ -673,7 +775,8 @@
 
     function renderContractDetail(contractId, invs, colCount) {
       const inner = document.getElementById(`portal-contract-${contractId}`);
-      if (!inner) return;
+      const innerM = document.getElementById(`portal-contract-m-${contractId}`);
+      if (!inner && !innerM) return;
       const files = contractFiles[contractId] || [];
       const contract = allContracts.find(c => c.id === contractId);
 
@@ -761,7 +864,8 @@
         });
         html += '</tbody></table>';
       }
-      inner.innerHTML = html;
+      if (inner) inner.innerHTML = html;
+      if (innerM) innerM.innerHTML = html;
 
       invs.forEach(inv => {
         if (expandedInvoices[inv.id]) loadInvoiceTrx(inv.id, contractId);
