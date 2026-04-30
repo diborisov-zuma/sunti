@@ -100,6 +100,7 @@
         data-text="signin_with" data-shape="rectangular">
       </div>
     </div>
+    <div id="auth-error-display" style="display:none;margin-top:24px;padding:12px 16px;background:#fce8e6;border-radius:8px;color:#c5221f;font-size:0.85rem;max-width:400px;margin-left:auto;margin-right:auto;text-align:left"></div>
   </div>
 
   <div id="app-view" style="display:none">
@@ -253,6 +254,25 @@
     let _portalLoginHint = null;
     let _tokenRefreshTimer = null;
 
+    function showAuthError(email, error, step) {
+      const msg = `${error} [${step}, ${email || '?'}]`;
+      sessionStorage.setItem('portal_last_error', msg);
+      const el = document.getElementById('auth-error-display');
+      if (el) {
+        el.style.display = 'block';
+        el.innerHTML = `<strong>Login error:</strong> ${error}<br><small>Step: ${step} | Account: ${email || '?'}</small>`;
+      }
+    }
+    // Show previous error on page load
+    (function() {
+      const prev = sessionStorage.getItem('portal_last_error');
+      if (prev) {
+        const el = document.getElementById('auth-error-display');
+        if (el) { el.style.display = 'block'; el.innerHTML = `<strong>Previous error:</strong> ${prev}`; }
+        sessionStorage.removeItem('portal_last_error');
+      }
+    })();
+
     function logAuthError(email, error, step) {
       try {
         fetch(`${API_URL}/portal_contracts/log-error`, {
@@ -280,7 +300,7 @@
         upgradeToAccessToken(loginHint);
       } catch(e) {
         logAuthError(loginHint, e.message, 'initApp_idtoken');
-        showToast('Error: ' + e.message, 'error');
+        showAuthError(loginHint, e.message, 'initApp_idtoken');
       }
     }
 
@@ -344,7 +364,7 @@
         document.getElementById('guest-view').style.display = 'block';
         document.getElementById('app-view').style.display = 'none';
         document.getElementById('portal-header').style.display = 'none';
-        showToast('Error: ' + e.message, 'error');
+        showAuthError(_portalLoginHint, e.message, 'initApp');
       }
     }
 
@@ -1160,6 +1180,8 @@
       if (matSelectedFolder && portalMaterials.length) renderPortalMaterials();
     };
 
+    // Default to English for portal if user hasn't chosen a language
+    if (!localStorage.getItem('lang')) setLang('en');
     updateTexts();
     tryRestoreSession();
   </script>
