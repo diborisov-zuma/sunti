@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sunti — AI Chat</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="stylesheet" href="style.css">
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <script src="_i18n.js"></script>
+  <script src="_config.js"></script>
+  <script src="_auth.js"></script>
+  <script src="_header.js"></script>
+  <style>
+    .chat-wrap {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      height: calc(100vh - 56px);
+    }
+    .chat-toolbar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 16px;
+      flex-shrink: 0;
+    }
+    .chat-toolbar h2 {
+      font-size: 1.2rem;
+      color: #222;
+      flex: 1;
+    }
+
+    /* Messages area */
+    .chat-messages {
+      flex: 1;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      padding: 8px 0;
+      min-height: 0;
+    }
+
+    .chat-msg {
+      max-width: 85%;
+      padding: 12px 16px;
+      border-radius: 12px;
+      font-size: 0.9rem;
+      line-height: 1.55;
+      word-wrap: break-word;
+    }
+    .chat-msg.user {
+      align-self: flex-end;
+      background: #1a73e8;
+      color: #fff;
+      border-bottom-right-radius: 4px;
+    }
+    .chat-msg.assistant {
+      align-self: flex-start;
+      background: #fff;
+      border: 1px solid #e8e8e8;
+      color: #333;
+      border-bottom-left-radius: 4px;
+    }
+    .chat-msg.assistant .msg-text { white-space: pre-wrap; }
+    .chat-msg.error {
+      align-self: flex-start;
+      background: #fff5f5;
+      border: 1px solid #f5c6c6;
+      color: #c5221f;
+    }
+
+    /* SQL reveal */
+    .sql-toggle {
+      margin-top: 10px;
+      font-size: 0.78rem;
+      color: #888;
+      cursor: pointer;
+      user-select: none;
+    }
+    .sql-toggle:hover { color: #555; }
+    .sql-block {
+      display: none;
+      margin-top: 8px;
+      background: #f8f8f8;
+      border: 1px solid #e8e8e8;
+      border-radius: 6px;
+      padding: 10px 12px;
+      font-family: monospace;
+      font-size: 0.8rem;
+      white-space: pre-wrap;
+      word-break: break-all;
+      color: #555;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+    .sql-block.open { display: block; }
+
+    /* Data table */
+    .data-table-wrap {
+      margin-top: 10px;
+      max-height: 300px;
+      overflow: auto;
+      border: 1px solid #e8e8e8;
+      border-radius: 6px;
+    }
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.8rem;
+    }
+    .data-table th {
+      background: #f4f4f4;
+      border-bottom: 1px solid #e8e8e8;
+      padding: 6px 10px;
+      text-align: left;
+      font-weight: 600;
+      color: #555;
+      position: sticky;
+      top: 0;
+      white-space: nowrap;
+    }
+    .data-table td {
+      border-bottom: 1px solid #f0f0f0;
+      padding: 5px 10px;
+      color: #333;
+      white-space: nowrap;
+    }
+    .data-table tr:last-child td { border-bottom: none; }
+    .data-table tr:hover td { background: #f8fbff; }
+
+    /* Starter prompts */
+    .chat-starters {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      flex: 1;
+      gap: 12px;
+      padding: 40px 0;
+    }
+    .chat-starters h3 {
+      font-size: 1rem;
+      color: #888;
+      font-weight: 400;
+      margin-bottom: 8px;
+    }
+    .starter-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: center;
+      max-width: 600px;
+    }
+    .starter-chip {
+      padding: 8px 16px;
+      background: #fff;
+      border: 1px solid #e8e8e8;
+      border-radius: 20px;
+      font-size: 0.84rem;
+      color: #555;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .starter-chip:hover {
+      border-color: #1a73e8;
+      color: #1a73e8;
+      background: #f0f6ff;
+    }
+
+    /* Input area */
+    .chat-input-area {
+      flex-shrink: 0;
+      padding-top: 12px;
+      border-top: 1px solid #e8e8e8;
+      display: flex;
+      gap: 10px;
+      align-items: flex-end;
+    }
+    .chat-input {
+      flex: 1;
+      border: 1px solid #ddd;
+      border-radius: 10px;
+      padding: 10px 14px;
+      font-size: 0.9rem;
+      resize: none;
+      outline: none;
+      max-height: 120px;
+      min-height: 44px;
+      font-family: inherit;
+      line-height: 1.4;
+    }
+    .chat-input:focus { border-color: #1a73e8; }
+    .chat-send {
+      padding: 10px 20px;
+      background: #1a73e8;
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      font-size: 0.88rem;
+      font-weight: 500;
+      cursor: pointer;
+      white-space: nowrap;
+      height: 44px;
+    }
+    .chat-send:hover { background: #1557b0; }
+    .chat-send:disabled { background: #ccc; cursor: not-allowed; }
+
+    /* Loading dots */
+    .typing-indicator {
+      display: flex;
+      gap: 4px;
+      padding: 14px 18px;
+      align-self: flex-start;
+      background: #fff;
+      border: 1px solid #e8e8e8;
+      border-radius: 12px;
+      border-bottom-left-radius: 4px;
+    }
+    .typing-dot {
+      width: 8px; height: 8px;
+      background: #ccc;
+      border-radius: 50%;
+      animation: typingBounce 1.2s infinite;
+    }
+    .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+    .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes typingBounce {
+      0%, 60%, 100% { transform: translateY(0); }
+      30% { transform: translateY(-6px); }
+    }
+  </style>
+</head>
+<body>
+  <header id="header"></header>
+  <div id="guest-view"></div>
+
+  <div class="chat-wrap" id="main-view" style="display:none">
+    <div class="chat-toolbar">
+      <h2 id="t-ai-chat-title">AI Chat</h2>
+      <button class="btn btn-outline" onclick="clearChat()" id="t-ai-chat-clear">Clear</button>
+    </div>
+
+    <div class="chat-messages" id="chat-messages">
+      <!-- Starter prompts shown when empty -->
+      <div class="chat-starters" id="chat-starters">
+        <h3 id="t-ai-chat-hint">Ask a question about your data</h3>
+        <div class="starter-chips">
+          <div class="starter-chip" onclick="askStarter(this)">Top 10 contractors by total payments</div>
+          <div class="starter-chip" onclick="askStarter(this)">Unpaid invoices this month</div>
+          <div class="starter-chip" onclick="askStarter(this)">Expenses by category for 2025</div>
+          <div class="starter-chip" onclick="askStarter(this)">Contracts in progress > 50%</div>
+          <div class="starter-chip" onclick="askStarter(this)">Unmatched bank statement lines</div>
+          <div class="starter-chip" onclick="askStarter(this)">Monthly expense totals for last 6 months</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="chat-input-area">
+      <textarea class="chat-input" id="chat-input" rows="1"
+        placeholder="Ask about your data..."
+        onkeydown="handleKey(event)"></textarea>
+      <button class="chat-send" id="chat-send" onclick="sendMessage()">Send</button>
+    </div>
+  </div>
+
+  <script>
+    renderHeader('ai_chat');
+
+    const chatHistory = []; // { role, content } for API context
+    let isLoading = false;
+
+    function onLogin() {
+      document.getElementById('guest-view').style.display = 'none';
+      const me = typeof currentMe !== 'undefined' ? currentMe : null;
+      if (!me || !me.is_admin) {
+        document.getElementById('main-view').style.display = 'none';
+        document.getElementById('guest-view').innerHTML = '<div style="padding:40px;text-align:center;color:#c5221f">Admin access required</div>';
+        document.getElementById('guest-view').style.display = 'block';
+        return;
+      }
+      document.getElementById('main-view').style.display = 'flex';
+      updateTexts();
+      document.getElementById('chat-input').focus();
+    }
+
+    function updateTexts() {
+      const title = document.getElementById('t-ai-chat-title');
+      const clear = document.getElementById('t-ai-chat-clear');
+      const hint = document.getElementById('t-ai-chat-hint');
+      if (title) title.textContent = t('aiChatTitle');
+      if (clear) clear.textContent = t('aiChatClear');
+      if (hint) hint.textContent = t('aiChatHint');
+    }
+
+    function handleKey(e) {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
+      }
+      // Auto-resize textarea
+      setTimeout(() => {
+        const ta = e.target;
+        ta.style.height = 'auto';
+        ta.style.height = Math.min(ta.scrollHeight, 120) + 'px';
+      }, 0);
+    }
+
+    function askStarter(el) {
+      document.getElementById('chat-input').value = el.textContent;
+      sendMessage();
+    }
+
+    async function sendMessage() {
+      if (isLoading) return;
+      const input = document.getElementById('chat-input');
+      const text = input.value.trim();
+      if (!text) return;
+
+      input.value = '';
+      input.style.height = 'auto';
+
+      // Hide starters
+      const starters = document.getElementById('chat-starters');
+      if (starters) starters.remove();
+
+      // Add user message
+      appendMessage('user', text);
+      chatHistory.push({ role: 'user', content: text });
+
+      // Show loading
+      isLoading = true;
+      document.getElementById('chat-send').disabled = true;
+      const loadingEl = showTyping();
+
+      try {
+        const resp = await fetch(`${API_URL}/ai_chat`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${window._accessToken}`,
+          },
+          body: JSON.stringify({
+            message: text,
+            history: chatHistory.slice(0, -1), // exclude current message (already in 'message')
+          }),
+        });
+
+        loadingEl.remove();
+
+        if (!resp.ok) {
+          const err = await resp.json().catch(() => ({ error: resp.statusText }));
+          appendMessage('error', err.error || 'Request failed');
+          return;
+        }
+
+        const data = await resp.json();
+
+        if (!data.success) {
+          appendMessage('error', data.error || 'Unknown error');
+          return;
+        }
+
+        // Build assistant message
+        appendAssistant(data);
+        chatHistory.push({ role: 'assistant', content: data.answer || '' });
+
+      } catch (e) {
+        loadingEl.remove();
+        appendMessage('error', e.message);
+      } finally {
+        isLoading = false;
+        document.getElementById('chat-send').disabled = false;
+        document.getElementById('chat-input').focus();
+      }
+    }
+
+    function appendMessage(type, text) {
+      const container = document.getElementById('chat-messages');
+      const div = document.createElement('div');
+      div.className = `chat-msg ${type}`;
+      div.textContent = text;
+      container.appendChild(div);
+      container.scrollTop = container.scrollHeight;
+    }
+
+    function appendAssistant(data) {
+      const container = document.getElementById('chat-messages');
+      const div = document.createElement('div');
+      div.className = 'chat-msg assistant';
+
+      // Answer text
+      const textEl = document.createElement('div');
+      textEl.className = 'msg-text';
+      textEl.textContent = data.answer || 'No response';
+      div.appendChild(textEl);
+
+      // SQL block (collapsible)
+      if (data.sql) {
+        const toggleId = 'sql-' + Date.now();
+
+        const toggle = document.createElement('div');
+        toggle.className = 'sql-toggle';
+        toggle.textContent = '> SQL query';
+        toggle.onclick = () => {
+          const block = document.getElementById(toggleId);
+          block.classList.toggle('open');
+          toggle.textContent = block.classList.contains('open') ? '< SQL query' : '> SQL query';
+        };
+        div.appendChild(toggle);
+
+        const sqlBlock = document.createElement('div');
+        sqlBlock.className = 'sql-block';
+        sqlBlock.id = toggleId;
+        sqlBlock.textContent = data.sql;
+        div.appendChild(sqlBlock);
+      }
+
+      // Data table
+      if (data.data && data.data.length > 0) {
+        const wrap = document.createElement('div');
+        wrap.className = 'data-table-wrap';
+
+        const table = document.createElement('table');
+        table.className = 'data-table';
+
+        // Header
+        const keys = Object.keys(data.data[0]);
+        const thead = document.createElement('thead');
+        const headRow = document.createElement('tr');
+        keys.forEach(k => {
+          const th = document.createElement('th');
+          th.textContent = k;
+          headRow.appendChild(th);
+        });
+        thead.appendChild(headRow);
+        table.appendChild(thead);
+
+        // Body (max 50 rows in UI)
+        const tbody = document.createElement('tbody');
+        const showRows = data.data.slice(0, 50);
+        showRows.forEach(row => {
+          const tr = document.createElement('tr');
+          keys.forEach(k => {
+            const td = document.createElement('td');
+            const val = row[k];
+            td.textContent = val === null || val === undefined ? '—' : val;
+            tr.appendChild(td);
+          });
+          tbody.appendChild(tr);
+        });
+        table.appendChild(tbody);
+        wrap.appendChild(table);
+        div.appendChild(wrap);
+
+        // Row count note
+        if (data.rowCount && data.rowCount > 50) {
+          const note = document.createElement('div');
+          note.style.cssText = 'font-size:0.75rem;color:#888;margin-top:4px';
+          note.textContent = `Showing 50 of ${data.rowCount} rows`;
+          div.appendChild(note);
+        }
+      }
+
+      container.appendChild(div);
+      container.scrollTop = container.scrollHeight;
+    }
+
+    function showTyping() {
+      const container = document.getElementById('chat-messages');
+      const div = document.createElement('div');
+      div.className = 'typing-indicator';
+      div.innerHTML = '<div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div>';
+      container.appendChild(div);
+      container.scrollTop = container.scrollHeight;
+      return div;
+    }
+
+    function clearChat() {
+      chatHistory.length = 0;
+      const container = document.getElementById('chat-messages');
+      container.innerHTML = `
+        <div class="chat-starters" id="chat-starters">
+          <h3 id="t-ai-chat-hint">${t('aiChatHint')}</h3>
+          <div class="starter-chips">
+            <div class="starter-chip" onclick="askStarter(this)">Top 10 contractors by total payments</div>
+            <div class="starter-chip" onclick="askStarter(this)">Unpaid invoices this month</div>
+            <div class="starter-chip" onclick="askStarter(this)">Expenses by category for 2025</div>
+            <div class="starter-chip" onclick="askStarter(this)">Contracts in progress > 50%</div>
+            <div class="starter-chip" onclick="askStarter(this)">Unmatched bank statement lines</div>
+            <div class="starter-chip" onclick="askStarter(this)">Monthly expense totals for last 6 months</div>
+          </div>
+        </div>
+      `;
+    }
+  </script>
+</body>
+</html>

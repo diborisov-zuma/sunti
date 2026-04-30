@@ -21,6 +21,7 @@ function renderHeader(activePage) {
       <a href="materials.html" class="nav-link ${activePage === 'materials' ? 'active' : ''}" id="t-nav-materials" style="display:none"></a>
       <a href="whatsapp.html" class="nav-link ${activePage === 'whatsapp' ? 'active' : ''}" id="t-nav-whatsapp" style="display:none"></a>
       <a href="statements.html" class="nav-link ${activePage === 'statements' ? 'active' : ''}" id="t-nav-statements"></a>
+      <a href="ai_chat.html" class="nav-link ${activePage === 'ai_chat' ? 'active' : ''}" id="t-nav-ai-chat" style="display:none"></a>
       <div class="nav-dropdown" id="nav-settings" style="display:none">
         <a class="nav-link ${['folders','companies','users','categories','portal'].includes(activePage) ? 'active' : ''}" id="t-nav-settings">⚙</a>
         <div class="nav-dropdown-menu">
@@ -174,6 +175,13 @@ function updateHeaderTexts() {
     nmat.style.display = (me4 && (me4.is_admin === true || me4.has_materials_access === true)) ? '' : 'none';
   }
   // reports removed
+  // AI Chat — admin only
+  const naic = document.getElementById('t-nav-ai-chat');
+  if (naic) {
+    naic.textContent = t('navAiChat');
+    const meAic = typeof currentMe !== 'undefined' ? currentMe : null;
+    naic.style.display = (meAic && meAic.is_admin === true) ? '' : 'none';
+  }
   if (nc) nc.textContent = t('navCompanies');
   if (nu) nu.textContent = t('navUsers');
   if (ncat) ncat.textContent = t('navCategories');

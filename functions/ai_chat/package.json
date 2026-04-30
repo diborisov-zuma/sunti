@@ -1,0 +1,11 @@
+{
+  "name": "ai_chat",
+  "version": "1.0.0",
+  "main": "index.js",
+  "type": "commonjs",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.52.0",
+    "@google-cloud/bigquery": "^8.1.1",
+    "@google-cloud/functions-framework": "^5.0.2"
+  }
+}
