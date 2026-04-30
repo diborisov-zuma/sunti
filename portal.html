@@ -7,6 +7,7 @@
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="stylesheet" href="style.css">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
   <script src="_i18n.js"></script>
   <script src="_config.js"></script>
   <style>
@@ -154,6 +155,7 @@
         <select class="filter-select" id="filter-status" style="display:none"><option value=""></option></select>
         <input type="text" class="filter-select" id="portal-search" placeholder="" style="min-width:150px">
         <button class="btn btn-outline" id="btn-print" style="display:none;padding:4px 10px;font-size:0.85rem" title="Print">🖨</button>
+        <button class="btn btn-outline" id="btn-excel" style="display:none;padding:4px 10px;font-size:0.85rem;color:#1d6f42" title="Export Excel">📊 Excel</button>
       </div>
       <div class="ct-wrap">
         <table class="ct-table" id="contracts-table">
@@ -572,6 +574,7 @@
         // Show status filter and print button
         document.getElementById('filter-status').style.display = '';
         document.getElementById('btn-print').style.display = '';
+        document.getElementById('btn-excel').style.display = '';
 
         renderContracts(colCount);
       } catch(e) {
@@ -993,6 +996,63 @@
       win.document.write(html);
       win.document.close();
       setTimeout(() => win.print(), 300);
+    });
+
+    // ─── Excel export ───
+    document.getElementById('btn-excel').addEventListener('click', () => {
+      if (!allContracts.length || typeof XLSX === 'undefined') return;
+      const dir = allContracts[0]?.direction || 'expense';
+      const sign = dir === 'expense' ? -1 : 1;
+      const folder = portalFolders.find(f => f.id === selectedFolder);
+
+      const header = ['Date', 'Name', 'Contractor'];
+      if (accessLevel === 'full') header.push('Total', 'Paid', 'To Pay');
+      header.push('Status');
+
+      const data = [header];
+      let sumTotal = 0, sumPaid = 0;
+      allContracts.forEach(c => {
+        const total = numVal(c.total_amount);
+        const paid = numVal(c.paid_amount);
+        const toPay = total - paid;
+        sumTotal += total; sumPaid += paid;
+        const row = [
+          c.date?.value || c.date || '',
+          (c.name || '') + (c.external_ref ? ' (' + c.external_ref + ')' : ''),
+          c.contractor_name_en || c.contractor_name_th || '',
+        ];
+        if (accessLevel === 'full') row.push(total * sign, paid * sign, toPay * sign);
+        row.push(c.status || '');
+        data.push(row);
+      });
+
+      // Totals row
+      if (accessLevel === 'full') {
+        const totRow = ['', '', 'Total:'];
+        totRow.push(sumTotal * sign, sumPaid * sign, (sumTotal - sumPaid) * sign, '');
+        data.push(totRow);
+      }
+
+      const ws = XLSX.utils.aoa_to_sheet(data);
+      // Column widths
+      ws['!cols'] = [
+        { wch: 12 }, { wch: 30 }, { wch: 25 },
+        ...(accessLevel === 'full' ? [{ wch: 14 }, { wch: 14 }, { wch: 14 }] : []),
+        { wch: 12 },
+      ];
+      // Number format for amount columns
+      if (accessLevel === 'full') {
+        for (let r = 1; r <= allContracts.length + 1; r++) {
+          for (let c = 3; c <= 5; c++) {
+            const cell = ws[XLSX.utils.encode_cell({ r, c })];
+            if (cell) cell.z = '#,##0.00';
+          }
+        }
+      }
+
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Contracts');
+      XLSX.writeFile(wb, `Contracts_${folder?.name || 'export'}_${new Date().toISOString().slice(0,10)}.xlsx`);
     });
 
     // ─── Actions ───
