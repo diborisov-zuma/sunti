@@ -6,14 +6,20 @@ function renderHeader(activePage) {
     <a class="logo" href="index.html">Sunti</a>
 
     <nav class="nav">
-      <a href="contracts.html" class="nav-link ${activePage === 'contracts' ? 'active' : ''}" id="t-nav-contracts" style="display:none"></a>
-      <a href="ctc.html" class="nav-link ${activePage === 'ctc' ? 'active' : ''}" id="t-nav-ctc" style="display:none"></a>
-      <a href="contractors.html" class="nav-link ${activePage === 'contractors' ? 'active' : ''}" id="t-nav-contractors2" style="display:none"></a>
+      <div class="nav-dropdown" id="nav-finance-group" style="display:none">
+        <a class="nav-link ${['contracts','ctc','contractors','invoices','finance','ai'].includes(activePage) ? 'active' : ''}" id="t-nav-finance-group"></a>
+        <div class="nav-dropdown-menu">
+          <a href="contracts.html"    class="${activePage === 'contracts'    ? 'active' : ''}" id="t-nav-contracts" style="display:none"></a>
+          <a href="ctc.html"          class="${activePage === 'ctc'          ? 'active' : ''}" id="t-nav-ctc" style="display:none"></a>
+          <a href="contractors.html"  class="${activePage === 'contractors'  ? 'active' : ''}" id="t-nav-contractors2" style="display:none"></a>
+          <a href="invoices.html"     class="${activePage === 'invoices'     ? 'active' : ''}" id="t-nav-invoices"></a>
+          <a href="finance.html"      class="${activePage === 'finance'      ? 'active' : ''}" id="t-nav-finance"></a>
+          <a href="ai.html"           class="${activePage === 'ai'           ? 'active' : ''}" id="t-nav-ai" style="display:none"></a>
+        </div>
+      </div>
       <a href="documentation.html" class="nav-link ${activePage === 'documentation' ? 'active' : ''}" id="t-nav-docs" style="display:none"></a>
       <a href="materials.html" class="nav-link ${activePage === 'materials' ? 'active' : ''}" id="t-nav-materials" style="display:none"></a>
       <a href="whatsapp.html" class="nav-link ${activePage === 'whatsapp' ? 'active' : ''}" id="t-nav-whatsapp" style="display:none"></a>
-      <a href="invoices.html" class="nav-link ${activePage === 'invoices' ? 'active' : ''}" id="t-nav-invoices"></a>
-      <a href="finance.html"  class="nav-link ${activePage === 'finance'  ? 'active' : ''}" id="t-nav-finance"></a>
       <a href="statements.html" class="nav-link ${activePage === 'statements' ? 'active' : ''}" id="t-nav-statements"></a>
       <div class="nav-dropdown" id="nav-settings" style="display:none">
         <a class="nav-link ${['folders','companies','users','categories','portal'].includes(activePage) ? 'active' : ''}" id="t-nav-settings">⚙</a>
@@ -75,14 +81,18 @@ function renderHeader(activePage) {
 
   updateHeaderTexts();
 
-  // Dropdown Settings
+  // Dropdown toggles
   const sdd = document.getElementById('nav-settings');
-  if (sdd) {
-    sdd.querySelector('.nav-link').addEventListener('click', e => {
+  const fdd = document.getElementById('nav-finance-group');
+  [sdd, fdd].forEach(dd => {
+    if (!dd) return;
+    dd.querySelector('.nav-link').addEventListener('click', e => {
       e.preventDefault();
-      sdd.classList.toggle('open');
+      // Close other dropdowns
+      [sdd, fdd].forEach(other => { if (other && other !== dd) other.classList.remove('open'); });
+      dd.classList.toggle('open');
     });
-  }
+  });
 
   // Закрываем панели при клике вне них
   document.addEventListener('click', e => {
@@ -92,6 +102,7 @@ function renderHeader(activePage) {
       panel.style.display = 'none';
     }
     if (sdd && !sdd.contains(e.target)) sdd.classList.remove('open');
+    if (fdd && !fdd.contains(e.target)) fdd.classList.remove('open');
   });
 }
 
@@ -118,6 +129,18 @@ function updateHeaderTexts() {
   if (ni) ni.textContent = t('navInvoices');
   if (nfi) nfi.textContent = t('navFinance');
   if (ns)  ns.textContent  = t('navStatements');
+  // Finance group dropdown
+  const nfg = document.getElementById('t-nav-finance-group');
+  const fgWrap = document.getElementById('nav-finance-group');
+  if (nfg) nfg.textContent = t('navFinanceGroup');
+  if (fgWrap) fgWrap.style.display = 'inline-flex';
+  // AI link — same access as contracts
+  const nai = document.getElementById('t-nav-ai');
+  if (nai) {
+    nai.textContent = t('navAi');
+    const meAi = typeof currentMe !== 'undefined' ? currentMe : null;
+    nai.style.display = (meAi && (meAi.is_admin === true || meAi.has_contracts_access === true)) ? '' : 'none';
+  }
   const nct = document.getElementById('t-nav-contracts');
   if (nct) {
     nct.textContent = t('navContracts');

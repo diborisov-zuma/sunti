@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sunti — AI</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="stylesheet" href="style.css">
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <script src="_i18n.js"></script>
+  <script src="_config.js"></script>
+  <script src="_auth.js"></script>
+  <script src="_header.js"></script>
+  <style>
+    .ai-wrap { max-width:900px;margin:0 auto;padding:24px; }
+    .ai-toolbar { display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap; }
+    .ai-toolbar h2 { font-size:1.2rem;color:#222;flex:1; }
+
+    .ai-form { background:#fff;border:1px solid #e8e8e8;border-radius:10px;padding:20px 24px;margin-bottom:20px; }
+    .ai-form .field-row { display:flex;gap:16px;margin-bottom:14px;flex-wrap:wrap; }
+    .ai-form .field-group { display:flex;flex-direction:column;gap:4px;flex:1;min-width:200px; }
+    .ai-form label { font-size:0.78rem;font-weight:600;color:#888;text-transform:uppercase; }
+    .ai-form select, .ai-form input[type="file"] {
+      border:1px solid #ddd;border-radius:6px;padding:8px 10px;font-size:0.88rem;color:#333;outline:none;background:#fff;
+    }
+
+    .upload-area {
+      border:2px dashed #ddd;border-radius:10px;padding:32px;text-align:center;color:#999;
+      cursor:pointer;transition:border-color 0.2s,background 0.2s;
+    }
+    .upload-area:hover { border-color:#1a73e8;background:#f8fbff; }
+    .upload-area.has-file { border-color:#1e8e3e;background:#f0faf0; }
+    .upload-area .icon { font-size:2rem;margin-bottom:8px; }
+    .upload-area .file-name { font-size:0.9rem;color:#333;font-weight:500; }
+
+    .ai-result { background:#fff;border:1px solid #e8e8e8;border-radius:10px;padding:20px 24px; }
+    .ai-result h3 { font-size:1rem;color:#222;margin:0 0 12px; }
+    .ai-result pre {
+      background:#f8f8f8;border:1px solid #e8e8e8;border-radius:8px;padding:14px;
+      font-size:0.84rem;color:#333;white-space:pre-wrap;word-wrap:break-word;
+      max-height:500px;overflow-y:auto;line-height:1.5;
+    }
+    .ai-loading { text-align:center;padding:40px;color:#888; }
+    .ai-loading .spinner { display:inline-block;width:24px;height:24px;border:3px solid #e8e8e8;border-top-color:#1a73e8;border-radius:50%;animation:spin 0.8s linear infinite; }
+    @keyframes spin { to { transform:rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div id="header"></div>
+
+  <div class="ai-wrap">
+    <div class="ai-toolbar">
+      <h2 id="t-ai-title">AI Document Analysis</h2>
+    </div>
+
+    <div class="ai-form">
+      <div class="field-row">
+        <div class="field-group">
+          <label id="lbl-ai-type">Document type</label>
+          <select id="ai-doc-type">
+            <option value="invoice">Invoice</option>
+            <option value="contract">Contract</option>
+          </select>
+        </div>
+        <div class="field-group">
+          <label id="lbl-ai-folder">Project *</label>
+          <select id="ai-folder" required>
+            <option value="">—</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="upload-area" id="upload-area" onclick="document.getElementById('ai-file').click()">
+        <div class="icon">📄</div>
+        <div id="upload-label">Drop PDF here or click to select</div>
+        <div class="file-name" id="upload-filename" style="display:none"></div>
+        <input type="file" id="ai-file" accept=".pdf,image/*" style="display:none">
+      </div>
+
+      <div style="margin-top:16px;text-align:center">
+        <button class="btn btn-primary" id="btn-analyze" disabled style="padding:8px 24px;font-size:0.95rem">
+          🤖 Analyze document
+        </button>
+      </div>
+    </div>
+
+    <div id="ai-result-area" style="display:none">
+      <div class="ai-result">
+        <h3 id="t-ai-result-title">Analysis result</h3>
+        <div id="ai-result-content"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    renderHeader('ai');
+
+    let foldersCache = [];
+
+    window.onAppReady = async function() {
+      await loadFolders();
+      updateTexts();
+    };
+
+    function updateTexts() {
+      document.getElementById('t-ai-title').textContent = t('aiTitle');
+      document.getElementById('lbl-ai-type').textContent = t('aiDocType');
+      document.getElementById('lbl-ai-folder').textContent = t('folder') + ' *';
+      document.getElementById('upload-label').textContent = t('aiUploadHint');
+      document.getElementById('btn-analyze').textContent = '🤖 ' + t('aiAnalyze');
+      document.getElementById('t-ai-result-title').textContent = t('aiResultTitle');
+      // Doc type options
+      const sel = document.getElementById('ai-doc-type');
+      sel.options[0].text = t('navInvoices');
+      sel.options[1].text = t('navContracts');
+    }
+
+    async function loadFolders() {
+      try {
+        const folders = await apiFetch('/folders');
+        foldersCache = folders;
+        const sel = document.getElementById('ai-folder');
+        sel.innerHTML = `<option value="">—</option>`;
+        folders.forEach(f => {
+          if (f.status === 'archive') return;
+          const opt = document.createElement('option');
+          opt.value = f.id; opt.textContent = f.name;
+          sel.appendChild(opt);
+        });
+      } catch(e) { console.error(e); }
+    }
+
+    // File selection
+    const fileInput = document.getElementById('ai-file');
+    const uploadArea = document.getElementById('upload-area');
+    const btnAnalyze = document.getElementById('btn-analyze');
+
+    fileInput.addEventListener('change', () => {
+      const file = fileInput.files[0];
+      if (file) {
+        document.getElementById('upload-filename').textContent = file.name;
+        document.getElementById('upload-filename').style.display = 'block';
+        document.getElementById('upload-label').style.display = 'none';
+        uploadArea.classList.add('has-file');
+        checkReady();
+      }
+    });
+
+    // Drag & drop
+    uploadArea.addEventListener('dragover', e => { e.preventDefault(); uploadArea.style.borderColor = '#1a73e8'; });
+    uploadArea.addEventListener('dragleave', () => { uploadArea.style.borderColor = ''; });
+    uploadArea.addEventListener('drop', e => {
+      e.preventDefault(); uploadArea.style.borderColor = '';
+      if (e.dataTransfer.files.length) {
+        fileInput.files = e.dataTransfer.files;
+        fileInput.dispatchEvent(new Event('change'));
+      }
+    });
+
+    document.getElementById('ai-folder').addEventListener('change', checkReady);
+
+    function checkReady() {
+      const hasFile = fileInput.files.length > 0;
+      const hasFolder = document.getElementById('ai-folder').value;
+      btnAnalyze.disabled = !(hasFile && hasFolder);
+    }
+
+    // Analyze
+    btnAnalyze.addEventListener('click', async () => {
+      const file = fileInput.files[0];
+      const folderId = document.getElementById('ai-folder').value;
+      const docType = document.getElementById('ai-doc-type').value;
+      if (!file || !folderId) return;
+
+      btnAnalyze.disabled = true;
+      const resultArea = document.getElementById('ai-result-area');
+      const resultContent = document.getElementById('ai-result-content');
+      resultArea.style.display = 'block';
+      resultContent.innerHTML = `<div class="ai-loading"><div class="spinner"></div><div style="margin-top:12px">${t('aiAnalyzing')}</div></div>`;
+
+      try {
+        // Convert file to base64
+        const base64 = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result.split(',')[1]);
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+
+        const response = await apiFetch('/ai_documents', {
+          method: 'POST',
+          body: JSON.stringify({
+            file_base64: base64,
+            file_name: file.name,
+            content_type: file.type || 'application/pdf',
+            doc_type: docType,
+            folder_id: folderId,
+          }),
+        });
+
+        resultContent.innerHTML = `<pre>${typeof response.analysis === 'string' ? response.analysis : JSON.stringify(response.analysis, null, 2)}</pre>`;
+      } catch(e) {
+        resultContent.innerHTML = `<div style="color:#c5221f;padding:16px">${e.message}</div>`;
+      }
+      btnAnalyze.disabled = false;
+    });
+
+    window.onLangChange = updateTexts;
+  </script>
+</body>
+</html>
