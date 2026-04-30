@@ -46,8 +46,10 @@
   </style>
 </head>
 <body>
-  <div id="header"></div>
+  <header id="header"></header>
+  <div id="guest-view"></div>
 
+  <div id="app-view" style="display:none">
   <div class="ai-wrap">
     <div class="ai-toolbar">
       <h2 id="t-ai-title">AI Document Analysis</h2>
@@ -92,6 +94,8 @@
     </div>
   </div>
 
+  </div><!-- /app-view -->
+
   <div class="toast" id="toast"></div>
 
   <script>
@@ -99,7 +103,7 @@
 
     let foldersCache = [];
 
-    window.onAppReady = async function() {
+    window.onLogin = async function(user, admin) {
       await loadFolders();
       updateTexts();
     };
