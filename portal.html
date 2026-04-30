@@ -308,13 +308,16 @@
         fillMatFolderSelect();
         updateTexts();
       } catch(e) {
-        // Token expired or invalid — clear and show login
+        console.error('Portal initApp error:', e);
         sessionStorage.removeItem('portal_token');
         sessionStorage.removeItem('portal_hint');
         _portalAccessToken = null;
         document.getElementById('guest-view').style.display = 'block';
         document.getElementById('app-view').style.display = 'none';
         document.getElementById('portal-header').style.display = 'none';
+        if (e.message && e.message !== 'Unauthorized') {
+          showToast('Error: ' + e.message, 'error');
+        }
       }
     }
 
