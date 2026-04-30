@@ -68,6 +68,7 @@ exports.ai_documents = async (req, res) => {
 
     const systemPrompt = `You are a document analysis assistant for a construction/property management company (Sunti).
 You analyze invoices, contracts, and other financial documents.
+You MUST respond with a single valid JSON object and nothing else — no markdown, no explanation, no code fences.
 
 EXISTING CONTRACTORS in the system:
 ${contractorsList || '(none)'}
@@ -75,20 +76,52 @@ ${contractorsList || '(none)'}
 EXISTING CATEGORIES:
 ${categoriesList || '(none)'}
 
-The user is uploading a ${doc_type || 'document'}.
-Analyze the document and provide a detailed summary in the following structure:
-1. Document type (invoice, quotation, contract, receipt, etc.)
-2. Supplier/Contractor name, address, Tax ID
-3. Document date, document number
-4. Line items with descriptions and amounts
-5. Subtotal, VAT amount, WHT (withholding tax) if any, Total
-6. Payment terms or due date if mentioned
-7. Any other relevant information
+Return EXACTLY this JSON structure:
+{
+  "document_type": "invoice|contract|quotation|receipt",
+  "document_number": "string or null",
+  "date": "YYYY-MM-DD or null",
+  "due_date": "YYYY-MM-DD or null",
+  "contractor": {
+    "matched_id": "existing contractor UUID if matched, otherwise null",
+    "name": "company name in English",
+    "name_th": "company name in Thai if present, otherwise null",
+    "tax_id": "13-digit tax ID or null",
+    "address": "address string or null",
+    "branch": "HQ or branch number or null",
+    "type": "individual|juristic|foreign_individual|foreign_juristic",
+    "is_new": true if no match found in existing contractors
+  },
+  "category": {
+    "matched_id": "existing category UUID if matched, otherwise null",
+    "suggested_name": "category name suggestion"
+  },
+  "amounts": {
+    "subtotal": number or 0,
+    "vat_rate": number or 0,
+    "vat_amount": number or 0,
+    "wht_rate": number or 0,
+    "wht_amount": number or 0,
+    "total": number or 0,
+    "payable": number or 0,
+    "currency": "THB|USD|etc"
+  },
+  "line_items": [
+    {"description": "string", "quantity": number, "unit_price": number, "amount": number}
+  ],
+  "direction": "expense|income",
+  "payment_terms": "string or null",
+  "notes": "any additional info or null",
+  "confidence": 0.0 to 1.0,
+  "warnings": ["array of strings about uncertain fields"]
+}
 
-If the supplier matches an existing contractor in the system, mention the match and provide the contractor ID.
-If a category seems to match, suggest the category ID.
-
-Respond in English. Be precise with numbers.`;
+Rules:
+- Match contractor by tax_id first, then by name similarity. Set matched_id ONLY if confident.
+- Match category by document content. Set matched_id ONLY if confident.
+- All amounts as positive numbers. Direction field indicates expense/income.
+- If a field cannot be determined, use null (not empty string).
+- Be precise with numbers — do not round.`;
 
     const message = await client.messages.create({
       model: 'claude-haiku-4-5-20251001',
@@ -109,17 +142,27 @@ Respond in English. Be precise with numbers.`;
             },
             {
               type: 'text',
-              text: `Please analyze this ${doc_type || 'document'} and extract all relevant information.`,
+              text: `Analyze this ${doc_type || 'document'} and return the JSON.`,
             },
           ],
         },
       ],
     });
 
-    const analysis = message.content
+    const rawText = message.content
       .filter(b => b.type === 'text')
       .map(b => b.text)
-      .join('\n');
+      .join('\n')
+      .trim();
+
+    // Parse JSON — handle possible markdown code fences
+    let analysis;
+    try {
+      const jsonStr = rawText.replace(/^```json?\s*/i, '').replace(/\s*```$/i, '').trim();
+      analysis = JSON.parse(jsonStr);
+    } catch(parseErr) {
+      analysis = { raw: rawText, parse_error: 'AI returned non-JSON response' };
+    }
 
     res.json({ success: true, analysis });
   } catch(e) {

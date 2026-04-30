@@ -90,6 +90,7 @@
       <div class="ai-result">
         <h3 id="t-ai-result-title">Analysis result</h3>
         <div id="ai-result-content"></div>
+        <div id="ai-actions" style="display:none;margin-top:16px;padding-top:16px;border-top:1px solid #e8e8e8;display:flex;gap:10px;flex-wrap:wrap"></div>
       </div>
     </div>
   </div>
@@ -171,6 +172,222 @@
       btnAnalyze.disabled = !(hasFile && hasFolder);
     }
 
+    let lastAnalysis = null;
+
+    function fmt(v) {
+      const n = parseFloat(v);
+      if (isNaN(n)) return '—';
+      return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function renderAnalysis(a) {
+      if (a.parse_error || a.raw) {
+        return `<div style="color:#c5221f;margin-bottom:8px">${a.parse_error}</div><pre>${a.raw || ''}</pre>`;
+      }
+
+      const c = a.contractor || {};
+      const am = a.amounts || {};
+      const items = a.line_items || [];
+      const warnings = a.warnings || [];
+
+      let html = '';
+
+      // Confidence & warnings
+      if (a.confidence != null) {
+        const pct = Math.round(a.confidence * 100);
+        const color = pct >= 80 ? '#1e8e3e' : pct >= 50 ? '#e37400' : '#c5221f';
+        html += `<div style="margin-bottom:12px;font-size:0.85rem">Confidence: <strong style="color:${color}">${pct}%</strong></div>`;
+      }
+      if (warnings.length) {
+        html += `<div style="background:#fef7e0;border-radius:6px;padding:8px 12px;margin-bottom:12px;font-size:0.82rem;color:#8a6d00">
+          ⚠ ${warnings.join('<br>⚠ ')}</div>`;
+      }
+
+      // Document info
+      html += `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 24px;margin-bottom:16px;font-size:0.88rem">
+        <div><span style="color:#888">Type:</span> <strong>${a.document_type || '—'}</strong></div>
+        <div><span style="color:#888">Number:</span> <strong>${a.document_number || '—'}</strong></div>
+        <div><span style="color:#888">Date:</span> <strong>${a.date || '—'}</strong></div>
+        <div><span style="color:#888">Due date:</span> <strong>${a.due_date || '—'}</strong></div>
+        <div><span style="color:#888">Direction:</span> <strong>${a.direction || '—'}</strong></div>
+        <div><span style="color:#888">Currency:</span> <strong>${am.currency || '—'}</strong></div>
+      </div>`;
+
+      // Contractor
+      const contractorMatch = c.matched_id ? '✅ Found in system' : '🆕 New contractor';
+      const contractorColor = c.matched_id ? '#e6f4ea' : '#fef7e0';
+      html += `<div style="background:${contractorColor};border-radius:8px;padding:12px 14px;margin-bottom:12px">
+        <div style="font-size:0.75rem;color:#888;text-transform:uppercase;margin-bottom:4px">Contractor — ${contractorMatch}</div>
+        <div style="font-size:0.95rem;font-weight:600">${c.name || '—'}</div>
+        ${c.name_th ? `<div style="font-size:0.85rem;color:#555">${c.name_th}</div>` : ''}
+        <div style="font-size:0.82rem;color:#666;margin-top:4px">
+          ${c.tax_id ? `Tax ID: ${c.tax_id} · ` : ''}${c.type || ''} · ${c.branch || ''}
+          ${c.address ? `<br>${c.address}` : ''}
+        </div>
+      </div>`;
+
+      // Category
+      const cat = a.category || {};
+      if (cat.matched_id || cat.suggested_name) {
+        html += `<div style="font-size:0.85rem;margin-bottom:12px"><span style="color:#888">Category:</span>
+          ${cat.matched_id ? '✅' : '❓'} <strong>${cat.suggested_name || '—'}</strong></div>`;
+      }
+
+      // Line items
+      if (items.length) {
+        html += `<table style="width:100%;border-collapse:collapse;margin-bottom:12px;font-size:0.84rem">
+          <thead><tr style="background:#f8f8f8;border-bottom:1px solid #e8e8e8">
+            <th style="padding:6px 8px;text-align:left;color:#888;font-size:0.72rem">DESCRIPTION</th>
+            <th style="padding:6px 8px;text-align:right;color:#888;font-size:0.72rem">QTY</th>
+            <th style="padding:6px 8px;text-align:right;color:#888;font-size:0.72rem">PRICE</th>
+            <th style="padding:6px 8px;text-align:right;color:#888;font-size:0.72rem">AMOUNT</th>
+          </tr></thead><tbody>`;
+        items.forEach(it => {
+          html += `<tr style="border-bottom:1px solid #f0f0f0">
+            <td style="padding:6px 8px">${it.description || '—'}</td>
+            <td style="padding:6px 8px;text-align:right">${it.quantity ?? '—'}</td>
+            <td style="padding:6px 8px;text-align:right">${fmt(it.unit_price)}</td>
+            <td style="padding:6px 8px;text-align:right;font-weight:500">${fmt(it.amount)}</td>
+          </tr>`;
+        });
+        html += `</tbody></table>`;
+      }
+
+      // Amounts summary
+      html += `<div style="background:#f8f8f8;border-radius:8px;padding:12px 14px;margin-bottom:12px">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 24px;font-size:0.88rem">
+          <div>Subtotal: <strong>${fmt(am.subtotal)}</strong></div>
+          <div>VAT ${am.vat_rate ? `(${am.vat_rate}%)` : ''}: <strong>${fmt(am.vat_amount)}</strong></div>
+          <div>WHT ${am.wht_rate ? `(${am.wht_rate}%)` : ''}: <strong>${fmt(am.wht_amount)}</strong></div>
+          <div>Total: <strong>${fmt(am.total)}</strong></div>
+          <div style="grid-column:span 2;font-size:1rem;margin-top:4px;color:#1a73e8">Payable: <strong>${fmt(am.payable)}</strong></div>
+        </div>
+      </div>`;
+
+      // Payment terms / notes
+      if (a.payment_terms) html += `<div style="font-size:0.85rem;margin-bottom:4px"><span style="color:#888">Payment terms:</span> ${a.payment_terms}</div>`;
+      if (a.notes) html += `<div style="font-size:0.85rem;color:#666">${a.notes}</div>`;
+
+      return html;
+    }
+
+    function renderActions(a) {
+      const actionsEl = document.getElementById('ai-actions');
+      if (!a || a.parse_error) { actionsEl.style.display = 'none'; return; }
+      actionsEl.style.display = 'flex';
+
+      const c = a.contractor || {};
+      let html = '';
+
+      if (c.is_new && !c.matched_id) {
+        html += `<button class="btn btn-primary" id="btn-create-contractor" style="padding:6px 16px;font-size:0.88rem;background:#e37400">
+          🆕 Create contractor: ${c.name || '?'}</button>`;
+      } else if (c.matched_id) {
+        html += `<button class="btn btn-outline" id="btn-confirm-contractor" style="padding:6px 16px;font-size:0.88rem;color:#1e8e3e;border-color:#1e8e3e">
+          ✅ Contractor confirmed: ${c.name || '?'}</button>`;
+      }
+
+      const docType = document.getElementById('ai-doc-type').value;
+      html += `<button class="btn btn-primary" id="btn-create-doc" style="padding:6px 16px;font-size:0.88rem" disabled>
+        📄 Create ${docType}</button>`;
+
+      actionsEl.innerHTML = html;
+
+      // If contractor matched — enable doc creation right away
+      if (c.matched_id) {
+        const confirmBtn = document.getElementById('btn-confirm-contractor');
+        if (confirmBtn) confirmBtn.disabled = true;
+        document.getElementById('btn-create-doc').disabled = false;
+      }
+
+      // Create contractor
+      const createBtn = document.getElementById('btn-create-contractor');
+      if (createBtn) {
+        createBtn.addEventListener('click', async () => {
+          createBtn.disabled = true;
+          try {
+            const body = {
+              name_en: c.name || '',
+              name_th: c.name_th || '',
+              tax_id: c.tax_id || '',
+              address_en: c.address || '',
+              branch: c.branch || 'HQ',
+              type: c.type || 'juristic',
+              is_vat_registered: (a.amounts?.vat_rate > 0),
+              is_active: true,
+            };
+            const res = await apiFetch('/contractors', { method: 'POST', body: JSON.stringify(body) });
+            if (res.id) {
+              lastAnalysis.contractor.matched_id = res.id;
+              lastAnalysis.contractor.is_new = false;
+              createBtn.textContent = '✅ Contractor created';
+              createBtn.style.background = '#1e8e3e';
+              document.getElementById('btn-create-doc').disabled = false;
+              showToast('Contractor created', 'success');
+            }
+          } catch(e) { showToast(e.message, 'error'); createBtn.disabled = false; }
+        });
+      }
+
+      // Create document
+      const docBtn = document.getElementById('btn-create-doc');
+      if (docBtn) {
+        docBtn.addEventListener('click', async () => {
+          docBtn.disabled = true;
+          const folderId = document.getElementById('ai-folder').value;
+          const am = a.amounts || {};
+          const contractorId = a.contractor?.matched_id || '';
+          const categoryId = a.category?.matched_id || '';
+
+          try {
+            if (docType === 'invoice') {
+              const body = {
+                folder_id: folderId,
+                name: a.document_number || a.notes || 'AI imported',
+                date: a.date || new Date().toISOString().slice(0,10),
+                direction: a.direction || 'expense',
+                total_amount: String(am.total || 0),
+                subtotal: String(am.subtotal || 0),
+                vat_rate: String(am.vat_rate || 0),
+                vat_amount: String(am.vat_amount || 0),
+                wht_rate: String(am.wht_rate || 0),
+                wht_amount: String(am.wht_amount || 0),
+                category_id: categoryId,
+                contractor_id: contractorId,
+                status: 'active',
+              };
+              const res = await apiFetch('/invoices', { method: 'POST', body: JSON.stringify(body) });
+              docBtn.textContent = '✅ Invoice created';
+              docBtn.style.background = '#1e8e3e';
+              showToast('Invoice created', 'success');
+            } else {
+              const body = {
+                folder_id: folderId,
+                contractor_id: contractorId,
+                name: a.document_number || a.notes || 'AI imported',
+                date: a.date || '',
+                direction: a.direction || 'expense',
+                total_amount: String(am.total || 0),
+                subtotal: String(am.subtotal || 0),
+                vat_amount: String(am.vat_amount || 0),
+                status: 'active',
+              };
+              const res = await apiFetch('/contracts', { method: 'POST', body: JSON.stringify(body) });
+              docBtn.textContent = '✅ Contract created';
+              docBtn.style.background = '#1e8e3e';
+              showToast('Contract created', 'success');
+            }
+          } catch(e) { showToast(e.message, 'error'); docBtn.disabled = false; }
+        });
+      }
+    }
+
+    function showToast(msg, type) {
+      const el = document.getElementById('toast');
+      el.textContent = msg; el.className = 'toast show' + (type ? ' ' + type : '');
+      clearTimeout(el._t); el._t = setTimeout(() => el.className = 'toast', 3000);
+    }
+
     // Analyze
     btnAnalyze.addEventListener('click', async () => {
       const file = fileInput.files[0];
@@ -183,9 +400,9 @@
       const resultContent = document.getElementById('ai-result-content');
       resultArea.style.display = 'block';
       resultContent.innerHTML = `<div class="ai-loading"><div class="spinner"></div><div style="margin-top:12px">${t('aiAnalyzing')}</div></div>`;
+      document.getElementById('ai-actions').style.display = 'none';
 
       try {
-        // Convert file to base64
         const base64 = await new Promise((resolve, reject) => {
           const reader = new FileReader();
           reader.onload = () => resolve(reader.result.split(',')[1]);
@@ -204,7 +421,9 @@
           }),
         });
 
-        resultContent.innerHTML = `<pre>${typeof response.analysis === 'string' ? response.analysis : JSON.stringify(response.analysis, null, 2)}</pre>`;
+        lastAnalysis = response.analysis;
+        resultContent.innerHTML = renderAnalysis(lastAnalysis);
+        renderActions(lastAnalysis);
       } catch(e) {
         resultContent.innerHTML = `<div style="color:#c5221f;padding:16px">${e.message}</div>`;
       }
