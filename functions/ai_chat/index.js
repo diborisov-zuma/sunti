@@ -192,7 +192,7 @@ exports.ai_chat = async (req, res) => {
   }
 
   try {
-    const client = new Anthropic();
+    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
     // Build conversation history for context
     const messages = [];
