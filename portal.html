@@ -147,6 +147,17 @@
     <img id="lightbox-img" src="" style="max-width:90vw;max-height:90vh;border-radius:8px">
   </div>
 
+  <!-- PDF viewer modal -->
+  <div class="modal-overlay" id="modal-pdf" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:300;align-items:center;justify-content:center">
+    <div style="background:#fff;border-radius:12px;width:90vw;height:90vh;max-width:1200px;display:flex;flex-direction:column;overflow:hidden">
+      <div style="padding:10px 16px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #e8e8e8">
+        <span id="pdf-title" style="font-size:0.9rem;font-weight:500;color:#222"></span>
+        <button class="btn btn-outline" id="btn-close-pdf" style="padding:2px 10px">✕</button>
+      </div>
+      <iframe id="pdf-iframe" style="flex:1;border:none" src=""></iframe>
+    </div>
+  </div>
+
   <div class="toast" id="toast"></div>
 
   <script>
@@ -585,13 +596,17 @@
       } catch(e) { inner.innerHTML = `<div style="color:#c33">${e.message}</div>`; }
     }
 
-    function renderPortalFileList(files) {
+    function renderPortalFileList(files, indent) {
       if (!files || !files.length) return '';
+      const ml = indent ? 'margin-left:24px;' : '';
       let html = '';
       files.forEach(f => {
         const size = f.file_size > 1048576 ? (f.file_size/1048576).toFixed(1)+' MB' : Math.round((f.file_size||0)/1024)+' KB';
-        html += `<div class="file-row">
-          <span style="flex:1">${f.file_name || '—'} <span style="color:#999">(${size})</span></span>
+        const isPdf = (f.file_name || '').toLowerCase().endsWith('.pdf');
+        const icon = isPdf ? '📄' : '📎';
+        html += `<div style="display:flex;align-items:center;gap:8px;padding:3px 0;font-size:0.82rem;${ml}">
+          ${isPdf ? `<button style="background:none;border:none;cursor:pointer;font-size:0.9rem;padding:0" title="View" data-action="view-pdf" data-file-id="${f.id}" data-file-name="${(f.file_name||'').replace(/"/g,'&quot;')}">👁</button>` : '<span style="width:0.9rem"></span>'}
+          <span style="flex:1;color:#333">${icon} ${f.file_name || '—'} <span style="color:#999">(${size})</span></span>
           <button class="btn btn-outline" style="padding:1px 8px;font-size:0.72rem" data-action="download" data-file-id="${f.id}">${t('download')}</button>
         </div>`;
       });
@@ -638,8 +653,8 @@
               <td style="font-size:0.78rem;color:#666">${tx.description || '—'}</td>
             </tr>`;
             if (txFiles.length) {
-              html += `<tr><td colspan="4" style="padding:2px 0 6px 16px">`;
-              html += renderPortalFileList(txFiles);
+              html += `<tr><td colspan="4" style="padding:2px 0 6px 0">`;
+              html += renderPortalFileList(txFiles, true);
               html += `</td></tr>`;
             }
           });
@@ -746,8 +761,8 @@
         </tr>`;
         if (accessLevel === 'full' && txFiles.length) {
           const colSpan = 4;
-          html += `<tr><td colspan="${colSpan}" style="padding:2px 0 6px 16px">`;
-          html += renderPortalFileList(txFiles);
+          html += `<tr><td colspan="${colSpan}" style="padding:2px 0 6px 0">`;
+          html += renderPortalFileList(txFiles, true);
           html += `</td></tr>`;
         }
       });
@@ -843,6 +858,27 @@
           if (r.url) window.open(r.url, '_blank');
         } catch(err) { showToast(err.message, 'error'); }
       }
+
+      const pdfBtn = e.target.closest('[data-action="view-pdf"]');
+      if (pdfBtn) {
+        const fileId = pdfBtn.dataset.fileId;
+        const fileName = pdfBtn.dataset.fileName || 'PDF';
+        try {
+          const r = await portalFetch(`/portal_contracts/files/${fileId}/download`);
+          if (r.url) {
+            document.getElementById('pdf-title').textContent = fileName;
+            document.getElementById('pdf-iframe').src = `https://docs.google.com/gview?url=${encodeURIComponent(r.url)}&embedded=true`;
+            const modal = document.getElementById('modal-pdf');
+            modal.style.display = 'flex';
+          }
+        } catch(err) { showToast(err.message, 'error'); }
+      }
+    });
+
+    // Close PDF modal
+    document.getElementById('btn-close-pdf').addEventListener('click', () => {
+      document.getElementById('modal-pdf').style.display = 'none';
+      document.getElementById('pdf-iframe').src = '';
     });
 
     // ─── Materials section ───
@@ -1083,6 +1119,8 @@
       if (e3.key === 'Escape') {
         const lb = document.getElementById('lightbox');
         if (lb) { lb.style.display = 'none'; lb.classList.remove('open'); }
+        const pm = document.getElementById('modal-pdf');
+        if (pm) { pm.style.display = 'none'; document.getElementById('pdf-iframe').src = ''; }
       }
     });
 
