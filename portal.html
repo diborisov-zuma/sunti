@@ -93,7 +93,8 @@
       <div id="g_id_onload"
         data-client_id="6445860840-9bfshkstrc2vra49qi847ie9od38614t.apps.googleusercontent.com"
         data-callback="handlePortalCredential"
-        data-auto_prompt="false">
+        data-auto_prompt="false"
+        data-itp_support="true">
       </div>
       <div class="g_id_signin"
         data-type="standard" data-size="large" data-theme="outline"
@@ -263,13 +264,23 @@
         el.innerHTML = `<strong>Login error:</strong> ${error}<br><small>Step: ${step} | Account: ${email || '?'}</small>`;
       }
     }
-    // Show previous error on page load
+    // Show auth debug info on page load
     (function() {
       const prev = sessionStorage.getItem('portal_last_error');
-      if (prev) {
-        const el = document.getElementById('auth-error-display');
-        if (el) { el.style.display = 'block'; el.innerHTML = `<strong>Previous error:</strong> ${prev}`; }
+      const step = sessionStorage.getItem('portal_auth_step');
+      const el = document.getElementById('auth-error-display');
+      if (el && (prev || step)) {
+        el.style.display = 'block';
+        let msg = '';
+        if (prev) msg += `<strong>Error:</strong> ${prev}<br>`;
+        if (step === 'clicked') {
+          msg += `<strong>Debug:</strong> Google Sign-In was clicked but callback never fired. Your browser may be blocking the sign-in popup.`;
+          logAuthError('', 'Callback never fired after click', 'popup_blocked');
+        }
+        if (step === 'callback') msg += `<strong>Debug:</strong> Callback received but login failed.`;
+        el.innerHTML = msg;
         sessionStorage.removeItem('portal_last_error');
+        sessionStorage.removeItem('portal_auth_step');
       }
     })();
 
@@ -283,8 +294,19 @@
       } catch(_) {}
     }
 
+    // Track Google Sign-In button click
+    document.getElementById('portal-signin').addEventListener('click', () => {
+      sessionStorage.setItem('portal_auth_step', 'clicked');
+    });
+
     async function handlePortalCredential(response) {
+      sessionStorage.setItem('portal_auth_step', 'callback');
       const credential = response.credential;
+      if (!credential) {
+        showAuthError('', 'No credential in response: ' + JSON.stringify(response), 'callback_empty');
+        logAuthError('', 'No credential: ' + JSON.stringify(response), 'callback_empty');
+        return;
+      }
       const payload = JSON.parse(atob(credential.split('.')[1]));
       const loginHint = payload.email;
 
