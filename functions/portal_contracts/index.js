@@ -67,6 +67,30 @@ function parseKey(url) {
 exports.portal_contracts = async (req, res) => {
   setCors(res);
   if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
+
+  const path = (req.url || '').split('?')[0];
+
+  // POST /portal_contracts/log-error — no auth required
+  if (req.method === 'POST' && path === '/log-error') {
+    try {
+      const b = req.body || {};
+      const logTable = `\`${PROJECT}.${DATASET}.portal_auth_logs\``;
+      await bigquery.query({
+        query: `INSERT INTO ${logTable} (id, email, error, step, user_agent, created_at)
+                VALUES (@id, @email, @error, @step, @user_agent, CURRENT_TIMESTAMP())`,
+        params: {
+          id: `${Date.now()}-${Math.random().toString(36).slice(2,10)}`,
+          email: b.email || 'unknown',
+          error: (b.error || '').substring(0, 1000),
+          step: (b.step || '').substring(0, 100),
+          user_agent: (req.headers['user-agent'] || '').substring(0, 500),
+        },
+      });
+    } catch(e) { console.error('Log error failed:', e.message); }
+    res.json({ ok: true });
+    return;
+  }
+
   if (req.method !== 'GET') { res.status(405).json({ error: 'Method not allowed' }); return; }
 
   const email = await verifyToken(req);
@@ -81,8 +105,6 @@ exports.portal_contracts = async (req, res) => {
   const accessLevel = sections.contracts; // 'full' or 'no_amounts'
   const folderIds = await getPortalFolders(portalUser.id);
   if (!folderIds.length) { res.json([]); return; }
-
-  const path = (req.url || '').split('?')[0];
 
   const cTable   = `\`${PROJECT}.${DATASET}.contracts\``;
   const invTable = `\`${PROJECT}.${DATASET}.invoices\``;

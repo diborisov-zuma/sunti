@@ -242,6 +242,16 @@
     let _portalLoginHint = null;
     let _tokenRefreshTimer = null;
 
+    function logAuthError(email, error, step) {
+      try {
+        fetch(`${API_URL}/portal_contracts/log-error`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: email || 'unknown', error: String(error), step }),
+        }).catch(() => {});
+      } catch(_) {}
+    }
+
     async function handlePortalCredential(response) {
       const payload = JSON.parse(atob(response.credential.split('.')[1]));
       await portalLogin(payload.email);
@@ -255,9 +265,10 @@
           hint: loginHint,
           callback: async (tokenResponse) => {
             if (tokenResponse.error) {
+              logAuthError(loginHint, tokenResponse.error_description || tokenResponse.error, 'oauth_token');
               sessionStorage.removeItem('portal_token');
               sessionStorage.removeItem('portal_hint');
-              showToast('Auth error', 'error');
+              showToast('Auth error: ' + (tokenResponse.error_description || tokenResponse.error), 'error');
               return;
             }
             _portalAccessToken = tokenResponse.access_token;
@@ -309,15 +320,14 @@
         updateTexts();
       } catch(e) {
         console.error('Portal initApp error:', e);
+        logAuthError(_portalLoginHint, e.message, 'initApp');
         sessionStorage.removeItem('portal_token');
         sessionStorage.removeItem('portal_hint');
         _portalAccessToken = null;
         document.getElementById('guest-view').style.display = 'block';
         document.getElementById('app-view').style.display = 'none';
         document.getElementById('portal-header').style.display = 'none';
-        if (e.message && e.message !== 'Unauthorized') {
-          showToast('Error: ' + e.message, 'error');
-        }
+        showToast('Error: ' + e.message, 'error');
       }
     }
 
