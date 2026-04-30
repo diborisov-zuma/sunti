@@ -107,7 +107,17 @@ Return EXACTLY this JSON structure:
     "currency": "THB|USD|etc"
   },
   "line_items": [
-    {"description": "string", "quantity": number, "unit_price": number, "amount": number}
+    {
+      "description": "string",
+      "quantity": number,
+      "unit_price": number,
+      "amount": number (qty * unit_price, excl VAT),
+      "vat_included": true/false (are prices in document VAT-inclusive?),
+      "vat_rate": number (e.g. 7),
+      "vat_amount": number (VAT for this line),
+      "amount_with_vat": number (amount + vat_amount),
+      "item_type": "goods|service"
+    }
   ],
   "direction": "expense|income",
   "payment_terms": "string or null",

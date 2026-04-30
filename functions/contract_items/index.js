@@ -50,7 +50,8 @@ exports.contract_items = async (req, res) => {
       if (!contractId) { res.status(400).json({ error: 'contract_id required' }); return; }
 
       const [rows] = await bigquery.query({
-        query: `SELECT id, contract_id, item_type, description, quantity, unit_price, amount, sort_order, created_at
+        query: `SELECT id, contract_id, item_type, description, quantity, unit_price, amount,
+                       vat_rate, vat_amount, amount_with_vat, vat_included, sort_order, created_at
                 FROM ${table}
                 WHERE contract_id = @contract_id
                 ORDER BY sort_order, created_at`,
@@ -72,7 +73,7 @@ exports.contract_items = async (req, res) => {
           return;
         }
         const values = items.map((it, i) => {
-          return `(@id${i}, @contract_id, @item_type${i}, @desc${i}, CAST(@qty${i} AS NUMERIC), CAST(@price${i} AS NUMERIC), CAST(@amount${i} AS NUMERIC), ${i}, @created_by, CURRENT_TIMESTAMP())`;
+          return `(@id${i}, @contract_id, @item_type${i}, @desc${i}, CAST(@qty${i} AS NUMERIC), CAST(@price${i} AS NUMERIC), CAST(@amount${i} AS NUMERIC), CAST(@vr${i} AS NUMERIC), CAST(@va${i} AS NUMERIC), CAST(@awv${i} AS NUMERIC), @vi${i}, ${i}, @created_by, CURRENT_TIMESTAMP())`;
         }).join(',\n');
 
         const params = { contract_id, created_by: email };
@@ -83,10 +84,14 @@ exports.contract_items = async (req, res) => {
           params[`qty${i}`] = it.quantity != null ? String(it.quantity) : '1';
           params[`price${i}`] = it.unit_price != null ? String(it.unit_price) : '0';
           params[`amount${i}`] = it.amount != null ? String(it.amount) : '0';
+          params[`vr${i}`] = it.vat_rate != null ? String(it.vat_rate) : '0';
+          params[`va${i}`] = it.vat_amount != null ? String(it.vat_amount) : '0';
+          params[`awv${i}`] = it.amount_with_vat != null ? String(it.amount_with_vat) : '0';
+          params[`vi${i}`] = !!it.vat_included;
         });
 
         await bigquery.query({
-          query: `INSERT INTO ${table} (id, contract_id, item_type, description, quantity, unit_price, amount, sort_order, created_by, created_at)
+          query: `INSERT INTO ${table} (id, contract_id, item_type, description, quantity, unit_price, amount, vat_rate, vat_amount, amount_with_vat, vat_included, sort_order, created_by, created_at)
                   VALUES ${values}`,
           params,
         });
@@ -102,8 +107,8 @@ exports.contract_items = async (req, res) => {
       }
       const id = uuidv4();
       await bigquery.query({
-        query: `INSERT INTO ${table} (id, contract_id, item_type, description, quantity, unit_price, amount, sort_order, created_by, created_at)
-                VALUES (@id, @contract_id, @item_type, @description, CAST(@quantity AS NUMERIC), CAST(@unit_price AS NUMERIC), CAST(@amount AS NUMERIC), @sort_order, @created_by, CURRENT_TIMESTAMP())`,
+        query: `INSERT INTO ${table} (id, contract_id, item_type, description, quantity, unit_price, amount, vat_rate, vat_amount, amount_with_vat, vat_included, sort_order, created_by, created_at)
+                VALUES (@id, @contract_id, @item_type, @description, CAST(@quantity AS NUMERIC), CAST(@unit_price AS NUMERIC), CAST(@amount AS NUMERIC), CAST(@vat_rate AS NUMERIC), CAST(@vat_amount AS NUMERIC), CAST(@amount_with_vat AS NUMERIC), @vat_included, @sort_order, @created_by, CURRENT_TIMESTAMP())`,
         params: {
           id,
           contract_id: b.contract_id,
@@ -112,6 +117,10 @@ exports.contract_items = async (req, res) => {
           quantity: b.quantity != null ? String(b.quantity) : '1',
           unit_price: b.unit_price != null ? String(b.unit_price) : '0',
           amount: b.amount != null ? String(b.amount) : '0',
+          vat_rate: b.vat_rate != null ? String(b.vat_rate) : '0',
+          vat_amount: b.vat_amount != null ? String(b.vat_amount) : '0',
+          amount_with_vat: b.amount_with_vat != null ? String(b.amount_with_vat) : '0',
+          vat_included: !!b.vat_included,
           sort_order: parseInt(b.sort_order || 0),
           created_by: email,
         },
@@ -133,6 +142,10 @@ exports.contract_items = async (req, res) => {
                     quantity = CAST(@quantity AS NUMERIC),
                     unit_price = CAST(@unit_price AS NUMERIC),
                     amount = CAST(@amount AS NUMERIC),
+                    vat_rate = CAST(@vat_rate AS NUMERIC),
+                    vat_amount = CAST(@vat_amount AS NUMERIC),
+                    amount_with_vat = CAST(@amount_with_vat AS NUMERIC),
+                    vat_included = @vat_included,
                     sort_order = @sort_order
                 WHERE id = @id`,
         params: {
@@ -142,6 +155,10 @@ exports.contract_items = async (req, res) => {
           quantity: b.quantity != null ? String(b.quantity) : '1',
           unit_price: b.unit_price != null ? String(b.unit_price) : '0',
           amount: b.amount != null ? String(b.amount) : '0',
+          vat_rate: b.vat_rate != null ? String(b.vat_rate) : '0',
+          vat_amount: b.vat_amount != null ? String(b.vat_amount) : '0',
+          amount_with_vat: b.amount_with_vat != null ? String(b.amount_with_vat) : '0',
+          vat_included: b.vat_included !== undefined ? !!b.vat_included : false,
           sort_order: parseInt(b.sort_order || 0),
         },
       });

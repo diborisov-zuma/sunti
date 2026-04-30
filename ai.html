@@ -278,22 +278,31 @@
 
       // Line items
       if (items.length) {
+        const hasVat = items.some(it => it.vat_amount > 0);
         html += `<table style="width:100%;border-collapse:collapse;margin-bottom:12px;font-size:0.84rem">
           <thead><tr style="background:#f8f8f8;border-bottom:1px solid #e8e8e8">
+            <th style="padding:6px 8px;text-align:left;color:#888;font-size:0.72rem">TYPE</th>
             <th style="padding:6px 8px;text-align:left;color:#888;font-size:0.72rem">DESCRIPTION</th>
             <th style="padding:6px 8px;text-align:right;color:#888;font-size:0.72rem">QTY</th>
             <th style="padding:6px 8px;text-align:right;color:#888;font-size:0.72rem">PRICE</th>
             <th style="padding:6px 8px;text-align:right;color:#888;font-size:0.72rem">AMOUNT</th>
+            ${hasVat ? `<th style="padding:6px 8px;text-align:right;color:#888;font-size:0.72rem">VAT</th>
+            <th style="padding:6px 8px;text-align:right;color:#888;font-size:0.72rem">WITH VAT</th>` : ''}
           </tr></thead><tbody>`;
         items.forEach(it => {
+          const typeLabel = it.item_type === 'service' ? '🔧' : '📦';
           html += `<tr style="border-bottom:1px solid #f0f0f0">
+            <td style="padding:6px 8px;text-align:center" title="${it.item_type || 'goods'}">${typeLabel}</td>
             <td style="padding:6px 8px">${it.description || '—'}</td>
             <td style="padding:6px 8px;text-align:right">${it.quantity ?? '—'}</td>
             <td style="padding:6px 8px;text-align:right">${fmt(it.unit_price)}</td>
             <td style="padding:6px 8px;text-align:right;font-weight:500">${fmt(it.amount)}</td>
+            ${hasVat ? `<td style="padding:6px 8px;text-align:right;color:#888">${fmt(it.vat_amount)}</td>
+            <td style="padding:6px 8px;text-align:right;font-weight:500">${fmt(it.amount_with_vat)}</td>` : ''}
           </tr>`;
         });
         html += `</tbody></table>`;
+        if (items[0]?.vat_included) html += `<div style="font-size:0.75rem;color:#888;margin-bottom:8px">* Prices in document are VAT-inclusive</div>`;
       }
 
       // Amounts summary
@@ -515,7 +524,11 @@
                 quantity: String(it.quantity || 1),
                 unit_price: String(it.unit_price || 0),
                 amount: String(it.amount || 0),
-                item_type: 'goods',
+                vat_rate: String(it.vat_rate || 0),
+                vat_amount: String(it.vat_amount || 0),
+                amount_with_vat: String(it.amount_with_vat || 0),
+                vat_included: !!it.vat_included,
+                item_type: it.item_type || 'goods',
               }));
               await apiFetch('/contract_items/batch', {
                 method: 'POST',
