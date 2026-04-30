@@ -81,6 +81,9 @@ async function applyLogin(idToken, accessToken) {
   document.getElementById('guest-view').style.display = 'none';
   document.getElementById('app-view').style.display   = 'block';
 
+  // Обновляем шапку после логина (видимость пунктов зависит от currentMe)
+  if (typeof updateHeaderTexts === 'function') updateHeaderTexts();
+
   if (typeof onLogin === 'function') onLogin(user, isAdmin);
 
   // Запускаем счётчик непрочитанных
