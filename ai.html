@@ -271,46 +271,57 @@
       return html;
     }
 
-    let contractorConfirmed = false;
-    let docNameConfirmed = false;
+    let stepConfirmed = { contractor: false, name: false, amounts: false, category: false };
 
     function checkCreateReady() {
       const btn = document.getElementById('btn-create-doc');
-      if (btn) btn.disabled = !(contractorConfirmed && docNameConfirmed);
+      if (!btn) return;
+      const ready = stepConfirmed.contractor && stepConfirmed.name && stepConfirmed.amounts && stepConfirmed.category;
+      btn.disabled = !ready;
+      btn.style.background = ready ? '#1a73e8' : '#ccc';
+      btn.style.cursor = ready ? 'pointer' : 'not-allowed';
+    }
+
+    function confirmBtn(id) {
+      const b = document.getElementById(id);
+      if (!b) return;
+      b.textContent = '✅ Confirmed'; b.disabled = true; b.style.background = '#e6f4ea';
     }
 
     function renderActions(a) {
       const actionsEl = document.getElementById('ai-actions');
       if (!a || a.parse_error) { actionsEl.style.display = 'none'; return; }
       actionsEl.style.display = 'block';
-      contractorConfirmed = false;
-      docNameConfirmed = false;
+      stepConfirmed = { contractor: false, name: false, amounts: false, category: false };
 
       const c = a.contractor || {};
+      const am = a.amounts || {};
+      const cat = a.category || {};
       const docType = document.getElementById('ai-doc-type').value;
       const suggestedName = a.document_number || a.notes || 'AI imported';
+      const inputStyle = 'border:1px solid #ddd;border-radius:6px;padding:5px 8px;font-size:0.85rem;outline:none;width:110px;text-align:right';
 
       let html = '';
 
-      // Step 1: Contractor confirmation
-      html += `<div style="margin-bottom:12px;padding:12px 14px;background:#f8f8f8;border-radius:8px">
-        <div style="font-size:0.75rem;color:#888;text-transform:uppercase;margin-bottom:6px">Step 1: Contractor</div>`;
+      // Step 1: Contractor
+      html += `<div style="margin-bottom:10px;padding:12px 14px;background:#f8f8f8;border-radius:8px">
+        <div style="font-size:0.72rem;color:#888;text-transform:uppercase;margin-bottom:6px">Step 1: Contractor</div>`;
       if (c.is_new && !c.matched_id) {
-        html += `<div style="display:flex;align-items:center;gap:10px">
+        html += `<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
           <span style="font-size:0.88rem">🆕 <strong>${c.name || '?'}</strong> — new contractor</span>
           <button class="btn btn-primary" id="btn-create-contractor" style="padding:4px 14px;font-size:0.82rem;background:#e37400">Create contractor</button>
         </div>`;
       } else if (c.matched_id) {
-        html += `<div style="display:flex;align-items:center;gap:10px">
+        html += `<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
           <span style="font-size:0.88rem">✅ <strong>${c.name || '?'}</strong> — found in system</span>
           <button class="btn btn-outline" id="btn-confirm-contractor" style="padding:4px 14px;font-size:0.82rem;color:#1e8e3e;border-color:#1e8e3e">Confirm</button>
         </div>`;
       }
       html += `</div>`;
 
-      // Step 2: Document name confirmation
-      html += `<div style="margin-bottom:12px;padding:12px 14px;background:#f8f8f8;border-radius:8px">
-        <div style="font-size:0.75rem;color:#888;text-transform:uppercase;margin-bottom:6px">Step 2: Document name</div>
+      // Step 2: Document name
+      html += `<div style="margin-bottom:10px;padding:12px 14px;background:#f8f8f8;border-radius:8px">
+        <div style="font-size:0.72rem;color:#888;text-transform:uppercase;margin-bottom:6px">Step 2: Document name</div>
         <div style="display:flex;align-items:center;gap:10px">
           <input type="text" id="ai-doc-name" value="${suggestedName.replace(/"/g, '&quot;')}"
             style="flex:1;border:1px solid #ddd;border-radius:6px;padding:6px 10px;font-size:0.88rem;outline:none">
@@ -318,9 +329,32 @@
         </div>
       </div>`;
 
-      // Step 3: Create document
-      html += `<div style="text-align:center">
-        <button class="btn btn-primary" id="btn-create-doc" style="padding:8px 24px;font-size:0.95rem" disabled>
+      // Step 3: Amounts
+      html += `<div style="margin-bottom:10px;padding:12px 14px;background:#f8f8f8;border-radius:8px">
+        <div style="font-size:0.72rem;color:#888;text-transform:uppercase;margin-bottom:6px">Step 3: Amounts</div>
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+          <div><label style="font-size:0.72rem;color:#888">Subtotal</label><br>
+            <input type="number" id="ai-subtotal" value="${am.subtotal || 0}" min="0" step="0.01" style="${inputStyle}"></div>
+          <div><label style="font-size:0.72rem;color:#888">VAT (${am.vat_rate || 0}%)</label><br>
+            <input type="number" id="ai-vat" value="${am.vat_amount || 0}" min="0" step="0.01" style="${inputStyle}"></div>
+          <div><label style="font-size:0.72rem;color:#888">Total</label><br>
+            <input type="number" id="ai-total" value="${am.total || 0}" min="0" step="0.01" style="${inputStyle}"></div>
+          <button class="btn btn-outline" id="btn-confirm-amounts" style="padding:4px 14px;font-size:0.82rem;color:#1e8e3e;border-color:#1e8e3e;align-self:flex-end">Confirm</button>
+        </div>
+      </div>`;
+
+      // Step 4: Category
+      html += `<div style="margin-bottom:10px;padding:12px 14px;background:#f8f8f8;border-radius:8px">
+        <div style="font-size:0.72rem;color:#888;text-transform:uppercase;margin-bottom:6px">Step 4: Category</div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <span style="font-size:0.88rem">${cat.matched_id ? '✅' : '❓'} <strong>${cat.suggested_name || '—'}</strong></span>
+          <button class="btn btn-outline" id="btn-confirm-category" style="padding:4px 14px;font-size:0.82rem;color:#1e8e3e;border-color:#1e8e3e">Confirm</button>
+        </div>
+      </div>`;
+
+      // Create button
+      html += `<div style="text-align:center;margin-top:14px">
+        <button class="btn btn-primary" id="btn-create-doc" style="padding:8px 24px;font-size:0.95rem;background:#ccc;cursor:not-allowed" disabled>
           📄 Create ${docType === 'invoice' ? t('navInvoices').toLowerCase() : t('navContracts').toLowerCase()}</button>
       </div>`;
 
@@ -328,41 +362,31 @@
 
       // --- Event handlers ---
 
-      // Confirm existing contractor
+      // Step 1: Confirm contractor
       const confirmCBtn = document.getElementById('btn-confirm-contractor');
       if (confirmCBtn) {
         confirmCBtn.addEventListener('click', () => {
-          contractorConfirmed = true;
-          confirmCBtn.textContent = '✅ Confirmed';
-          confirmCBtn.disabled = true;
-          confirmCBtn.style.background = '#e6f4ea';
+          stepConfirmed.contractor = true;
+          confirmBtn('btn-confirm-contractor');
           checkCreateReady();
         });
       }
-
-      // Create new contractor
       const createCBtn = document.getElementById('btn-create-contractor');
       if (createCBtn) {
         createCBtn.addEventListener('click', async () => {
           createCBtn.disabled = true;
           try {
             const body = {
-              name_en: c.name || '',
-              name_th: c.name_th || '',
-              tax_id: c.tax_id || '',
-              address_en: c.address || '',
-              branch: c.branch || 'HQ',
-              type: c.type || 'juristic',
-              is_vat_registered: (a.amounts?.vat_rate > 0),
-              is_active: true,
+              name_en: c.name || '', name_th: c.name_th || '', tax_id: c.tax_id || '',
+              address_en: c.address || '', branch: c.branch || 'HQ',
+              type: c.type || 'juristic', is_vat_registered: (am.vat_rate > 0), is_active: true,
             };
             const res = await apiFetch('/contractors', { method: 'POST', body: JSON.stringify(body) });
             if (res.id) {
               lastAnalysis.contractor.matched_id = res.id;
               lastAnalysis.contractor.is_new = false;
-              contractorConfirmed = true;
-              createCBtn.textContent = '✅ Created';
-              createCBtn.style.background = '#1e8e3e';
+              stepConfirmed.contractor = true;
+              createCBtn.textContent = '✅ Created'; createCBtn.style.background = '#1e8e3e';
               showToast('Contractor created', 'success');
               checkCreateReady();
             }
@@ -370,74 +394,76 @@
         });
       }
 
-      // Confirm document name
-      const confirmNBtn = document.getElementById('btn-confirm-name');
-      if (confirmNBtn) {
-        confirmNBtn.addEventListener('click', () => {
-          const nameVal = document.getElementById('ai-doc-name').value.trim();
-          if (!nameVal) { showToast('Document name is required', 'error'); return; }
-          docNameConfirmed = true;
-          confirmNBtn.textContent = '✅ Confirmed';
-          confirmNBtn.disabled = true;
-          confirmNBtn.style.background = '#e6f4ea';
-          document.getElementById('ai-doc-name').readOnly = true;
-          document.getElementById('ai-doc-name').style.background = '#f0f0f0';
-          checkCreateReady();
+      // Step 2: Confirm name
+      document.getElementById('btn-confirm-name').addEventListener('click', () => {
+        const v = document.getElementById('ai-doc-name').value.trim();
+        if (!v) { showToast('Document name is required', 'error'); return; }
+        stepConfirmed.name = true;
+        confirmBtn('btn-confirm-name');
+        document.getElementById('ai-doc-name').readOnly = true;
+        document.getElementById('ai-doc-name').style.background = '#f0f0f0';
+        checkCreateReady();
+      });
+
+      // Step 3: Confirm amounts
+      document.getElementById('btn-confirm-amounts').addEventListener('click', () => {
+        stepConfirmed.amounts = true;
+        confirmBtn('btn-confirm-amounts');
+        ['ai-subtotal','ai-vat','ai-total'].forEach(id => {
+          const el = document.getElementById(id); if (el) { el.readOnly = true; el.style.background = '#f0f0f0'; }
         });
-      }
+        checkCreateReady();
+      });
+
+      // Step 4: Confirm category
+      document.getElementById('btn-confirm-category').addEventListener('click', () => {
+        stepConfirmed.category = true;
+        confirmBtn('btn-confirm-category');
+        checkCreateReady();
+      });
 
       // Create document
-      const docBtn = document.getElementById('btn-create-doc');
-      if (docBtn) {
-        docBtn.addEventListener('click', async () => {
-          docBtn.disabled = true;
-          const folderId = document.getElementById('ai-folder').value;
-          const docName = document.getElementById('ai-doc-name').value.trim();
-          const am = a.amounts || {};
-          const contractorId = a.contractor?.matched_id || '';
-          const categoryId = a.category?.matched_id || '';
+      document.getElementById('btn-create-doc').addEventListener('click', async () => {
+        const docBtn = document.getElementById('btn-create-doc');
+        docBtn.disabled = true;
+        const folderId = document.getElementById('ai-folder').value;
+        const docName = document.getElementById('ai-doc-name').value.trim();
+        const subtotal = document.getElementById('ai-subtotal').value;
+        const vatAmount = document.getElementById('ai-vat').value;
+        const total = document.getElementById('ai-total').value;
+        const contractorId = a.contractor?.matched_id || '';
+        const categoryId = cat.matched_id || '';
+        const paymentTerms = a.payment_terms || '';
+        const notes = [a.notes || '', paymentTerms ? 'Payment terms: ' + paymentTerms : ''].filter(Boolean).join('\n');
 
-          try {
-            if (docType === 'invoice') {
-              const body = {
-                folder_id: folderId,
-                name: docName,
-                date: a.date || new Date().toISOString().slice(0, 10),
-                direction: a.direction || 'expense',
-                total_amount: String(am.total || 0),
-                subtotal: String(am.subtotal || 0),
-                vat_rate: String(am.vat_rate || 0),
-                vat_amount: String(am.vat_amount || 0),
-                wht_rate: String(am.wht_rate || 0),
-                wht_amount: String(am.wht_amount || 0),
-                category_id: categoryId,
-                contractor_id: contractorId,
-                status: 'active',
-              };
-              await apiFetch('/invoices', { method: 'POST', body: JSON.stringify(body) });
-              docBtn.textContent = '✅ Invoice created';
-              docBtn.style.background = '#1e8e3e';
-              showToast('Invoice created', 'success');
-            } else {
-              const body = {
-                folder_id: folderId,
-                contractor_id: contractorId,
-                name: docName,
-                date: a.date || '',
-                direction: a.direction || 'expense',
-                total_amount: String(am.total || 0),
-                subtotal: String(am.subtotal || 0),
-                vat_amount: String(am.vat_amount || 0),
-                status: 'active',
-              };
-              await apiFetch('/contracts', { method: 'POST', body: JSON.stringify(body) });
-              docBtn.textContent = '✅ Contract created';
-              docBtn.style.background = '#1e8e3e';
-              showToast('Contract created', 'success');
-            }
-          } catch(e) { showToast(e.message, 'error'); docBtn.disabled = false; }
-        });
-      }
+        try {
+          if (docType === 'invoice') {
+            const body = {
+              folder_id: folderId, name: docName,
+              date: a.date || new Date().toISOString().slice(0, 10),
+              direction: a.direction || 'expense',
+              total_amount: String(total), subtotal: String(subtotal),
+              vat_rate: String(am.vat_rate || 0), vat_amount: String(vatAmount),
+              wht_rate: String(am.wht_rate || 0), wht_amount: String(am.wht_amount || 0),
+              category_id: categoryId, contractor_id: contractorId, status: 'active',
+            };
+            await apiFetch('/invoices', { method: 'POST', body: JSON.stringify(body) });
+            docBtn.textContent = '✅ Invoice created'; docBtn.style.background = '#1e8e3e';
+            showToast('Invoice created', 'success');
+          } else {
+            const body = {
+              folder_id: folderId, contractor_id: contractorId, name: docName,
+              date: a.date || '', direction: a.direction || 'expense',
+              total_amount: String(total), subtotal: String(subtotal),
+              vat_amount: String(vatAmount), status: 'active',
+              notes: notes || '',
+            };
+            await apiFetch('/contracts', { method: 'POST', body: JSON.stringify(body) });
+            docBtn.textContent = '✅ Contract created'; docBtn.style.background = '#1e8e3e';
+            showToast('Contract created', 'success');
+          }
+        } catch(e) { showToast(e.message, 'error'); docBtn.disabled = false; }
+      });
     }
 
     function showToast(msg, type) {
