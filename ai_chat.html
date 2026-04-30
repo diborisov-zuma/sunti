@@ -268,12 +268,10 @@
   </div>
 
   <script>
-    renderHeader('ai_chat');
-
     const chatHistory = []; // { role, content } for API context
     let isLoading = false;
 
-    function onLogin() {
+    window.onLogin = async function() {
       document.getElementById('guest-view').style.display = 'none';
       const me = typeof currentMe !== 'undefined' ? currentMe : null;
       if (!me || !me.is_admin) {
@@ -478,6 +476,8 @@
       container.scrollTop = container.scrollHeight;
       return div;
     }
+
+    renderHeader('ai_chat');
 
     function clearChat() {
       chatHistory.length = 0;
