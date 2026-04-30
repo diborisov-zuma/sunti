@@ -596,18 +596,28 @@
       } catch(e) { inner.innerHTML = `<div style="color:#c33">${e.message}</div>`; }
     }
 
+    function fileType(fn) {
+      if (!fn) return 'other';
+      if (/\.pdf$/i.test(fn)) return 'pdf';
+      if (/\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i.test(fn)) return 'image';
+      return 'other';
+    }
+
     function renderPortalFileList(files, indent) {
       if (!files || !files.length) return '';
       const ml = indent ? 'margin-left:24px;' : '';
       let html = '';
       files.forEach(f => {
         const size = f.file_size > 1048576 ? (f.file_size/1048576).toFixed(1)+' MB' : Math.round((f.file_size||0)/1024)+' KB';
-        const isPdf = (f.file_name || '').toLowerCase().endsWith('.pdf');
-        const icon = isPdf ? '📄' : '📎';
-        html += `<div style="display:flex;align-items:center;gap:8px;padding:3px 0;font-size:0.82rem;${ml}">
-          ${isPdf ? `<button style="background:none;border:none;cursor:pointer;font-size:0.9rem;padding:0" title="View" data-action="view-pdf" data-file-id="${f.id}" data-file-name="${(f.file_name||'').replace(/"/g,'&quot;')}">👁</button>` : '<span style="width:0.9rem"></span>'}
-          <span style="flex:1;color:#333">${icon} ${f.file_name || '—'} <span style="color:#999">(${size})</span></span>
-          <button class="btn btn-outline" style="padding:1px 8px;font-size:0.72rem" data-action="download" data-file-id="${f.id}">${t('download')}</button>
+        const ft = fileType(f.file_name);
+        const icon = ft === 'pdf' ? '📄' : ft === 'image' ? '🖼️' : '📎';
+        const canPreview = ft === 'pdf' || ft === 'image';
+        const viewAction = ft === 'pdf' ? 'view-pdf' : 'view-image';
+        html += `<div style="display:flex;align-items:center;gap:8px;padding:4px 0;font-size:0.85rem;${ml}">
+          <span style="font-size:1.2rem;flex-shrink:0">${icon}</span>
+          <span style="flex:1;color:#333">${f.file_name || '—'} <span style="color:#999">(${size})</span></span>
+          ${canPreview ? `<button class="btn btn-outline" style="padding:1px 8px;font-size:0.75rem" data-action="${viewAction}" data-file-id="${f.id}" data-file-name="${(f.file_name||'').replace(/"/g,'&quot;')}">👁 ${t('view')}</button>` : ''}
+          <button class="btn btn-outline" style="padding:1px 8px;font-size:0.75rem" data-action="download" data-file-id="${f.id}">⬇ ${t('download')}</button>
         </div>`;
       });
       return html;
@@ -868,8 +878,20 @@
           if (r.url) {
             document.getElementById('pdf-title').textContent = fileName;
             document.getElementById('pdf-iframe').src = `https://docs.google.com/gview?url=${encodeURIComponent(r.url)}&embedded=true`;
-            const modal = document.getElementById('modal-pdf');
-            modal.style.display = 'flex';
+            document.getElementById('modal-pdf').style.display = 'flex';
+          }
+        } catch(err) { showToast(err.message, 'error'); }
+      }
+
+      const imgBtn = e.target.closest('[data-action="view-image"]');
+      if (imgBtn) {
+        const fileId = imgBtn.dataset.fileId;
+        try {
+          const r = await portalFetch(`/portal_contracts/files/${fileId}/download`);
+          if (r.url) {
+            document.getElementById('lightbox-img').src = r.url;
+            const lb = document.getElementById('lightbox');
+            lb.style.display = 'flex'; lb.classList.add('open');
           }
         } catch(err) { showToast(err.message, 'error'); }
       }
