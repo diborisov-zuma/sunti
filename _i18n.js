@@ -578,7 +578,7 @@ const i18n = {
     incomePaid: 'Income (received)',
     incomeRemaining: 'Income (remaining)',
     navFolders: 'Projects',
-    navInvoices: 'Documents',
+    navInvoices: 'Invoices',
     navFinance: 'Finances',
     navFinanceGroup: 'Finance',
     navAi: 'AI',

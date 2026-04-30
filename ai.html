@@ -271,40 +271,80 @@
       return html;
     }
 
+    let contractorConfirmed = false;
+    let docNameConfirmed = false;
+
+    function checkCreateReady() {
+      const btn = document.getElementById('btn-create-doc');
+      if (btn) btn.disabled = !(contractorConfirmed && docNameConfirmed);
+    }
+
     function renderActions(a) {
       const actionsEl = document.getElementById('ai-actions');
       if (!a || a.parse_error) { actionsEl.style.display = 'none'; return; }
-      actionsEl.style.display = 'flex';
+      actionsEl.style.display = 'block';
+      contractorConfirmed = false;
+      docNameConfirmed = false;
 
       const c = a.contractor || {};
+      const docType = document.getElementById('ai-doc-type').value;
+      const suggestedName = a.document_number || a.notes || 'AI imported';
+
       let html = '';
 
+      // Step 1: Contractor confirmation
+      html += `<div style="margin-bottom:12px;padding:12px 14px;background:#f8f8f8;border-radius:8px">
+        <div style="font-size:0.75rem;color:#888;text-transform:uppercase;margin-bottom:6px">Step 1: Contractor</div>`;
       if (c.is_new && !c.matched_id) {
-        html += `<button class="btn btn-primary" id="btn-create-contractor" style="padding:6px 16px;font-size:0.88rem;background:#e37400">
-          🆕 Create contractor: ${c.name || '?'}</button>`;
+        html += `<div style="display:flex;align-items:center;gap:10px">
+          <span style="font-size:0.88rem">🆕 <strong>${c.name || '?'}</strong> — new contractor</span>
+          <button class="btn btn-primary" id="btn-create-contractor" style="padding:4px 14px;font-size:0.82rem;background:#e37400">Create contractor</button>
+        </div>`;
       } else if (c.matched_id) {
-        html += `<button class="btn btn-outline" id="btn-confirm-contractor" style="padding:6px 16px;font-size:0.88rem;color:#1e8e3e;border-color:#1e8e3e">
-          ✅ Contractor confirmed: ${c.name || '?'}</button>`;
+        html += `<div style="display:flex;align-items:center;gap:10px">
+          <span style="font-size:0.88rem">✅ <strong>${c.name || '?'}</strong> — found in system</span>
+          <button class="btn btn-outline" id="btn-confirm-contractor" style="padding:4px 14px;font-size:0.82rem;color:#1e8e3e;border-color:#1e8e3e">Confirm</button>
+        </div>`;
       }
+      html += `</div>`;
 
-      const docType = document.getElementById('ai-doc-type').value;
-      html += `<button class="btn btn-primary" id="btn-create-doc" style="padding:6px 16px;font-size:0.88rem" disabled>
-        📄 Create ${docType}</button>`;
+      // Step 2: Document name confirmation
+      html += `<div style="margin-bottom:12px;padding:12px 14px;background:#f8f8f8;border-radius:8px">
+        <div style="font-size:0.75rem;color:#888;text-transform:uppercase;margin-bottom:6px">Step 2: Document name</div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <input type="text" id="ai-doc-name" value="${suggestedName.replace(/"/g, '&quot;')}"
+            style="flex:1;border:1px solid #ddd;border-radius:6px;padding:6px 10px;font-size:0.88rem;outline:none">
+          <button class="btn btn-outline" id="btn-confirm-name" style="padding:4px 14px;font-size:0.82rem;color:#1e8e3e;border-color:#1e8e3e">Confirm</button>
+        </div>
+      </div>`;
+
+      // Step 3: Create document
+      html += `<div style="text-align:center">
+        <button class="btn btn-primary" id="btn-create-doc" style="padding:8px 24px;font-size:0.95rem" disabled>
+          📄 Create ${docType === 'invoice' ? t('navInvoices').toLowerCase() : t('navContracts').toLowerCase()}</button>
+      </div>`;
 
       actionsEl.innerHTML = html;
 
-      // If contractor matched — enable doc creation right away
-      if (c.matched_id) {
-        const confirmBtn = document.getElementById('btn-confirm-contractor');
-        if (confirmBtn) confirmBtn.disabled = true;
-        document.getElementById('btn-create-doc').disabled = false;
+      // --- Event handlers ---
+
+      // Confirm existing contractor
+      const confirmCBtn = document.getElementById('btn-confirm-contractor');
+      if (confirmCBtn) {
+        confirmCBtn.addEventListener('click', () => {
+          contractorConfirmed = true;
+          confirmCBtn.textContent = '✅ Confirmed';
+          confirmCBtn.disabled = true;
+          confirmCBtn.style.background = '#e6f4ea';
+          checkCreateReady();
+        });
       }
 
-      // Create contractor
-      const createBtn = document.getElementById('btn-create-contractor');
-      if (createBtn) {
-        createBtn.addEventListener('click', async () => {
-          createBtn.disabled = true;
+      // Create new contractor
+      const createCBtn = document.getElementById('btn-create-contractor');
+      if (createCBtn) {
+        createCBtn.addEventListener('click', async () => {
+          createCBtn.disabled = true;
           try {
             const body = {
               name_en: c.name || '',
@@ -320,12 +360,29 @@
             if (res.id) {
               lastAnalysis.contractor.matched_id = res.id;
               lastAnalysis.contractor.is_new = false;
-              createBtn.textContent = '✅ Contractor created';
-              createBtn.style.background = '#1e8e3e';
-              document.getElementById('btn-create-doc').disabled = false;
+              contractorConfirmed = true;
+              createCBtn.textContent = '✅ Created';
+              createCBtn.style.background = '#1e8e3e';
               showToast('Contractor created', 'success');
+              checkCreateReady();
             }
-          } catch(e) { showToast(e.message, 'error'); createBtn.disabled = false; }
+          } catch(e) { showToast(e.message, 'error'); createCBtn.disabled = false; }
+        });
+      }
+
+      // Confirm document name
+      const confirmNBtn = document.getElementById('btn-confirm-name');
+      if (confirmNBtn) {
+        confirmNBtn.addEventListener('click', () => {
+          const nameVal = document.getElementById('ai-doc-name').value.trim();
+          if (!nameVal) { showToast('Document name is required', 'error'); return; }
+          docNameConfirmed = true;
+          confirmNBtn.textContent = '✅ Confirmed';
+          confirmNBtn.disabled = true;
+          confirmNBtn.style.background = '#e6f4ea';
+          document.getElementById('ai-doc-name').readOnly = true;
+          document.getElementById('ai-doc-name').style.background = '#f0f0f0';
+          checkCreateReady();
         });
       }
 
@@ -335,6 +392,7 @@
         docBtn.addEventListener('click', async () => {
           docBtn.disabled = true;
           const folderId = document.getElementById('ai-folder').value;
+          const docName = document.getElementById('ai-doc-name').value.trim();
           const am = a.amounts || {};
           const contractorId = a.contractor?.matched_id || '';
           const categoryId = a.category?.matched_id || '';
@@ -343,8 +401,8 @@
             if (docType === 'invoice') {
               const body = {
                 folder_id: folderId,
-                name: a.document_number || a.notes || 'AI imported',
-                date: a.date || new Date().toISOString().slice(0,10),
+                name: docName,
+                date: a.date || new Date().toISOString().slice(0, 10),
                 direction: a.direction || 'expense',
                 total_amount: String(am.total || 0),
                 subtotal: String(am.subtotal || 0),
@@ -356,7 +414,7 @@
                 contractor_id: contractorId,
                 status: 'active',
               };
-              const res = await apiFetch('/invoices', { method: 'POST', body: JSON.stringify(body) });
+              await apiFetch('/invoices', { method: 'POST', body: JSON.stringify(body) });
               docBtn.textContent = '✅ Invoice created';
               docBtn.style.background = '#1e8e3e';
               showToast('Invoice created', 'success');
@@ -364,7 +422,7 @@
               const body = {
                 folder_id: folderId,
                 contractor_id: contractorId,
-                name: a.document_number || a.notes || 'AI imported',
+                name: docName,
                 date: a.date || '',
                 direction: a.direction || 'expense',
                 total_amount: String(am.total || 0),
@@ -372,7 +430,7 @@
                 vat_amount: String(am.vat_amount || 0),
                 status: 'active',
               };
-              const res = await apiFetch('/contracts', { method: 'POST', body: JSON.stringify(body) });
+              await apiFetch('/contracts', { method: 'POST', body: JSON.stringify(body) });
               docBtn.textContent = '✅ Contract created';
               docBtn.style.background = '#1e8e3e';
               showToast('Contract created', 'success');
