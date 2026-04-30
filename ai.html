@@ -97,15 +97,51 @@
 
   </div><!-- /app-view -->
 
+  <!-- Contractor creation modal -->
+  <div class="modal-overlay" id="modal-contractor" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:200;align-items:center;justify-content:center">
+    <div style="background:#fff;border-radius:12px;width:480px;max-width:95vw;padding:20px 24px">
+      <h3 style="margin:0 0 16px">Create contractor</h3>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div><label style="font-size:0.72rem;color:#888">Name (EN)</label>
+          <input type="text" id="mc-name-en" style="width:100%;border:1px solid #ddd;border-radius:6px;padding:6px 8px;font-size:0.88rem"></div>
+        <div><label style="font-size:0.72rem;color:#888">Name (TH)</label>
+          <input type="text" id="mc-name-th" style="width:100%;border:1px solid #ddd;border-radius:6px;padding:6px 8px;font-size:0.88rem"></div>
+        <div><label style="font-size:0.72rem;color:#888">Tax ID</label>
+          <input type="text" id="mc-tax-id" style="width:100%;border:1px solid #ddd;border-radius:6px;padding:6px 8px;font-size:0.88rem"></div>
+        <div><label style="font-size:0.72rem;color:#888">Type</label>
+          <select id="mc-type" style="width:100%;border:1px solid #ddd;border-radius:6px;padding:6px 8px;font-size:0.88rem">
+            <option value="juristic">Juristic</option>
+            <option value="individual">Individual</option>
+            <option value="foreign_juristic">Foreign juristic</option>
+            <option value="foreign_individual">Foreign individual</option>
+          </select></div>
+        <div><label style="font-size:0.72rem;color:#888">Branch</label>
+          <input type="text" id="mc-branch" value="HQ" style="width:100%;border:1px solid #ddd;border-radius:6px;padding:6px 8px;font-size:0.88rem"></div>
+        <div><label style="font-size:0.72rem;color:#888">VAT registered</label>
+          <select id="mc-vat" style="width:100%;border:1px solid #ddd;border-radius:6px;padding:6px 8px;font-size:0.88rem">
+            <option value="true">Yes</option><option value="false">No</option>
+          </select></div>
+        <div style="grid-column:span 2"><label style="font-size:0.72rem;color:#888">Address</label>
+          <input type="text" id="mc-address" style="width:100%;border:1px solid #ddd;border-radius:6px;padding:6px 8px;font-size:0.88rem"></div>
+      </div>
+      <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px">
+        <button class="btn btn-outline" id="mc-cancel" style="padding:6px 16px">Cancel</button>
+        <button class="btn btn-primary" id="mc-save" style="padding:6px 16px">Save & Confirm</button>
+      </div>
+    </div>
+  </div>
+
   <div class="toast" id="toast"></div>
 
   <script>
     renderHeader('ai');
 
     let foldersCache = [];
+    let contractorsCache = [];
+    let categoriesCache = [];
 
     window.onLogin = async function(user, admin) {
-      await loadFolders();
+      await Promise.all([loadFolders(), loadContractors(), loadCategories()]);
       updateTexts();
     };
 
@@ -135,6 +171,13 @@
           sel.appendChild(opt);
         });
       } catch(e) { console.error(e); }
+    }
+
+    async function loadContractors() {
+      try { contractorsCache = await apiFetch('/contractors'); } catch(e) { console.error(e); }
+    }
+    async function loadCategories() {
+      try { categoriesCache = await apiFetch('/categories'); } catch(e) { console.error(e); }
     }
 
     // File selection
@@ -300,24 +343,35 @@
       const docType = document.getElementById('ai-doc-type').value;
       const suggestedName = a.document_number || a.notes || 'AI imported';
       const inputStyle = 'border:1px solid #ddd;border-radius:6px;padding:5px 8px;font-size:0.85rem;outline:none;width:110px;text-align:right';
+      const selStyle = 'flex:1;border:1px solid #ddd;border-radius:6px;padding:6px 10px;font-size:0.88rem;outline:none;background:#fff';
+
+      // Build contractor options
+      let ctrOptions = `<option value="">— select —</option>`;
+      contractorsCache.forEach(ct => {
+        const name = ct.name_en || ct.name_th || '—';
+        const sel = ct.id === c.matched_id ? ' selected' : '';
+        ctrOptions += `<option value="${ct.id}"${sel}>${name}${ct.tax_id ? ' ('+ct.tax_id+')' : ''}</option>`;
+      });
+
+      // Build category options
+      let catOptions = `<option value="">— select —</option>`;
+      categoriesCache.forEach(ct => {
+        const name = ct.name_en || ct.name || '—';
+        const sel = ct.id === cat.matched_id ? ' selected' : '';
+        catOptions += `<option value="${ct.id}"${sel}>${name} (${ct.type || ''})</option>`;
+      });
 
       let html = '';
 
       // Step 1: Contractor
       html += `<div style="margin-bottom:10px;padding:12px 14px;background:#f8f8f8;border-radius:8px">
-        <div style="font-size:0.72rem;color:#888;text-transform:uppercase;margin-bottom:6px">Step 1: Contractor</div>`;
-      if (c.is_new && !c.matched_id) {
-        html += `<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-          <span style="font-size:0.88rem">🆕 <strong>${c.name || '?'}</strong> — new contractor</span>
-          <button class="btn btn-primary" id="btn-create-contractor" style="padding:4px 14px;font-size:0.82rem;background:#e37400">Create contractor</button>
-        </div>`;
-      } else if (c.matched_id) {
-        html += `<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-          <span style="font-size:0.88rem">✅ <strong>${c.name || '?'}</strong> — found in system</span>
+        <div style="font-size:0.72rem;color:#888;text-transform:uppercase;margin-bottom:6px">Step 1: Contractor</div>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <select id="ai-contractor-select" style="${selStyle}">${ctrOptions}</select>
           <button class="btn btn-outline" id="btn-confirm-contractor" style="padding:4px 14px;font-size:0.82rem;color:#1e8e3e;border-color:#1e8e3e">Confirm</button>
-        </div>`;
-      }
-      html += `</div>`;
+          <button class="btn btn-primary" id="btn-new-contractor" style="padding:4px 14px;font-size:0.82rem;background:#e37400">+ New</button>
+        </div>
+      </div>`;
 
       // Step 2: Document name
       html += `<div style="margin-bottom:10px;padding:12px 14px;background:#f8f8f8;border-radius:8px">
@@ -346,8 +400,8 @@
       // Step 4: Category
       html += `<div style="margin-bottom:10px;padding:12px 14px;background:#f8f8f8;border-radius:8px">
         <div style="font-size:0.72rem;color:#888;text-transform:uppercase;margin-bottom:6px">Step 4: Category</div>
-        <div style="display:flex;align-items:center;gap:10px">
-          <span style="font-size:0.88rem">${cat.matched_id ? '✅' : '❓'} <strong>${cat.suggested_name || '—'}</strong></span>
+        <div style="display:flex;align-items:center;gap:8px">
+          <select id="ai-category-select" style="${selStyle}">${catOptions}</select>
           <button class="btn btn-outline" id="btn-confirm-category" style="padding:4px 14px;font-size:0.82rem;color:#1e8e3e;border-color:#1e8e3e">Confirm</button>
         </div>
       </div>`;
@@ -363,36 +417,27 @@
       // --- Event handlers ---
 
       // Step 1: Confirm contractor
-      const confirmCBtn = document.getElementById('btn-confirm-contractor');
-      if (confirmCBtn) {
-        confirmCBtn.addEventListener('click', () => {
-          stepConfirmed.contractor = true;
-          confirmBtn('btn-confirm-contractor');
-          checkCreateReady();
-        });
-      }
-      const createCBtn = document.getElementById('btn-create-contractor');
-      if (createCBtn) {
-        createCBtn.addEventListener('click', async () => {
-          createCBtn.disabled = true;
-          try {
-            const body = {
-              name_en: c.name || '', name_th: c.name_th || '', tax_id: c.tax_id || '',
-              address_en: c.address || '', branch: c.branch || 'HQ',
-              type: c.type || 'juristic', is_vat_registered: (am.vat_rate > 0), is_active: true,
-            };
-            const res = await apiFetch('/contractors', { method: 'POST', body: JSON.stringify(body) });
-            if (res.id) {
-              lastAnalysis.contractor.matched_id = res.id;
-              lastAnalysis.contractor.is_new = false;
-              stepConfirmed.contractor = true;
-              createCBtn.textContent = '✅ Created'; createCBtn.style.background = '#1e8e3e';
-              showToast('Contractor created', 'success');
-              checkCreateReady();
-            }
-          } catch(e) { showToast(e.message, 'error'); createCBtn.disabled = false; }
-        });
-      }
+      document.getElementById('btn-confirm-contractor').addEventListener('click', () => {
+        const sel = document.getElementById('ai-contractor-select');
+        if (!sel.value) { showToast('Select a contractor', 'error'); return; }
+        lastAnalysis.contractor.matched_id = sel.value;
+        stepConfirmed.contractor = true;
+        confirmBtn('btn-confirm-contractor');
+        sel.disabled = true; sel.style.background = '#f0f0f0';
+        checkCreateReady();
+      });
+
+      // Step 1: Open new contractor modal
+      document.getElementById('btn-new-contractor').addEventListener('click', () => {
+        document.getElementById('mc-name-en').value = c.name || '';
+        document.getElementById('mc-name-th').value = c.name_th || '';
+        document.getElementById('mc-tax-id').value = c.tax_id || '';
+        document.getElementById('mc-type').value = c.type || 'juristic';
+        document.getElementById('mc-branch').value = c.branch || 'HQ';
+        document.getElementById('mc-vat').value = (am.vat_rate > 0) ? 'true' : 'false';
+        document.getElementById('mc-address').value = c.address || '';
+        document.getElementById('modal-contractor').style.display = 'flex';
+      });
 
       // Step 2: Confirm name
       document.getElementById('btn-confirm-name').addEventListener('click', () => {
@@ -419,6 +464,8 @@
       document.getElementById('btn-confirm-category').addEventListener('click', () => {
         stepConfirmed.category = true;
         confirmBtn('btn-confirm-category');
+        const sel = document.getElementById('ai-category-select');
+        sel.disabled = true; sel.style.background = '#f0f0f0';
         checkCreateReady();
       });
 
@@ -431,8 +478,8 @@
         const subtotal = document.getElementById('ai-subtotal').value;
         const vatAmount = document.getElementById('ai-vat').value;
         const total = document.getElementById('ai-total').value;
-        const contractorId = a.contractor?.matched_id || '';
-        const categoryId = cat.matched_id || '';
+        const contractorId = document.getElementById('ai-contractor-select').value;
+        const categoryId = document.getElementById('ai-category-select').value;
         const paymentTerms = a.payment_terms || '';
         const notes = [a.notes || '', paymentTerms ? 'Payment terms: ' + paymentTerms : ''].filter(Boolean).join('\n');
 
@@ -455,8 +502,7 @@
               folder_id: folderId, contractor_id: contractorId, name: docName,
               date: a.date || '', direction: a.direction || 'expense',
               total_amount: String(total), subtotal: String(subtotal),
-              vat_amount: String(vatAmount), status: 'active',
-              notes: notes || '',
+              vat_amount: String(vatAmount), status: 'active', notes: notes || '',
             };
             await apiFetch('/contracts', { method: 'POST', body: JSON.stringify(body) });
             docBtn.textContent = '✅ Contract created'; docBtn.style.background = '#1e8e3e';
@@ -512,6 +558,52 @@
         resultContent.innerHTML = `<div style="color:#c5221f;padding:16px">${e.message}</div>`;
       }
       btnAnalyze.disabled = false;
+    });
+
+    // Contractor modal handlers
+    document.getElementById('mc-cancel').addEventListener('click', () => {
+      document.getElementById('modal-contractor').style.display = 'none';
+    });
+    document.getElementById('mc-save').addEventListener('click', async () => {
+      const saveBtn = document.getElementById('mc-save');
+      saveBtn.disabled = true;
+      try {
+        const body = {
+          name_en: document.getElementById('mc-name-en').value.trim(),
+          name_th: document.getElementById('mc-name-th').value.trim(),
+          tax_id: document.getElementById('mc-tax-id').value.trim(),
+          type: document.getElementById('mc-type').value,
+          branch: document.getElementById('mc-branch').value.trim() || 'HQ',
+          is_vat_registered: document.getElementById('mc-vat').value === 'true',
+          address_en: document.getElementById('mc-address').value.trim(),
+          is_active: true,
+        };
+        if (!body.name_en && !body.name_th) { showToast('Name is required', 'error'); saveBtn.disabled = false; return; }
+        const res = await apiFetch('/contractors', { method: 'POST', body: JSON.stringify(body) });
+        if (res.id) {
+          // Add to cache and dropdown
+          const newC = { id: res.id, name_en: body.name_en, name_th: body.name_th, tax_id: body.tax_id };
+          contractorsCache.push(newC);
+          const sel = document.getElementById('ai-contractor-select');
+          const opt = document.createElement('option');
+          opt.value = res.id;
+          opt.textContent = (body.name_en || body.name_th) + (body.tax_id ? ' ('+body.tax_id+')' : '');
+          opt.selected = true;
+          sel.appendChild(opt);
+          // Auto-confirm contractor
+          if (lastAnalysis) lastAnalysis.contractor.matched_id = res.id;
+          stepConfirmed.contractor = true;
+          confirmBtn('btn-confirm-contractor');
+          sel.disabled = true; sel.style.background = '#f0f0f0';
+          checkCreateReady();
+          document.getElementById('modal-contractor').style.display = 'none';
+          showToast('Contractor created & confirmed', 'success');
+        }
+      } catch(e) { showToast(e.message, 'error'); }
+      saveBtn.disabled = false;
+    });
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape') document.getElementById('modal-contractor').style.display = 'none';
     });
 
     window.onLangChange = updateTexts;
