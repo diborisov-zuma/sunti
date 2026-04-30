@@ -498,15 +498,32 @@
             docBtn.textContent = '✅ Invoice created'; docBtn.style.background = '#1e8e3e';
             showToast('Invoice created', 'success');
           } else {
+            const lineItems = a.line_items || [];
+            const hasItems = lineItems.length > 0;
             const body = {
               folder_id: folderId, contractor_id: contractorId, name: docName,
               date: a.date || '', direction: a.direction || 'expense',
               total_amount: String(total), subtotal: String(subtotal),
               vat_amount: String(vatAmount), status: 'active', notes: notes || '',
+              has_items: hasItems,
             };
-            await apiFetch('/contracts', { method: 'POST', body: JSON.stringify(body) });
+            const cRes = await apiFetch('/contracts', { method: 'POST', body: JSON.stringify(body) });
+            // Save line items as contract_items
+            if (hasItems && cRes.id) {
+              const items = lineItems.map(it => ({
+                description: it.description || '',
+                quantity: String(it.quantity || 1),
+                unit_price: String(it.unit_price || 0),
+                amount: String(it.amount || 0),
+                item_type: 'goods',
+              }));
+              await apiFetch('/contract_items/batch', {
+                method: 'POST',
+                body: JSON.stringify({ contract_id: cRes.id, items }),
+              });
+            }
             docBtn.textContent = '✅ Contract created'; docBtn.style.background = '#1e8e3e';
-            showToast('Contract created', 'success');
+            showToast(`Contract created${hasItems ? ' + ' + lineItems.length + ' items' : ''}`, 'success');
           }
         } catch(e) { showToast(e.message, 'error'); docBtn.disabled = false; }
       });

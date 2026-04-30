@@ -229,6 +229,12 @@
         <label id="lbl-c-progress-notes"></label>
         <textarea id="c-progress-notes" rows="2"></textarea>
       </div>
+      <div class="field-group" style="margin-top:8px">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+          <input type="checkbox" id="c-has-items">
+          <span id="lbl-c-has-items"></span>
+        </label>
+      </div>
       <div class="modal-actions">
         <button class="btn btn-outline" id="btn-c-cancel"></button>
         <button class="btn btn-primary" id="btn-c-save"></button>
@@ -421,6 +427,7 @@
     let contractFilesCache = {}; // contractId → [files]
     let contractDirectTrx  = {}; // contractId → [transactions]
     let contractDirectTrxFiles = {}; // contractId → { txId → [files] }
+    let contractItemsCache = {}; // contractId → [items]
     let invoiceTrx        = {}; // invoiceId → [transactions]
     let fileUploadCtx     = null; // { type:'contract'|'invoice'|'transaction', id, folderId, contractId }
 
@@ -514,6 +521,7 @@
       setText('lbl-c-progress', t('portalProgress') + ' %');
       setText('lbl-c-notes', t('notes'));
       setText('lbl-c-progress-notes', t('progressNotes'));
+      setText('lbl-c-has-items', t('hasItems'));
       setText('btn-c-cancel', t('cancel'));
       setText('btn-c-save', t('save'));
 
@@ -786,11 +794,15 @@
       const inner = document.getElementById(`contract-inner-${contractId}`);
       if (!inner) return;
       try {
-        const [invs, cFiles, directTrx] = await Promise.all([
+        const contract = allContracts.find(c => c.id === contractId);
+        const fetchItems = contract?.has_items ? apiFetch(`/contract_items?contract_id=${contractId}`) : Promise.resolve([]);
+        const [invs, cFiles, directTrx, items] = await Promise.all([
           apiFetch(`/contracts/${contractId}/invoices`),
           apiFetch(`/contract_files?contract_id=${contractId}`),
           apiFetch(`/transactions?contract_id=${contractId}`),
+          fetchItems,
         ]);
+        contractItemsCache[contractId] = items;
         // Load files for each direct transaction
         const dtfArr = await Promise.all(directTrx.map(tx => apiFetch(`/transaction_files?transaction_id=${tx.id}`).catch(() => [])));
         const dtfMap = {};
@@ -875,6 +887,38 @@
         </div>`;
       }
       html += renderFileList(cFiles, 'contract', contractId, contractId);
+
+      // Contract items (if has_items)
+      if (contract?.has_items) {
+        const items = contractItemsCache[contractId] || [];
+        html += `<div style="background:#f5f0ff;border-radius:8px;padding:10px 12px;margin:10px 0">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+            <span style="font-size:0.75rem;color:#888;text-transform:uppercase">${t('contractItems')} (${items.length})</span>
+            <button class="btn btn-outline" style="font-size:0.72rem;padding:2px 8px" data-action="add-contract-item" data-contract-id="${contractId}">${t('addItem')}</button>
+          </div>`;
+        if (items.length) {
+          html += `<table class="trx-mini-table"><thead><tr>
+            <th style="width:50px">#</th><th>${t('description')}</th><th style="width:60px">${t('type')}</th>
+            <th style="width:60px;text-align:right">Qty</th><th style="width:90px;text-align:right">Price</th>
+            <th style="width:100px;text-align:right">${t('amount')}</th><th style="width:40px"></th>
+          </tr></thead><tbody>`;
+          items.forEach((it, i) => {
+            html += `<tr>
+              <td>${i+1}</td>
+              <td>${it.description || '—'}</td>
+              <td style="font-size:0.72rem">${it.item_type === 'service' ? t('itemService') : t('itemGoods')}</td>
+              <td style="text-align:right">${numVal(it.quantity)}</td>
+              <td style="text-align:right">${fmt(numVal(it.unit_price))}</td>
+              <td style="text-align:right;font-weight:500">${fmt(numVal(it.amount))}</td>
+              <td><button class="btn btn-outline" style="padding:0 4px;font-size:0.68rem;color:#c5221f" data-action="delete-contract-item" data-item-id="${it.id}" data-contract-id="${contractId}">×</button></td>
+            </tr>`;
+          });
+          html += `</tbody></table>`;
+        } else {
+          html += `<div style="color:#bbb;font-size:0.82rem">—</div>`;
+        }
+        html += `</div>`;
+      }
 
       // Direct payments (without invoice)
       const directTrx = arguments[3] || [];
@@ -1109,6 +1153,7 @@
         document.getElementById('c-notes').value = c.notes || '';
         document.getElementById('c-progress').value = numVal(c.progress_pct) || '';
         document.getElementById('c-progress-notes').value = c.progress_notes || '';
+        document.getElementById('c-has-items').checked = !!c.has_items;
         openModal('modal-contract');
       }
 
@@ -1220,6 +1265,40 @@
           loadContractDetail(contractId);
           loadContracts();
         } catch(err) { showToast(err.message, 'error'); btn.disabled = false; }
+      }
+
+      if (action === 'add-contract-item') {
+        const contractId = btn.dataset.contractId;
+        const desc = prompt(t('description'));
+        if (!desc) return;
+        const qty = prompt('Quantity', '1');
+        const price = prompt('Unit price', '0');
+        const itemType = prompt('Type: goods / service', 'goods');
+        try {
+          await apiFetch('/contract_items', {
+            method: 'POST',
+            body: JSON.stringify({
+              contract_id: contractId, description: desc,
+              quantity: qty || '1', unit_price: price || '0',
+              amount: String((parseFloat(qty||1) * parseFloat(price||0))),
+              item_type: (itemType === 'service') ? 'service' : 'goods',
+            }),
+          });
+          showToast(t('saved'), 'success');
+          loadContractDetail(contractId);
+        } catch(e) { showToast(e.message, 'error'); }
+        return;
+      }
+
+      if (action === 'delete-contract-item') {
+        if (!confirm(t('confirmDelete'))) return;
+        btn.disabled = true;
+        try {
+          await apiFetch(`/contract_items/${btn.dataset.itemId}`, { method: 'DELETE' });
+          showToast(t('deleted'), 'success');
+          loadContractDetail(btn.dataset.contractId);
+        } catch(e) { showToast(e.message, 'error'); btn.disabled = false; }
+        return;
       }
 
       if (action === 'add-direct-payment') {
@@ -1453,6 +1532,7 @@
         progress_pct: document.getElementById('c-progress').value || '0',
         progress_notes: document.getElementById('c-progress-notes').value.trim(),
         responsible_email: document.getElementById('c-responsible').value || '',
+        has_items: document.getElementById('c-has-items').checked,
         status: document.getElementById('c-status-select').value || 'estimate',
       };
 

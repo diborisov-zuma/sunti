@@ -290,6 +290,11 @@ const i18n = {
     completed: 'Завершён',
     cancelled: 'Отменён',
     progressNotes: 'Комментарий по работам',
+    hasItems: 'Артикульный учёт (товары/услуги)',
+    contractItems: 'Позиции контракта',
+    addItem: 'Добавить позицию',
+    itemGoods: 'Товар',
+    itemService: 'Услуга',
 
     // Документация проекта
     navDocs: 'Документация',
@@ -720,6 +725,11 @@ const i18n = {
     completed: 'Completed',
     cancelled: 'Cancelled',
     progressNotes: 'Work progress notes',
+    hasItems: 'Item tracking (goods/services)',
+    contractItems: 'Contract items',
+    addItem: 'Add item',
+    itemGoods: 'Goods',
+    itemService: 'Service',
 
     // Project documentation
     navDocs: 'Documentation',
@@ -1150,6 +1160,11 @@ const i18n = {
     completed: 'เสร็จสิ้น',
     cancelled: 'ยกเลิก',
     progressNotes: 'ความคืบหน้าของงาน',
+    hasItems: 'ติดตามรายการ (สินค้า/บริการ)',
+    contractItems: 'รายการสัญญา',
+    addItem: 'เพิ่มรายการ',
+    itemGoods: 'สินค้า',
+    itemService: 'บริการ',
 
     // เอกสารโครงการ
     navDocs: 'เอกสาร',

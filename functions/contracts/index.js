@@ -128,7 +128,7 @@ exports.contracts = async (req, res) => {
         query: `SELECT c.id, c.folder_id, c.contractor_id, c.name, c.external_ref,
                        c.date, c.direction, c.total_amount, c.subtotal, c.vat_amount,
                        c.paid_amount, c.payment_terms, c.status, c.notes,
-                       c.progress_pct, c.progress_notes, c.responsible_email, c.needs_review,
+                       c.progress_pct, c.progress_notes, c.responsible_email, c.needs_review, c.has_items,
                        c.created_by, c.created_at, c.updated_by, c.updated_at,
                        f.name AS folder_name,
                        ct.name_en AS contractor_name_en, ct.name_th AS contractor_name_th,
@@ -178,7 +178,7 @@ exports.contracts = async (req, res) => {
                   (id, folder_id, contractor_id, name, external_ref, date, direction,
                    total_amount, subtotal, vat_amount, paid_amount,
                    payment_terms, status, notes, progress_pct, progress_notes, responsible_email, needs_review,
-                   created_by, created_at)
+                   has_items, created_by, created_at)
                 VALUES
                   (@id, @folder_id, @contractor_id, @name, NULLIF(@external_ref,''),
                    IF(@date = '', NULL, DATE(@date)), @direction,
@@ -186,7 +186,7 @@ exports.contracts = async (req, res) => {
                    CAST(@vat_amount AS NUMERIC), CAST('0' AS NUMERIC),
                    NULLIF(@payment_terms,''), 'active', NULLIF(@notes,''),
                    CAST(@progress_pct AS NUMERIC), NULLIF(@progress_notes,''), NULLIF(@responsible_email,''), @needs_review,
-                   @created_by, CURRENT_TIMESTAMP())`,
+                   @has_items, @created_by, CURRENT_TIMESTAMP())`,
         params: {
           id,
           folder_id:      b.folder_id,
@@ -203,6 +203,7 @@ exports.contracts = async (req, res) => {
           progress_notes: b.progress_notes || '',
           responsible_email: b.responsible_email || '',
           needs_review:  !!b.needs_review,
+          has_items:     !!b.has_items,
           notes:         b.notes || '',
           created_by:    email,
         },
@@ -252,6 +253,7 @@ exports.contracts = async (req, res) => {
                     progress_notes = NULLIF(@progress_notes,''),
                     responsible_email = NULLIF(@responsible_email,''),
                     needs_review = @needs_review,
+                    has_items = @has_items,
                     updated_by = @updated_by,
                     updated_at = CURRENT_TIMESTAMP()
                 WHERE id = @id`,
@@ -273,6 +275,7 @@ exports.contracts = async (req, res) => {
           progress_notes: b.progress_notes || '',
           responsible_email: b.responsible_email || '',
           needs_review: b.needs_review !== undefined ? !!b.needs_review : false,
+          has_items: b.has_items !== undefined ? !!b.has_items : false,
           updated_by: email,
         },
       });
