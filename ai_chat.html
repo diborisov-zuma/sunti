@@ -385,6 +385,16 @@
       container.scrollTop = container.scrollHeight;
     }
 
+    function formatCellValue(val) {
+      // Strip quotes from BigQuery NUMERIC strings
+      let v = typeof val === 'string' ? val.replace(/^"|"$/g, '') : val;
+      const num = Number(v);
+      if (v !== '' && !isNaN(num) && isFinite(num)) {
+        return num.toLocaleString('en-US', { minimumFractionDigits: num % 1 === 0 ? 0 : 2, maximumFractionDigits: 2 });
+      }
+      return val;
+    }
+
     function appendAssistant(data) {
       const container = document.getElementById('chat-messages');
       const div = document.createElement('div');
@@ -425,8 +435,8 @@
         const table = document.createElement('table');
         table.className = 'data-table';
 
-        // Header
-        const keys = Object.keys(data.data[0]);
+        // Header — hide internal ID columns
+        const keys = Object.keys(data.data[0]).filter(k => k !== 'id' && !k.endsWith('_id'));
         const thead = document.createElement('thead');
         const headRow = document.createElement('tr');
         keys.forEach(k => {
@@ -445,7 +455,7 @@
           keys.forEach(k => {
             const td = document.createElement('td');
             const val = row[k];
-            td.textContent = val === null || val === undefined ? '—' : val;
+            td.textContent = val === null || val === undefined ? '—' : formatCellValue(val);
             tr.appendChild(td);
           });
           tbody.appendChild(tr);
