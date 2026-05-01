@@ -223,13 +223,22 @@ exports.ai_chat = async (req, res) => {
 
     let parsed;
     try {
-      const cleaned = sqlRaw.replace(/^```json?\s*/i, '').replace(/\s*```$/i, '').trim();
+      // Strip markdown fences (multiline) and extract JSON
+      let cleaned = sqlRaw;
+      const jsonMatch = cleaned.match(/```json?\s*([\s\S]*?)```/);
+      if (jsonMatch) {
+        cleaned = jsonMatch[1].trim();
+      } else {
+        // Try to find raw JSON object
+        const braceMatch = cleaned.match(/\{[\s\S]*\}/);
+        if (braceMatch) cleaned = braceMatch[0].trim();
+      }
       parsed = JSON.parse(cleaned);
     } catch (e) {
       // If Claude didn't return JSON, treat as a conversational answer
       return res.json({
         success: true,
-        answer: sqlRaw,
+        answer: sqlRaw.replace(/```json?\s*/gi, '').replace(/```/g, '').trim(),
         sql: null,
         data: null,
       });
