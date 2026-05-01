@@ -131,7 +131,7 @@ RULES:
 6. When joining tables, use meaningful aliases.
 7. Format dates as YYYY-MM-DD.
 8. Respond in the SAME LANGUAGE as the user's question (Russian, English, or Thai).
-9. When searching by name (folders, contractors, companies, categories), NEVER use exact match (=). Always use LOWER() + LIKE with wildcards: WHERE LOWER(f.name) LIKE LOWER('%villa 2%'). Names may be in English, Russian, or Thai — user may type in any language.
+9. IMPORTANT: When the user mentions a folder, contractor, company, category, or account by name — find the matching record in the REFERENCE DATA section and use its exact ID in the SQL WHERE clause. NEVER search by name with = or LIKE. The user may use a different language, abbreviation, or spelling — use your judgment to match. Example: user says "Вилла 2" → match to "Villa 2" in reference data → use WHERE folder_id = 'exact-uuid'.
 10. For NUMERIC fields that may be NULL, always use COALESCE(field, 0) in calculations.
 
 When you receive a question, respond with EXACTLY this JSON (no markdown fences):
@@ -200,6 +200,42 @@ exports.ai_chat = async (req, res) => {
   try {
     const client = new Anthropic();
 
+    // Load reference data for AI context
+    const [folders] = await bigquery.query({
+      query: `SELECT id, name, status, company_id FROM \`${PROJECT}.${DATASET}.folders\` WHERE status = 'active' ORDER BY name`,
+    });
+    const [companies] = await bigquery.query({
+      query: `SELECT id, name FROM \`${PROJECT}.${DATASET}.companies\` ORDER BY name`,
+    });
+    const [contractors] = await bigquery.query({
+      query: `SELECT id, name_en, name_th, tax_id FROM \`${PROJECT}.${DATASET}.contractors\` WHERE is_active = true ORDER BY name_en LIMIT 300`,
+    });
+    const [categories] = await bigquery.query({
+      query: `SELECT id, name, name_en, name_th, type FROM \`${PROJECT}.${DATASET}.categories\` ORDER BY sort_order`,
+    });
+    const [accounts] = await bigquery.query({
+      query: `SELECT id, name, company_id, bank_name FROM \`${PROJECT}.${DATASET}.company_accounts\` WHERE is_active = true ORDER BY name`,
+    });
+
+    const refData = `
+REFERENCE DATA (use these IDs in SQL, do NOT search by name in WHERE clauses):
+
+FOLDERS (projects/villas):
+${folders.map(f => `- "${f.name}" (id: ${f.id}, company_id: ${f.company_id})`).join('\n') || '(none)'}
+
+COMPANIES:
+${companies.map(c => `- "${c.name}" (id: ${c.id})`).join('\n') || '(none)'}
+
+CONTRACTORS:
+${contractors.map(c => `- "${c.name_en || c.name_th}" ${c.name_th && c.name_en ? '/ "' + c.name_th + '"' : ''} (id: ${c.id}, tax_id: ${c.tax_id || 'N/A'})`).join('\n') || '(none)'}
+
+CATEGORIES:
+${categories.map(c => `- "${c.name_en || c.name}" ${c.name_th ? '/ "' + c.name_th + '"' : ''} (type: ${c.type}, id: ${c.id})`).join('\n') || '(none)'}
+
+ACCOUNTS:
+${accounts.map(a => `- "${a.name}" / ${a.bank_name || ''} (id: ${a.id}, company_id: ${a.company_id})`).join('\n') || '(none)'}
+`;
+
     // Build conversation history for context
     const messages = [];
     if (Array.isArray(history)) {
@@ -213,7 +249,7 @@ exports.ai_chat = async (req, res) => {
     const sqlResponse = await client.messages.create({
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 2048,
-      system: SYSTEM_PROMPT,
+      system: SYSTEM_PROMPT + '\n' + refData,
       messages,
     });
 
