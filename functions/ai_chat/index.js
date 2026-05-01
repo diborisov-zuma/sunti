@@ -144,12 +144,13 @@ Format a clear, helpful answer based on the data.
 
 RULES:
 1. Respond in the SAME LANGUAGE as the user's question.
-2. If data contains monetary amounts, format them with commas (e.g. 1,234,567.00) and add ฿ for THB.
-3. If data is tabular, present it clearly.
-4. Keep the answer concise but complete.
-5. If no rows returned, say so clearly.
-6. Never expose internal IDs — use human-readable names.
-7. Do NOT wrap your response in markdown code fences.`;
+2. ALL numbers must be formatted with comma thousands separator and dot decimal: 1,234,567.89. This applies to ALL numeric values — monetary amounts, quantities, percentages, counts.
+3. For monetary amounts, also add ฿ for THB.
+4. If data is tabular, present it clearly.
+5. Keep the answer concise but complete.
+6. If no rows returned, say so clearly.
+7. Never expose internal IDs — use human-readable names.
+8. Do NOT wrap your response in markdown code fences.`;
 
 // Validate that SQL is SELECT-only
 function validateSQL(sql) {
