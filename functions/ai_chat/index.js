@@ -112,6 +112,9 @@ Important notes:
 - invoices table contains both invoices and documents (it was renamed from 'documents').
 - folders are projects/villas.
 - NUMERIC values from BigQuery come as objects {value: "123"} — but in SQL they work normally.
+- transactions.contractor_id is OPTIONAL and often NULL. To find payments by contractor, JOIN through invoices: transactions.invoice_id → invoices.id → invoices.contractor_id. Use COALESCE(t.contractor_id, i.contractor_id) when you need the contractor for a transaction.
+- contracts.paid_amount is computed from child invoices. To get accurate contract payment data, use invoices.paid_amount or sum transactions through invoices.
+- When calculating totals by contractor, always join through invoices as the primary path, not directly through transactions.contractor_id.
 `;
 
 const SYSTEM_PROMPT = `You are an AI data analyst for Sunti — a construction/property management company in Thailand.
