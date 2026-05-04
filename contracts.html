@@ -421,6 +421,7 @@
     let sortField        = 'date';
     let sortDir          = 'desc'; // 'asc' | 'desc'
     let expandedContracts = {};
+    let lastSavedContractId = null;
     let expandedInvoices  = {};
     let expandedTrx       = {};
     let contractInvoices  = {}; // contractId → [invoices]
@@ -738,6 +739,7 @@
         const outstanding = numVal(c.total_amount) - numVal(c.invoiced_total);
 
         const tr = document.createElement('tr');
+        tr.dataset.contractId = c.id;
         if (isExp) tr.className = 'expanded';
         tr.innerHTML = `
           <td><button class="expand-btn${isExp?' open':''}" data-expand-contract="${c.id}">${isExp?'▼':'▶'}</button></td>
@@ -764,6 +766,18 @@
 
         if (isExp) loadContractDetail(c.id);
       });
+
+      // Highlight last saved contract
+      if (lastSavedContractId) {
+        const savedRow = tbody.querySelector(`tr[data-contract-id="${lastSavedContractId}"]`);
+        if (savedRow) {
+          savedRow.style.transition = 'background 0.3s';
+          savedRow.style.background = '#e8f0fe';
+          savedRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          setTimeout(() => { savedRow.style.background = ''; }, 3000);
+        }
+        lastSavedContractId = null;
+      }
 
       // Totals footer
       const tfoot = document.getElementById('ct-tfoot');
@@ -1557,11 +1571,15 @@
 
       closeModal('modal-contract');
       try {
+        let savedId;
         if (currentContractMode === 'create') {
-          await apiFetch('/contracts', { method: 'POST', body: JSON.stringify(body) });
+          const res = await apiFetch('/contracts', { method: 'POST', body: JSON.stringify(body) });
+          savedId = res?.id || null;
         } else {
           await apiFetch(`/contracts/${currentContractId}`, { method: 'PUT', body: JSON.stringify(body) });
+          savedId = currentContractId;
         }
+        lastSavedContractId = savedId;
         showToast(t('saved'), 'success'); loadContracts();
       } catch(e) { showToast(e.message, 'error'); }
     });
