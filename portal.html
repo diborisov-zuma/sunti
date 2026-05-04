@@ -251,6 +251,7 @@
       if (s === 'estimate')  return `<span class="badge badge-yellow">${t('estimate')}</span>`;
       if (s === 'confirmed') return `<span class="badge badge-green">${t('confirmed')}</span>`;
       if (s === 'active')    return `<span class="badge badge-green">${t('active')}</span>`;
+      if (s === 'in_stock')  return `<span class="badge" style="background:#f5d5e8;color:#333">${t('inStock')}</span>`;
       if (s === 'delivered') return `<span class="badge" style="background:#d5daf5;color:#333">${t('delivered')}</span>`;
       if (s === 'completed') return `<span class="badge badge-gray">${t('completed')}</span>`;
       if (s === 'cancelled') return `<span class="badge badge-red">${t('cancelled')}</span>`;
@@ -289,6 +290,7 @@
         <option value="active">${t('active')}</option>
         <option value="estimate">${t('estimate')}</option>
         <option value="confirmed">${t('confirmed')}</option>
+        <option value="in_stock">${t('inStock')}</option>
         <option value="delivered">${t('delivered')}</option>
         <option value="completed">${t('completed')}</option>
         <option value="cancelled">${t('cancelled')}</option>`;
