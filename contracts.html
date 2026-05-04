@@ -677,6 +677,7 @@
         if (filterResponsible) url += `&responsible=${encodeURIComponent(filterResponsible)}`;
         allContracts = await apiFetch(url);
         renderContracts();
+        highlightSavedContract();
       } catch(e) {
         tbody.innerHTML = `<tr><td colspan="11" class="empty-state">${e.message}</td></tr>`;
       }
@@ -692,6 +693,21 @@
           th.insertAdjacentHTML('beforeend', `<span class="sort-arrow">${sortDir === 'asc' ? '▲' : '▼'}</span>`);
         }
       });
+    }
+
+    function highlightSavedContract() {
+      if (!lastSavedContractId) return;
+      const tbody = document.getElementById('ct-tbody');
+      const savedRow = tbody.querySelector(`tr[data-contract-id="${lastSavedContractId}"]`);
+      if (savedRow) {
+        savedRow.style.background = '#e8f0fe';
+        savedRow.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        setTimeout(() => {
+          savedRow.style.transition = 'background 1s';
+          savedRow.style.background = '';
+        }, 4000);
+      }
+      lastSavedContractId = null;
     }
 
     function renderContracts() {
@@ -769,21 +785,6 @@
 
         if (isExp) loadContractDetail(c.id);
       });
-
-      // Highlight last saved contract
-      if (lastSavedContractId) {
-        const hId = lastSavedContractId;
-        lastSavedContractId = null;
-        setTimeout(() => {
-          const savedRow = tbody.querySelector(`tr[data-contract-id="${hId}"]`);
-          if (savedRow) {
-            savedRow.style.transition = 'background 0.5s';
-            savedRow.style.background = '#e8f0fe';
-            savedRow.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            setTimeout(() => { savedRow.style.background = ''; }, 4000);
-          }
-        }, 300);
-      }
 
       // Totals footer
       const tfoot = document.getElementById('ct-tfoot');
