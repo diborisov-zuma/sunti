@@ -772,14 +772,17 @@
 
       // Highlight last saved contract
       if (lastSavedContractId) {
-        const savedRow = tbody.querySelector(`tr[data-contract-id="${lastSavedContractId}"]`);
-        if (savedRow) {
-          savedRow.style.transition = 'background 0.3s';
-          savedRow.style.background = '#e8f0fe';
-          savedRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          setTimeout(() => { savedRow.style.background = ''; }, 3000);
-        }
+        const hId = lastSavedContractId;
         lastSavedContractId = null;
+        setTimeout(() => {
+          const savedRow = tbody.querySelector(`tr[data-contract-id="${hId}"]`);
+          if (savedRow) {
+            savedRow.style.transition = 'background 0.5s';
+            savedRow.style.background = '#e8f0fe';
+            savedRow.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            setTimeout(() => { savedRow.style.background = ''; }, 4000);
+          }
+        }, 300);
       }
 
       // Totals footer
@@ -1583,6 +1586,7 @@
           savedId = currentContractId;
         }
         lastSavedContractId = savedId;
+        if (savedId) expandedContracts[savedId] = true;
         showToast(t('saved'), 'success'); loadContracts();
       } catch(e) { showToast(e.message, 'error'); }
     });
