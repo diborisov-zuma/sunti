@@ -94,9 +94,6 @@
         <div class="toolbar-right">
           <select class="filter-select" id="filter-company"><option value="">—</option></select>
           <select class="filter-select" id="filter-folder"><option value="">—</option></select>
-          <input type="text" class="filter-select" id="filter-search" placeholder="" style="min-width:160px">
-          <select class="filter-select" id="filter-contractor"><option value="">—</option></select>
-          <select class="filter-select" id="filter-responsible"><option value="">—</option></select>
           <select class="filter-select" id="filter-status">
             <option value="active"></option>
             <option value="estimate"></option>
@@ -107,6 +104,9 @@
             <option value="cancelled"></option>
             <option value="all"></option>
           </select>
+          <input type="text" class="filter-select" id="filter-search" placeholder="" style="min-width:160px">
+          <select class="filter-select" id="filter-contractor"><option value="">—</option></select>
+          <select class="filter-select" id="filter-responsible"><option value="">—</option></select>
           <button class="btn btn-outline" id="btn-print" onclick="printContracts()" style="padding:6px 12px;font-size:0.82rem">🖨</button>
           <button class="btn btn-primary" id="btn-create"></button>
         </div>
@@ -119,6 +119,7 @@
               <th style="width:30px"></th>
               <th style="width:24px"></th>
               <th class="sortable" data-sort="date" id="th-date"></th>
+              <th class="sortable" data-sort="status" id="th-status"></th>
               <th style="width:24px"></th>
               <th class="sortable" data-sort="name" id="th-name"></th>
               <th class="sortable" data-sort="contractor" id="th-contractor"></th>
@@ -126,7 +127,6 @@
               <th class="sortable" data-sort="paid_amount" id="th-paid"></th>
               <th class="sortable" data-sort="remaining" id="th-remaining"></th>
               <th class="sortable" data-sort="progress_pct" id="th-progress"></th>
-              <th class="sortable" data-sort="status" id="th-status"></th>
             </tr>
           </thead>
           <tbody id="ct-tbody"></tbody>
@@ -764,6 +764,7 @@
           <td><button class="expand-btn${isExp?' open':''}" data-expand-contract="${c.id}">${isExp?'▼':'▶'}</button></td>
           <td style="text-align:center;cursor:pointer;font-size:0.7rem" data-action="toggle-review" data-id="${c.id}">${c.needs_review ? '🔴' : '<span style="color:#ddd">○</span>'}</td>
           <td>${formatDate(c.date)}</td>
+          <td>${statusBadge(c.status)}</td>
           <td style="text-align:center">${parseInt(c.file_count) > 0 ? '<span style="font-size:1rem" title="Files">📄</span>' : ''}</td>
           <td><strong>${c.name || '—'}</strong>${c.external_ref ? `<br><span style="font-size:0.75rem;color:#999">${c.external_ref}</span>` : ''}</td>
           <td style="font-size:0.82rem">${contractorName(c)}</td>
@@ -771,7 +772,6 @@
           <td>${amtCell(c.paid_amount, dir)}</td>
           <td>${amtCell(numVal(c.total_amount) - numVal(c.paid_amount), dir)}</td>
           <td style="text-align:center"><strong>${numVal(c.progress_pct)}%</strong></td>
-          <td>${statusBadge(c.status)}</td>
         `;
         tbody.appendChild(tr);
 

@@ -151,8 +151,8 @@
       <div class="page-toolbar">
         <h2 id="t-page-title"></h2>
         <select class="filter-select" id="filter-folder"></select>
-        <select class="filter-select" id="filter-contractor" style="display:none"><option value=""></option></select>
         <select class="filter-select" id="filter-status" style="display:none"><option value=""></option></select>
+        <select class="filter-select" id="filter-contractor" style="display:none"><option value=""></option></select>
         <input type="text" class="filter-select" id="portal-search" placeholder="" style="min-width:150px">
         <button class="btn btn-outline" id="btn-print" style="display:none;padding:4px 10px;font-size:0.85rem" title="Print">🖨</button>
         <button class="btn btn-outline" id="btn-excel" style="display:none;padding:4px 10px;font-size:0.85rem;color:#1d6f42" title="Export Excel">📊 Excel</button>
@@ -536,10 +536,10 @@
         ? `${sortHeader('total_amount',t('contractTotal'))}${sortHeader('paid_amount',t('paidAmount'))}${sortHeader('outstanding',t('remainingToPay'))}${sortHeader('progress',t('portalProgress'))}`
         : `${sortHeader('progress',t('portalProgress'))}`;
       thead.innerHTML = `<tr>
-        <th style="width:30px"></th><th style="width:24px"></th>${sortHeader('date',t('date'))}${sortHeader('name',t('name'))}
+        <th style="width:30px"></th><th style="width:24px"></th>${sortHeader('date',t('date'))}${sortHeader('status',t('statusLabel'))}
+        ${sortHeader('name',t('name'))}
         ${sortHeader('contractor',t('contractor'))}
         ${amtHeaders}
-        ${sortHeader('status',t('statusLabel'))}
       </tr>`;
     }
 
@@ -637,10 +637,10 @@
           <td><button class="expand-btn${isExp?' open':''}" data-expand-contract="${c.id}">${isExp?'▼':'▶'}</button></td>
           <td style="text-align:center;font-size:0.7rem">${c.needs_review ? '🔴' : ''}</td>
           <td>${formatDate(c.date)}</td>
+          <td>${statusBadge(c.status)}</td>
           <td><strong>${c.name || '—'}</strong>${c.external_ref ? `<br><span style="font-size:0.75rem;color:#999">${c.external_ref}</span>` : ''}</td>
           <td style="font-size:0.82rem">${c.contractor_name_en || c.contractor_name_th || '—'}</td>
           ${amtCells}
-          <td>${statusBadge(c.status)}</td>
         `;
         tbody.appendChild(tr);
 
