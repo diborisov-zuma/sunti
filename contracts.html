@@ -463,7 +463,7 @@
     }
     function openModal(id)  { document.getElementById(id).classList.add('open'); }
     function closeModal(id) { document.getElementById(id).classList.remove('open'); }
-    function onPdfLoaded() {
+    window.onPdfLoaded = function() {
       const iframe = document.getElementById('pdf-iframe');
       if (!iframe.src || iframe.src === '' || iframe.src === 'about:blank') return;
       document.getElementById('pdf-loading').style.display = 'none';
