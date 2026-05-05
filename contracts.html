@@ -11,6 +11,8 @@
   <script src="_config.js"></script>
   <script src="_auth.js"></script>
   <script src="_header.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script src="_pdf_viewer.js"></script>
   <style>
     .page-wrap { padding:16px 24px; }
     .sortable { cursor:pointer;user-select:none;white-space:nowrap; }
@@ -389,20 +391,7 @@
     </div>
   </div>
 
-  <!-- PDF Viewer -->
-  <div class="modal-overlay" id="modal-pdf" style="z-index:300">
-    <div style="background:#fff;border-radius:12px;width:90vw;height:90vh;max-width:1200px;display:flex;flex-direction:column;overflow:hidden">
-      <div style="padding:10px 16px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #e8e8e8">
-        <span id="pdf-title" style="font-size:0.9rem;font-weight:500;color:#222"></span>
-        <button class="btn btn-outline" onclick="closeModal('modal-pdf'); document.getElementById('pdf-iframe').src=''" style="padding:2px 10px">✕</button>
-      </div>
-      <div id="pdf-loading" style="flex:1;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px">
-        <div style="width:32px;height:32px;border:3px solid #e8e8e8;border-top-color:#1a73e8;border-radius:50%;animation:spin 0.8s linear infinite"></div>
-        <span style="font-size:0.85rem;color:#888" id="pdf-loading-text"></span>
-      </div>
-      <iframe id="pdf-iframe" style="flex:1;border:none;display:none" src="" onload="onPdfLoaded()"></iframe>
-    </div>
-  </div>
+  <!-- PDF Viewer injected by _pdf_viewer.js -->
 
   <div class="toast" id="toast"></div>
 
@@ -463,12 +452,6 @@
     }
     function openModal(id)  { document.getElementById(id).classList.add('open'); }
     function closeModal(id) { document.getElementById(id).classList.remove('open'); }
-    window.onPdfLoaded = function() {
-      const iframe = document.getElementById('pdf-iframe');
-      if (!iframe.src || iframe.src === '' || iframe.src === 'about:blank') return;
-      document.getElementById('pdf-loading').style.display = 'none';
-      iframe.style.display = 'block';
-    }
     function numVal(v) { return typeof v === 'object' ? parseFloat(v?.value || 0) : parseFloat(v || 0); }
     function contractorName(c) { return c?.contractor_name_en || c?.contractor_name_th || '—'; }
     function statusBadge(s) {
@@ -1445,19 +1428,9 @@
         const fileName = btn.dataset.fileName || 'PDF';
         const endpoint = entityType === 'contract' ? 'contract_files' : entityType === 'invoice' ? 'invoice_files' : 'transaction_files';
         try {
-          // Show modal with loading state immediately
-          document.getElementById('pdf-title').textContent = fileName;
-          document.getElementById('pdf-iframe').style.display = 'none';
-          document.getElementById('pdf-iframe').src = '';
-          document.getElementById('pdf-loading').style.display = 'flex';
-          document.getElementById('pdf-loading-text').textContent = t('loading');
-          openModal('modal-pdf');
-
           const r = await apiFetch(`/${endpoint}/${fileId}/signed-download-url?view=true`);
-          if (r.url) {
-            document.getElementById('pdf-iframe').src = `https://docs.google.com/gview?url=${encodeURIComponent(r.url)}&embedded=true`;
-          }
-        } catch(err) { closeModal('modal-pdf'); showToast(err.message, 'error'); }
+          if (r.url) openPdfViewer(r.url, fileName);
+        } catch(err) { showToast(err.message, 'error'); }
       }
 
       if (action === 'download-file') {
@@ -1907,7 +1880,7 @@
         closeModal('modal-trx');
         closeModal('modal-link-inv');
         closeModal('modal-file');
-        closeModal('modal-pdf'); document.getElementById('pdf-iframe').src = '';
+        closePdfViewer();
       }
     });
 

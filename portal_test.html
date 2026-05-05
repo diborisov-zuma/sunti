@@ -9,6 +9,8 @@
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <script src="_i18n.js"></script>
   <script src="_config.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script src="_pdf_viewer.js"></script>
   <style>
     .portal-header { background:#fff;border-bottom:1px solid #e8e8e8;padding:0 24px;height:56px;display:flex;align-items:center;gap:16px;position:sticky;top:0;z-index:100; }
     .portal-header .logo { font-size:1.1rem;font-weight:600;color:#222;text-decoration:none; }
@@ -194,16 +196,7 @@
     <img id="lightbox-img" src="" style="max-width:90vw;max-height:90vh;border-radius:8px">
   </div>
 
-  <!-- PDF viewer modal -->
-  <div class="modal-overlay" id="modal-pdf" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:300;align-items:center;justify-content:center">
-    <div style="background:#fff;border-radius:12px;width:90vw;height:90vh;max-width:1200px;display:flex;flex-direction:column;overflow:hidden">
-      <div style="padding:10px 16px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #e8e8e8">
-        <span id="pdf-title" style="font-size:0.9rem;font-weight:500;color:#222"></span>
-        <button class="btn btn-outline" id="btn-close-pdf" style="padding:2px 10px">✕</button>
-      </div>
-      <iframe id="pdf-iframe" style="flex:1;border:none" src=""></iframe>
-    </div>
-  </div>
+  <!-- PDF Viewer injected by _pdf_viewer.js -->
 
   <div class="toast" id="toast"></div>
 
@@ -1027,11 +1020,7 @@
         const fileName = pdfBtn.dataset.fileName || 'PDF';
         try {
           const r = await portalFetch(`/portal_contracts/files/${fileId}/download?view=true`);
-          if (r.url) {
-            document.getElementById('pdf-title').textContent = fileName;
-            document.getElementById('pdf-iframe').src = `https://docs.google.com/gview?url=${encodeURIComponent(r.url)}&embedded=true`;
-            document.getElementById('modal-pdf').style.display = 'flex';
-          }
+          if (r.url) openPdfViewer(r.url, fileName);
         } catch(err) { showToast(err.message, 'error'); }
       }
 
@@ -1047,12 +1036,6 @@
           }
         } catch(err) { showToast(err.message, 'error'); }
       }
-    });
-
-    // Close PDF modal
-    document.getElementById('btn-close-pdf').addEventListener('click', () => {
-      document.getElementById('modal-pdf').style.display = 'none';
-      document.getElementById('pdf-iframe').src = '';
     });
 
     // ─── Materials section ───
@@ -1293,8 +1276,7 @@
       if (e3.key === 'Escape') {
         const lb = document.getElementById('lightbox');
         if (lb) { lb.style.display = 'none'; lb.classList.remove('open'); }
-        const pm = document.getElementById('modal-pdf');
-        if (pm) { pm.style.display = 'none'; document.getElementById('pdf-iframe').src = ''; }
+        closePdfViewer();
       }
     });
 
