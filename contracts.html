@@ -695,6 +695,61 @@
       });
     }
 
+    const ACTIVE_STATUSES = ['estimate','confirmed','active','in_stock','delivered','completed'];
+
+    function matchesCurrentFilters(c) {
+      if (filterFolder && c.folder_id !== filterFolder) return false;
+      if (filterContractor && c.contractor_id !== filterContractor) return false;
+      if (filterStatus === 'active') {
+        if (!ACTIVE_STATUSES.includes(c.status)) return false;
+      } else if (filterStatus && filterStatus !== 'all') {
+        if (c.status !== filterStatus) return false;
+      }
+      if (filterSearch) {
+        const s = filterSearch.toLowerCase();
+        const name = (c.name || '').toLowerCase();
+        const ext = (c.external_ref || '').toLowerCase();
+        if (!name.includes(s) && !ext.includes(s)) return false;
+      }
+      return true;
+    }
+
+    function updateContractRow(tr, c) {
+      const dir = c.direction || 'expense';
+      const isExp = expandedContracts[c.id];
+      tr.innerHTML = `
+        <td><button class="expand-btn${isExp?' open':''}" data-expand-contract="${c.id}">${isExp?'▼':'▶'}</button></td>
+        <td style="text-align:center;cursor:pointer;font-size:0.7rem" data-action="toggle-review" data-id="${c.id}">${c.needs_review ? '🔴' : '<span style="color:#ddd">○</span>'}</td>
+        <td>${formatDate(c.date)}</td>
+        <td>${statusBadge(c.status)}</td>
+        <td style="text-align:center">${parseInt(c.file_count) > 0 ? '<span style="font-size:1rem" title="Files">📄</span>' : ''}</td>
+        <td><strong>${c.name || '—'}</strong>${c.external_ref ? `<br><span style="font-size:0.75rem;color:#999">${c.external_ref}</span>` : ''}</td>
+        <td style="font-size:0.82rem">${contractorName(c)}</td>
+        <td>${amtCell(c.total_amount, dir)}</td>
+        <td>${amtCell(c.paid_amount, dir)}</td>
+        <td>${amtCell(numVal(c.total_amount) - numVal(c.paid_amount), dir)}</td>
+        <td style="text-align:center"><strong>${numVal(c.progress_pct)}%</strong></td>
+      `;
+    }
+
+    function recalcFooter() {
+      const tfoot = document.getElementById('ct-tfoot');
+      if (!tfoot) return;
+      if (!allContracts.length) { tfoot.style.display = 'none'; return; }
+      let sumTotal = 0, sumPaid = 0;
+      allContracts.forEach(c => {
+        sumTotal += numVal(c.total_amount);
+        sumPaid += numVal(c.paid_amount);
+      });
+      const dir = allContracts[0]?.direction || 'expense';
+      document.getElementById('tf-label').textContent = t('totalAmount') + ':';
+      document.getElementById('tf-total').innerHTML = `<div style="font-size:0.68rem;color:#888">${t('contractTotal')}</div>${amtCell(sumTotal, dir)}`;
+      document.getElementById('tf-paid').innerHTML = `<div style="font-size:0.68rem;color:#888">${t('paidAmount')}</div>${amtCell(sumPaid, dir)}`;
+      const sumRemaining = sumTotal - sumPaid;
+      document.getElementById('tf-remaining').innerHTML = `<div style="font-size:0.68rem;color:#888">${t('remainingToPay')}</div>${amtCell(sumRemaining, dir)}`;
+      tfoot.style.display = '';
+    }
+
     function highlightSavedContract() {
       if (!lastSavedContractId) return;
       const tbody = document.getElementById('ct-tbody');
@@ -1576,20 +1631,91 @@
         }
       }
 
-      closeModal('modal-contract');
+      // Show saving state on button
+      const saveBtn = document.getElementById('btn-c-save');
+      const saveBtnOrigText = saveBtn.textContent;
+      saveBtn.textContent = t('saving');
+      saveBtn.disabled = true;
+
       try {
-        let savedId;
         if (currentContractMode === 'create') {
           const res = await apiFetch('/contracts', { method: 'POST', body: JSON.stringify(body) });
-          savedId = res?.id || null;
+          closeModal('modal-contract');
+          lastSavedContractId = res?.id || null;
+          if (lastSavedContractId) expandedContracts[lastSavedContractId] = true;
+          showToast(t('saved'), 'success');
+          loadContracts();
         } else {
           await apiFetch(`/contracts/${currentContractId}`, { method: 'PUT', body: JSON.stringify(body) });
-          savedId = currentContractId;
+          closeModal('modal-contract');
+          // Update locally instead of reloading
+          const idx = allContracts.findIndex(c => c.id === currentContractId);
+          if (idx !== -1) {
+            const c = allContracts[idx];
+            // Update fields from form
+            c.name = body.name;
+            c.external_ref = body.external_ref;
+            c.date = body.date ? { value: body.date } : c.date;
+            c.direction = body.direction;
+            c.total_amount = { value: body.total_amount };
+            c.subtotal = { value: body.subtotal };
+            c.vat_amount = { value: body.vat_amount };
+            c.payment_terms = body.payment_terms;
+            c.status = body.status;
+            c.notes = body.notes;
+            c.progress_pct = body.progress_pct;
+            c.progress_notes = body.progress_notes;
+            c.responsible_email = body.responsible_email;
+            c.has_items = body.has_items;
+            c.folder_id = body.folder_id;
+            c.contractor_id = body.contractor_id;
+            // Update contractor display name
+            const ctr = contractorsCache.find(x => x.id === body.contractor_id);
+            if (ctr) { c.contractor_name_en = ctr.name_en; c.contractor_name_th = ctr.name_th; }
+
+            // Check if still matches current filters
+            if (matchesCurrentFilters(c)) {
+              // Re-render row in place
+              const tbody = document.getElementById('ct-tbody');
+              const oldRow = tbody.querySelector(`tr[data-contract-id="${currentContractId}"]`);
+              if (oldRow) {
+                updateContractRow(oldRow, c);
+                oldRow.style.background = '#e8f0fe';
+                setTimeout(() => { oldRow.style.transition = 'background 1s'; oldRow.style.background = ''; }, 3000);
+              }
+              recalcFooter();
+            } else {
+              // Fade out — no longer matches filter
+              const tbody = document.getElementById('ct-tbody');
+              const oldRow = tbody.querySelector(`tr[data-contract-id="${currentContractId}"]`);
+              const detailRow = document.getElementById(`contract-detail-${currentContractId}`);
+              if (oldRow) {
+                oldRow.style.transition = 'opacity 0.8s';
+                oldRow.style.opacity = '0.3';
+                if (detailRow) { detailRow.style.transition = 'opacity 0.8s'; detailRow.style.opacity = '0.3'; }
+                setTimeout(() => {
+                  allContracts.splice(idx, 1);
+                  oldRow.remove();
+                  if (detailRow) detailRow.remove();
+                  recalcFooter();
+                }, 800);
+              } else {
+                allContracts.splice(idx, 1);
+                recalcFooter();
+              }
+            }
+            showToast(t('saved'), 'success');
+          } else {
+            // Fallback — reload all
+            showToast(t('saved'), 'success');
+            loadContracts();
+          }
         }
-        lastSavedContractId = savedId;
-        if (savedId) expandedContracts[savedId] = true;
-        showToast(t('saved'), 'success'); loadContracts();
       } catch(e) { showToast(e.message, 'error'); }
+      finally {
+        saveBtn.textContent = saveBtnOrigText;
+        saveBtn.disabled = false;
+      }
     });
 
     // ─── Create invoice from contract ───
