@@ -20,17 +20,18 @@
     .portal-header .nav-link.active { background:#e8f0fe;color:#1a73e8;font-weight:500; }
     .portal-header .header-right { display:flex;align-items:center;gap:12px; }
 
-    .page-wrap { padding:24px;max-width:1400px;margin:0 auto; }
+    .page-wrap { padding:24px;max-width:90%;margin:0 auto; }
     .page-toolbar { display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap; }
-    .page-toolbar h2 { font-size:1.1rem;color:#222;flex:1; }
+    .page-toolbar h2 { font-size:1rem;color:#222;flex:1; }
 
-    select.filter-select { border:1px solid #ddd;border-radius:6px;padding:6px 10px;font-size:0.85rem;color:#333;outline:none;background:#fff; }
+    select.filter-select, input.filter-select { border:1px solid #ddd;border-radius:6px;padding:6px 10px;font-size:0.8rem;color:#333;outline:none;background:#fff; }
+    input.filter-select:focus { border-color:#1a73e8; }
 
     .ct-wrap { background:#fff;border:1px solid #e8e8e8;border-radius:10px;overflow:hidden; }
     .ct-table { width:100%;border-collapse:collapse; }
     .ct-table thead { background:#f8f8f8;border-bottom:1px solid #e8e8e8; }
-    .ct-table th { padding:10px 14px;font-size:0.78rem;font-weight:600;color:#888;text-align:left;text-transform:uppercase; }
-    .ct-table td { padding:11px 14px;font-size:0.88rem;color:#333;border-bottom:1px solid #f0f0f0; }
+    .ct-table th { padding:8px 12px;font-size:0.72rem;font-weight:600;color:#888;text-align:left;text-transform:uppercase; }
+    .ct-table td { padding:8px 12px;font-size:0.82rem;color:#333;border-bottom:1px solid #f0f0f0; }
     .ct-table tr:last-child td { border-bottom:none; }
     .ct-table tr:hover td { background:#fafafa; }
     .ct-table tr.expanded td { background:#f0f4ff; }
@@ -39,8 +40,8 @@
     .detail-inner { padding:16px 16px 16px 44px;background:#fafcff; }
 
     .inv-mini-table, .trx-mini-table { width:100%;border-collapse:collapse;margin-top:8px; }
-    .inv-mini-table th, .trx-mini-table th { padding:6px 10px;font-size:0.72rem;font-weight:600;color:#888;text-align:left;text-transform:uppercase;border-bottom:1px solid #e8e8e8; }
-    .inv-mini-table td, .trx-mini-table td { padding:8px 10px;font-size:0.84rem;color:#333;border-bottom:1px solid #f0f0f0; }
+    .inv-mini-table th, .trx-mini-table th { padding:5px 8px;font-size:0.68rem;font-weight:600;color:#888;text-align:left;text-transform:uppercase;border-bottom:1px solid #e8e8e8; }
+    .inv-mini-table td, .trx-mini-table td { padding:6px 8px;font-size:0.78rem;color:#333;border-bottom:1px solid #f0f0f0; }
 
     .empty-state { text-align:center;padding:48px 24px;color:#bbb; }
     .loading { text-align:center;padding:32px;color:#bbb; }
@@ -760,11 +761,11 @@
         const icon = ft === 'pdf' ? '📄' : ft === 'image' ? '🖼️' : '📎';
         const canPreview = ft === 'pdf' || ft === 'image';
         const viewAction = ft === 'pdf' ? 'view-pdf' : 'view-image';
-        html += `<div style="display:flex;align-items:center;gap:8px;padding:4px 0;font-size:0.85rem;${ml}">
-          <span style="font-size:1.2rem;flex-shrink:0">${icon}</span>
+        html += `<div style="display:flex;align-items:center;gap:8px;padding:4px 0;font-size:0.8rem;${ml}">
+          ${canPreview ? `<button class="btn btn-outline" style="padding:1px 8px;font-size:0.72rem" data-action="${viewAction}" data-file-id="${f.id}" data-file-name="${(f.file_name||'').replace(/"/g,'&quot;')}">👁</button>` : ''}
+          <span style="font-size:1rem;flex-shrink:0">${icon}</span>
           <span style="flex:1;color:#333">${f.file_name || '—'} <span style="color:#999">(${size})</span></span>
-          ${canPreview ? `<button class="btn btn-outline" style="padding:1px 8px;font-size:0.75rem" data-action="${viewAction}" data-file-id="${f.id}" data-file-name="${(f.file_name||'').replace(/"/g,'&quot;')}">👁 ${t('view')}</button>` : ''}
-          <button class="btn btn-outline" style="padding:1px 8px;font-size:0.75rem" data-action="download" data-file-id="${f.id}">⬇ ${t('download')}</button>
+          <button class="btn btn-outline" style="padding:1px 8px;font-size:0.72rem" data-action="download" data-file-id="${f.id}">⬇</button>
         </div>`;
       });
       return html;
