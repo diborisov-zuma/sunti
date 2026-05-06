@@ -64,6 +64,7 @@
     .wa-type-btn:hover { border-color:#1a73e8; }
     .wa-type-btn.active-client { background:#e6f4ea;border-color:#1e8e3e;color:#1e8e3e; }
     .wa-type-btn.active-agent { background:#e8f0fe;border-color:#1a73e8;color:#1a73e8; }
+    .wa-type-btn.active-developer { background:#fef7e0;border-color:#e37400;color:#e37400; }
   </style>
 </head>
 <body>
@@ -129,6 +130,7 @@
     function typeTag(type) {
       if (type === 'client') return `<span class="wa-tag wa-tag-client">${t('waMarkClient')}</span>`;
       if (type === 'agent') return `<span class="wa-tag wa-tag-agent">${t('waMarkAgent')}</span>`;
+      if (type === 'developer') return `<span class="wa-tag" style="background:#fef7e0;color:#e37400">${t('waMarkDeveloper')}</span>`;
       return `<span class="wa-tag wa-tag-unknown">${t('waMarkUnknown')}</span>`;
     }
 
@@ -223,6 +225,7 @@
           <div class="wa-type-btns">
             <button class="wa-type-btn ${contact.contact_type === 'client' ? 'active-client' : ''}" data-set-type="client">${t('waMarkClient')}</button>
             <button class="wa-type-btn ${contact.contact_type === 'agent' ? 'active-agent' : ''}" data-set-type="agent">${t('waMarkAgent')}</button>
+            <button class="wa-type-btn ${contact.contact_type === 'developer' ? 'active-developer' : ''}" data-set-type="developer">${t('waMarkDeveloper')}</button>
           </div>
         </div>
         <div class="wa-messages" id="wa-messages"><div style="text-align:center;padding:20px;color:#bbb">${t('loading')}</div></div>

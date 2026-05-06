@@ -42,11 +42,12 @@ exports.wa_inbox = async (req, res) => {
   try {
     // GET /wa_inbox/contacts — list chats
     if (req.method === 'GET' && (path === '/contacts' || path === '/')) {
-      const filter = req.query.filter || 'all'; // all, new, client, agent, unknown
+      const filter = req.query.filter || 'all'; // all, new, client, agent, developer, unknown
       let where = 'WHERE 1=1';
       if (filter === 'new') where += ' AND is_new = TRUE';
       else if (filter === 'client') where += " AND contact_type = 'client'";
       else if (filter === 'agent') where += " AND contact_type = 'agent'";
+      else if (filter === 'developer') where += " AND contact_type = 'developer'";
       else if (filter === 'unknown') where += " AND (contact_type = 'unknown' OR contact_type IS NULL)";
 
       const search = req.query.search;
