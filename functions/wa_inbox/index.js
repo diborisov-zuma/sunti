@@ -60,7 +60,7 @@ exports.wa_inbox = async (req, res) => {
                        c.notes, c.first_message_at, c.last_message_at,
                        c.message_count, c.is_new,
                        lm.text AS last_text,
-                       IFNULL(ur.unread_count, 0) AS unread_count
+                       CAST(IFNULL(ur.unread_count, 0) AS INT64) AS unread_count
                 FROM ${contactTable} c
                 LEFT JOIN (
                   SELECT contact_id, text, ROW_NUMBER() OVER (PARTITION BY contact_id ORDER BY created_at DESC) AS rn
@@ -72,8 +72,9 @@ exports.wa_inbox = async (req, res) => {
                   GROUP BY contact_id
                 ) ur ON ur.contact_id = c.id
                 ${where}
-                ORDER BY (CASE WHEN IFNULL(ur.unread_count, 0) > 0 THEN 0 ELSE 1 END) ASC,
-                         c.last_message_at DESC
+                ORDER BY
+                  CASE WHEN CAST(IFNULL(ur.unread_count, 0) AS INT64) > 0 THEN 0 ELSE 1 END,
+                  c.last_message_at DESC
                 LIMIT 100`,
         params: search ? { search: `%${search.trim()}%` } : {},
       });
