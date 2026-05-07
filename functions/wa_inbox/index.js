@@ -73,7 +73,7 @@ exports.wa_inbox = async (req, res) => {
                 ) ur ON ur.contact_id = c.id
                 ${where}
                 ORDER BY
-                  CASE WHEN CAST(IFNULL(ur.unread_count, 0) AS INT64) > 0 THEN 0 ELSE 1 END,
+                  IF(IFNULL(ur.unread_count, 0) > 0, 0, 1),
                   c.last_message_at DESC
                 LIMIT 100`,
         params: search ? { search: `%${search.trim()}%` } : {},
