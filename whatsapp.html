@@ -179,7 +179,7 @@
         if (debugSql) console.log('SQL:', atob(debugSql));
         allContacts = await resp.json();
         // Debug: log unread_count for first 10
-        console.log('Contacts order:', allContacts.slice(0, 15).map(c => `${c.name||c.phone}: unread=${c.unread_count}`));
+        console.log('Contacts order:', allContacts.slice(0, 15).map(c => `${c.name||c.phone}: unread=${JSON.stringify(c.unread_count)} (type: ${typeof c.unread_count})`));
         renderContacts();
       } catch(e) { console.error(e); }
     }
@@ -191,7 +191,7 @@
         return;
       }
       list.innerHTML = allContacts.map(c => {
-        const unread = parseInt(c.unread_count) || 0;
+        const unread = parseInt(c.unread_count?.value ?? c.unread_count) || 0;
         const hasUnread = unread > 0;
         return `
         <div class="wa-chat-item ${c.id === selectedContactId ? 'active' : ''} ${c.is_new ? 'is-new' : ''} ${hasUnread ? 'has-unread' : ''}" data-contact-id="${c.id}">
