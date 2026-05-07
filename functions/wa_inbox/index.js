@@ -55,8 +55,7 @@ exports.wa_inbox = async (req, res) => {
         where += ' AND (LOWER(name) LIKE LOWER(@search) OR phone LIKE @search)';
       }
 
-      const [rows] = await bigquery.query({
-        query: `SELECT c.id, c.phone, c.name, c.contact_type, c.contact_type_by,
+      const sql = `SELECT c.id, c.phone, c.name, c.contact_type, c.contact_type_by,
                        c.notes, c.first_message_at, c.last_message_at,
                        c.message_count, c.is_new,
                        lm.text AS last_text,
@@ -75,9 +74,12 @@ exports.wa_inbox = async (req, res) => {
                 ORDER BY
                   IF(IFNULL(ur.unread_count, 0) > 0, 0, 1),
                   c.last_message_at DESC
-                LIMIT 100`,
+                LIMIT 100`;
+      const [rows] = await bigquery.query({
+        query: sql,
         params: search ? { search: `%${search.trim()}%` } : {},
       });
+      res.set('X-Debug-SQL', Buffer.from(sql).toString('base64'));
       res.json(rows);
       return;
     }

@@ -172,7 +172,14 @@
         let url = `/wa_inbox/contacts?filter=${currentFilter}`;
         const search = document.getElementById('wa-search').value.trim();
         if (search) url += `&search=${encodeURIComponent(search)}`;
-        allContacts = await apiFetch(url);
+        const resp = await fetch(`${API_URL}${url}`, {
+          headers: { 'Authorization': `Bearer ${window._accessToken}` }
+        });
+        const debugSql = resp.headers.get('X-Debug-SQL');
+        if (debugSql) console.log('SQL:', atob(debugSql));
+        allContacts = await resp.json();
+        // Debug: log unread_count for first 10
+        console.log('Contacts order:', allContacts.slice(0, 15).map(c => `${c.name||c.phone}: unread=${c.unread_count}`));
         renderContacts();
       } catch(e) { console.error(e); }
     }
