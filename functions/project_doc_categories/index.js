@@ -36,9 +36,16 @@ exports.project_doc_categories = async (req, res) => {
 
   try {
     if (req.method === 'GET') {
-      const [rows] = await bigquery.query({
-        query: `SELECT id, name, name_en, name_th, sort_order FROM ${table} ORDER BY sort_order ASC, name ASC`,
-      });
+      const folder_id = req.query.folder_id;
+      let query, params;
+      if (folder_id) {
+        query = `SELECT id, name, name_en, name_th, sort_order, folder_id FROM ${table} WHERE folder_id = @folder_id ORDER BY sort_order ASC, name ASC`;
+        params = { folder_id };
+      } else {
+        query = `SELECT id, name, name_en, name_th, sort_order, folder_id FROM ${table} ORDER BY sort_order ASC, name ASC`;
+        params = {};
+      }
+      const [rows] = await bigquery.query({ query, params });
       res.json(rows);
       return;
     }
@@ -46,13 +53,14 @@ exports.project_doc_categories = async (req, res) => {
     if (!(await isAdmin(email))) { res.status(403).json({ error: 'Forbidden' }); return; }
 
     if (req.method === 'POST') {
-      const { name, name_en, name_th, sort_order } = req.body || {};
+      const { name, name_en, name_th, sort_order, folder_id } = req.body || {};
       if (!name && !name_en) { res.status(400).json({ error: 'name required' }); return; }
+      if (!folder_id) { res.status(400).json({ error: 'folder_id required' }); return; }
       const id = uuidv4();
       await bigquery.query({
-        query: `INSERT INTO ${table} (id, name, name_en, name_th, sort_order, created_by)
-                VALUES (@id, @name, @name_en, @name_th, @sort_order, @email)`,
-        params: { id, name: name || '', name_en: name_en || '', name_th: name_th || '', sort_order: parseInt(sort_order || 0), email },
+        query: `INSERT INTO ${table} (id, name, name_en, name_th, sort_order, folder_id, created_by)
+                VALUES (@id, @name, @name_en, @name_th, @sort_order, @folder_id, @email)`,
+        params: { id, name: name || '', name_en: name_en || '', name_th: name_th || '', sort_order: parseInt(sort_order || 0), folder_id, email },
       });
       res.json({ success: true, id });
       return;
