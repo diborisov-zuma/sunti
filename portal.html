@@ -252,6 +252,12 @@
       return `<span class="badge badge-gray">${s || '—'}</span>`;
     }
 
+    const STATUS_LABELS = {
+      estimate: 'Estimate', confirmed: 'Confirmed', active: 'Active',
+      in_stock: 'Storage', delivered: 'Delivered', completed: 'Completed', cancelled: 'Cancelled'
+    };
+    function statusLabel(s) { return STATUS_LABELS[s] || s || '—'; }
+
     function amtCell(val, dir) {
       if (accessLevel === 'no_amounts') return '';
       const n = numVal(val);
@@ -950,7 +956,7 @@
             <td style="text-align:right">${fmt(dPaid)}</td>
             <td style="text-align:right">${fmt(dToPay)}</td>
           ` : ''}
-          <td>${c.status || '—'}</td>
+          <td>${statusLabel(c.status)}</td>
         </tr>`;
       }).join('');
       const dSumTotal = dir === 'expense' ? -sumTotal : sumTotal;
@@ -1018,7 +1024,7 @@
           c.contractor_name_en || c.contractor_name_th || '',
         ];
         if (accessLevel === 'full') row.push(total * sign, paid * sign, toPay * sign);
-        row.push(c.status || '');
+        row.push(statusLabel(c.status));
         data.push(row);
       });
 
