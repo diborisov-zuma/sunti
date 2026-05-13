@@ -61,9 +61,11 @@
     .checkbox-row input[type=checkbox] { width:18px;height:18px;cursor:pointer; }
     .checkbox-row label { font-size:0.9rem;color:#333;cursor:pointer;flex:1; }
 
-    .folder-access-list { display:flex;flex-direction:column;gap:8px;margin-top:4px; }
-    .folder-access-row { display:grid;grid-template-columns:1fr 180px;align-items:center;gap:10px; }
-    .folder-access-row .folder-name { font-size:0.88rem;color:#333;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+    .folder-access-list { display:flex;flex-direction:column;gap:6px;margin-top:4px; }
+    .folder-access-header { display:grid;grid-template-columns:1fr 1fr 1fr 1fr;align-items:center;gap:10px;padding-bottom:4px;border-bottom:1px solid #f0f0f0;margin-bottom:4px; }
+    .folder-access-header span { font-size:0.72rem;font-weight:600;color:#888;text-transform:uppercase; }
+    .folder-access-row { display:grid;grid-template-columns:1fr 1fr 1fr 1fr;align-items:center;gap:10px; }
+    .folder-access-row .folder-name { font-size:0.85rem;color:#333;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
     .folder-access-row select { padding:6px 10px;border:1px solid #ddd;border-radius:6px;font-size:0.85rem;outline:none; }
     .folder-access-row select:focus { border-color:#1a73e8; }
     .folders-loading { color:#bbb;font-size:0.85rem;padding:8px 0; }
@@ -86,7 +88,7 @@
   </div>
 
   <div class="modal-overlay" id="modal-edit">
-    <div class="modal" style="width:520px;max-width:95vw;max-height:90vh;overflow-y:auto">
+    <div class="modal" style="width:60vw;max-width:95vw;max-height:90vh;overflow-y:auto">
       <h3 id="t-modal-title"></h3>
 
       <div class="section-divider" id="t-section-main"></div>
@@ -383,7 +385,13 @@
           `;
         }).join('');
 
-        container.innerHTML = `<div class="folder-access-list">${rows}</div>`;
+        const header = `<div class="folder-access-header">
+          <span>${t('navFolders')}</span>
+          <span>${t('sectionDocAccess')}</span>
+          <span>${t('docsAccess')}</span>
+          <span>${t('materialsAccess')}</span>
+        </div>`;
+        container.innerHTML = `<div class="folder-access-list">${header}${rows}</div>`;
       } catch(e) {
         container.innerHTML = '<div class="folders-loading" style="color:#c5221f">' + t('accessLoadError') + '</div>';
         console.error(e);
