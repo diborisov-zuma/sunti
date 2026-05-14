@@ -18,9 +18,14 @@
     .doc-sidebar-title { font-size:0.78rem;font-weight:600;color:#888;text-transform:uppercase; }
     .doc-main { flex:1;overflow-y:auto;padding:24px; }
 
-    .cat-item { padding:8px 16px;cursor:pointer;font-size:0.88rem;color:#333;border-radius:6px;margin:1px 6px;transition:background 0.1s; }
+    .cat-item { padding:8px 12px 8px 16px;cursor:pointer;font-size:0.88rem;color:#333;border-radius:6px;margin:1px 6px;transition:background 0.1s;display:flex;align-items:center;justify-content:space-between;gap:4px; }
     .cat-item:hover { background:#f4f4f4; }
     .cat-item.active { background:#e8f0fe;color:#1a73e8;font-weight:500; }
+    .cat-item .cat-actions { display:none;gap:2px;flex-shrink:0; }
+    .cat-item:hover .cat-actions { display:flex; }
+    .cat-item .cat-action-btn { background:none;border:none;cursor:pointer;padding:2px 4px;font-size:0.78rem;color:#888;border-radius:4px;line-height:1; }
+    .cat-item .cat-action-btn:hover { background:#e0e0e0;color:#333; }
+    .cat-item .cat-action-btn.delete-btn:hover { background:#fce8e6;color:#c5221f; }
 
     .doc-card { background:#fff;border:1px solid #e8e8e8;border-radius:10px;padding:14px 18px;margin-bottom:10px;transition:border-color 0.15s; }
     .doc-card:hover { border-color:#1a73e8; }
@@ -216,21 +221,62 @@
 
     function renderCategories() {
       const list = document.getElementById('cat-list');
-      // Get unique categories from docs + all categories
-      const usedCatIds = new Set(allDocs.map(d => d.category_id).filter(Boolean));
-      const allCats = categories.filter(c => usedCatIds.has(c.id) || true);
+      const isEditor = accessLevel === 'editor';
+      // Count docs per category
+      const docCountByCat = {};
+      allDocs.forEach(d => { if (d.category_id) docCountByCat[d.category_id] = (docCountByCat[d.category_id] || 0) + 1; });
 
-      list.innerHTML = `<div class="cat-item ${!selectedCategory ? 'active' : ''}" data-cat-id="">${t('allCategories')}</div>`;
-      allCats.forEach(c => {
-        list.innerHTML += `<div class="cat-item ${selectedCategory === c.id ? 'active' : ''}" data-cat-id="${c.id}">${catLabel(c)}</div>`;
+      list.innerHTML = `<div class="cat-item ${!selectedCategory ? 'active' : ''}" data-cat-id=""><span>${t('allCategories')}</span></div>`;
+      categories.forEach(c => {
+        const count = docCountByCat[c.id] || 0;
+        const actions = isEditor ? `<span class="cat-actions">
+          <button class="cat-action-btn" data-cat-action="rename" data-cat-id="${c.id}" title="${t('rename')}">✎</button>
+          ${count === 0 ? `<button class="cat-action-btn delete-btn" data-cat-action="delete" data-cat-id="${c.id}" title="${t('delete')}">✕</button>` : ''}
+        </span>` : '';
+        list.innerHTML += `<div class="cat-item ${selectedCategory === c.id ? 'active' : ''}" data-cat-id="${c.id}"><span>${catLabel(c)}</span>${actions}</div>`;
       });
 
       // Show admin buttons
       const adminBtns = document.getElementById('cat-admin-btns');
-      if (adminBtns) adminBtns.style.display = (accessLevel === 'editor') ? '' : 'none';
+      if (adminBtns) adminBtns.style.display = isEditor ? '' : 'none';
     }
 
-    document.getElementById('cat-list').addEventListener('click', e => {
+    document.getElementById('cat-list').addEventListener('click', async e => {
+      // Rename category
+      const renameBtn = e.target.closest('[data-cat-action="rename"]');
+      if (renameBtn) {
+        e.stopPropagation();
+        const catId = renameBtn.dataset.catId;
+        const cat = categories.find(c => c.id === catId);
+        if (!cat) return;
+        const newName = prompt(t('rename'), catLabel(cat));
+        if (!newName || newName === catLabel(cat)) return;
+        try {
+          await apiFetch(`/project_doc_categories/${catId}`, { method: 'PUT', body: JSON.stringify({ name: newName, name_en: newName }) });
+          categories = await apiFetch(`/project_doc_categories?folder_id=${selectedFolder}`);
+          renderCategories();
+          showToast(t('saved'), 'success');
+        } catch(err) { showToast(err.message, 'error'); }
+        return;
+      }
+      // Delete category
+      const deleteBtn = e.target.closest('[data-cat-action="delete"]');
+      if (deleteBtn) {
+        e.stopPropagation();
+        const catId = deleteBtn.dataset.catId;
+        if (!confirm(t('confirmDelete'))) return;
+        deleteBtn.disabled = true;
+        try {
+          await apiFetch(`/project_doc_categories/${catId}`, { method: 'DELETE' });
+          categories = await apiFetch(`/project_doc_categories?folder_id=${selectedFolder}`);
+          if (selectedCategory === catId) selectedCategory = '';
+          renderCategories();
+          renderDocs();
+          showToast(t('deleted'), 'success');
+        } catch(err) { showToast(err.message, 'error'); deleteBtn.disabled = false; }
+        return;
+      }
+      // Select category
       const item = e.target.closest('.cat-item');
       if (!item) return;
       selectedCategory = item.dataset.catId;
