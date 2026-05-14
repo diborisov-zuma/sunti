@@ -15,6 +15,11 @@
     /* Override sidebar width: 286px (220 + 30%) */
     .sidebar { width:286px; }
 
+    select.filter-select {
+      border:1px solid #ddd;border-radius:6px;padding:6px 10px;font-size:0.85rem;color:#333;outline:none;background:#fff;cursor:pointer;
+    }
+    select.filter-select:focus { border-color:#1a73e8; }
+
     .cat-item {
       display:flex;align-items:center;gap:6px;
       padding:6px 12px;cursor:pointer;font-size:0.88rem;color:#333;
@@ -67,7 +72,7 @@
           <span class="sidebar-title" id="t-categories-title"></span>
         </div>
         <div style="padding:8px">
-          <select class="filter-select" id="filter-folder" style="width:100%;font-size:0.82rem">
+          <select class="filter-select" id="filter-folder" style="width:100%">
             <option value="">—</option>
           </select>
         </div>
