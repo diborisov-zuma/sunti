@@ -226,7 +226,6 @@
 
     function renderCategories() {
       const list = document.getElementById('cat-list');
-      const isEditor = accessLevel === 'editor';
       // Count docs per category
       const docCountByCat = {};
       allDocs.forEach(d => { if (d.category_id) docCountByCat[d.category_id] = (docCountByCat[d.category_id] || 0) + 1; });
@@ -234,16 +233,16 @@
       list.innerHTML = `<div class="cat-item ${!selectedCategory ? 'active' : ''}" data-cat-id=""><span class="cat-name">${t('allCategories')}</span></div>`;
       categories.forEach(c => {
         const count = docCountByCat[c.id] || 0;
-        const actions = isEditor ? `<span class="cat-actions">
+        const actions = isAdmin ? `<span class="cat-actions">
           <button class="icon-btn" data-cat-action="rename" data-cat-id="${c.id}" title="${t('rename')}">✎</button>
           ${count === 0 ? `<button class="icon-btn del" data-cat-action="delete" data-cat-id="${c.id}" title="${t('delete')}">✕</button>` : ''}
         </span>` : '';
         list.innerHTML += `<div class="cat-item ${selectedCategory === c.id ? 'active' : ''}" data-cat-id="${c.id}"><span class="cat-name">${catLabel(c)}</span>${actions}</div>`;
       });
 
-      // Show admin buttons
+      // Show admin buttons (add category)
       const adminBtns = document.getElementById('cat-admin-btns');
-      if (adminBtns) adminBtns.style.display = isEditor ? '' : 'none';
+      if (adminBtns) adminBtns.style.display = isAdmin ? '' : 'none';
     }
 
     document.getElementById('cat-list').addEventListener('click', async e => {
