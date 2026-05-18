@@ -3,6 +3,10 @@
 -- Run in: https://console.cloud.google.com/bigquery?project=project-9718e7d4-4cd7-4f52-8d6
 -- ============================================
 
+-- 0. Add sales_level column to users_folders (run first!)
+ALTER TABLE `project-9718e7d4-4cd7-4f52-8d6.sunti.users_folders` ADD COLUMN IF NOT EXISTS sales_level STRING DEFAULT 'none';
+
+
 -- 1. Buyers (покупатели)
 CREATE TABLE IF NOT EXISTS `project-9718e7d4-4cd7-4f52-8d6.sunti.buyers` (
   id STRING NOT NULL,

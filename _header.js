@@ -7,11 +7,12 @@ function renderHeader(activePage) {
 
     <nav class="nav">
       <div class="nav-dropdown" id="nav-finance-group" style="display:none">
-        <a class="nav-link ${['contracts','ctc','contractors','invoices','finance','ai'].includes(activePage) ? 'active' : ''}" id="t-nav-finance-group"></a>
+        <a class="nav-link ${['contracts','ctc','contractors','invoices','finance','sales','ai'].includes(activePage) ? 'active' : ''}" id="t-nav-finance-group"></a>
         <div class="nav-dropdown-menu">
           <a href="contracts.html"    class="${activePage === 'contracts'    ? 'active' : ''}" id="t-nav-contracts" style="display:none"></a>
           <a href="ctc.html"          class="${activePage === 'ctc'          ? 'active' : ''}" id="t-nav-ctc" style="display:none"></a>
           <a href="contractors.html"  class="${activePage === 'contractors'  ? 'active' : ''}" id="t-nav-contractors2" style="display:none"></a>
+          <a href="sales.html"        class="${activePage === 'sales'        ? 'active' : ''}" id="t-nav-sales" style="display:none"></a>
           <a href="invoices.html"     class="${activePage === 'invoices'     ? 'active' : ''}" id="t-nav-invoices"></a>
           <a href="finance.html"      class="${activePage === 'finance'      ? 'active' : ''}" id="t-nav-finance"></a>
           <a href="ai.html"           class="${activePage === 'ai'           ? 'active' : ''}" id="t-nav-ai" style="display:none"></a>
@@ -23,12 +24,13 @@ function renderHeader(activePage) {
       <a href="statements.html" class="nav-link ${activePage === 'statements' ? 'active' : ''}" id="t-nav-statements"></a>
       <a href="ai_chat.html" class="nav-link ${activePage === 'ai_chat' ? 'active' : ''}" id="t-nav-ai-chat" style="display:none"></a>
       <div class="nav-dropdown" id="nav-settings" style="display:none">
-        <a class="nav-link ${['folders','companies','users','categories','portal'].includes(activePage) ? 'active' : ''}" id="t-nav-settings">⚙</a>
+        <a class="nav-link ${['folders','companies','users','categories','portal','buyers'].includes(activePage) ? 'active' : ''}" id="t-nav-settings">⚙</a>
         <div class="nav-dropdown-menu">
           <a href="folders.html"      class="${activePage === 'folders'      ? 'active' : ''}" id="t-nav-folders"></a>
           <a href="companies.html"    class="${activePage === 'companies'    ? 'active' : ''}" id="t-nav-companies"></a>
           <a href="users.html"        class="${activePage === 'users'        ? 'active' : ''}" id="t-nav-users"></a>
           <a href="categories.html"   class="${activePage === 'categories'   ? 'active' : ''}" id="t-nav-categories"></a>
+          <a href="buyers.html"       class="${activePage === 'buyers'       ? 'active' : ''}" id="t-nav-buyers"></a>
           <a href="portal_settings.html" class="${activePage === 'portal' ? 'active' : ''}" id="t-nav-portal"></a>
         </div>
       </div>
@@ -135,6 +137,16 @@ function updateHeaderTexts() {
   const fgWrap = document.getElementById('nav-finance-group');
   if (nfg) nfg.textContent = t('navFinanceGroup');
   if (fgWrap) fgWrap.style.display = 'inline-flex';
+  // Sales link
+  const nsales = document.getElementById('t-nav-sales');
+  if (nsales) {
+    nsales.textContent = t('navSales');
+    const meS = typeof currentMe !== 'undefined' ? currentMe : null;
+    nsales.style.display = (meS && (meS.is_admin === true || meS.has_sales_access === true)) ? '' : 'none';
+  }
+  // Buyers link (in settings)
+  const nbuyers = document.getElementById('t-nav-buyers');
+  if (nbuyers) nbuyers.textContent = t('navBuyers');
   // AI link — same access as contracts
   const nai = document.getElementById('t-nav-ai');
   if (nai) {

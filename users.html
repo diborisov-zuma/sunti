@@ -62,9 +62,9 @@
     .checkbox-row label { font-size:0.9rem;color:#333;cursor:pointer;flex:1; }
 
     .folder-access-list { display:flex;flex-direction:column;gap:6px;margin-top:4px; }
-    .folder-access-header { display:grid;grid-template-columns:1fr 1fr 1fr 1fr;align-items:center;gap:10px;padding-bottom:4px;border-bottom:1px solid #f0f0f0;margin-bottom:4px; }
+    .folder-access-header { display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr;align-items:center;gap:10px;padding-bottom:4px;border-bottom:1px solid #f0f0f0;margin-bottom:4px; }
     .folder-access-header span { font-size:0.72rem;font-weight:600;color:#888;text-transform:uppercase; }
-    .folder-access-row { display:grid;grid-template-columns:1fr 1fr 1fr 1fr;align-items:center;gap:10px; }
+    .folder-access-row { display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr;align-items:center;gap:10px; }
     .folder-access-row .folder-name { font-size:0.85rem;color:#333;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
     .folder-access-row select { padding:6px 10px;border:1px solid #ddd;border-radius:6px;font-size:0.85rem;outline:none; }
     .folder-access-row select:focus { border-color:#1a73e8; }
@@ -88,7 +88,7 @@
   </div>
 
   <div class="modal-overlay" id="modal-edit">
-    <div class="modal" style="width:60vw;max-width:95vw;max-height:90vh;overflow-y:auto">
+    <div class="modal" style="width:95vw;max-width:95vw;max-height:90vh;overflow-y:auto">
       <h3 id="t-modal-title"></h3>
 
       <div class="section-divider" id="t-section-main"></div>
@@ -347,7 +347,7 @@
         const records = await apiFetch(`/users_folders?user_email=${encodeURIComponent(userEmail)}`);
         currentUserFolderAccess = {};
         for (const r of records) {
-          currentUserFolderAccess[r.folder_id] = { id: r.id, docs_access: r.docs_access, docs_level: r.docs_level || 'none' };
+          currentUserFolderAccess[r.folder_id] = { id: r.id, docs_access: r.docs_access, docs_level: r.docs_level || 'none', materials_level: r.materials_level || 'none', sales_level: r.sales_level || 'none' };
         }
 
         if (!allFolders.length) {
@@ -363,6 +363,7 @@
           const current = currentUserFolderAccess[f.id]?.docs_access || 'none';
           const docsLvl = currentUserFolderAccess[f.id]?.docs_level || 'none';
           const matLvl = currentUserFolderAccess[f.id]?.materials_level || 'none';
+          const salesLvl = currentUserFolderAccess[f.id]?.sales_level || 'none';
           return `
             <div class="folder-access-row" data-folder-id="${f.id}">
               <span class="folder-name" title="${f.name}">${f.name}</span>
@@ -381,6 +382,11 @@
                 <option value="viewer" ${matLvl === 'viewer' ? 'selected' : ''}>${t('materialsLevelViewer')}</option>
                 <option value="editor" ${matLvl === 'editor' ? 'selected' : ''}>${t('materialsLevelEditor')}</option>
               </select>
+              <select class="folder-sales-select" title="${t('salesAccess')}">
+                <option value="none"   ${salesLvl === 'none'   ? 'selected' : ''}>${t('salesLevelNone')}</option>
+                <option value="viewer" ${salesLvl === 'viewer' ? 'selected' : ''}>${t('salesLevelViewer')}</option>
+                <option value="editor" ${salesLvl === 'editor' ? 'selected' : ''}>${t('salesLevelEditor')}</option>
+              </select>
             </div>
           `;
         }).join('');
@@ -390,6 +396,7 @@
           <span>${t('sectionDocAccess')}</span>
           <span>${t('docsAccess')}</span>
           <span>${t('materialsAccess')}</span>
+          <span>${t('salesAccess')}</span>
         </div>`;
         container.innerHTML = `<div class="folder-access-list">${header}${rows}</div>`;
       } catch(e) {
@@ -474,21 +481,22 @@
         const newAccess = row.querySelector('.folder-access-select').value;
         const newDocsLevel = row.querySelector('.folder-docs-select')?.value || 'none';
         const newMatLevel = row.querySelector('.folder-materials-select')?.value || 'none';
+        const newSalesLevel = row.querySelector('.folder-sales-select')?.value || 'none';
         const existing  = currentUserFolderAccess[folderId];
-        const anyAccess = newAccess !== 'none' || newDocsLevel !== 'none' || newMatLevel !== 'none';
+        const anyAccess = newAccess !== 'none' || newDocsLevel !== 'none' || newMatLevel !== 'none' || newSalesLevel !== 'none';
         if (existing) {
           if (!anyAccess) {
             promises.push(apiFetch(`/users_folders/${existing.id}`, { method: 'DELETE' }));
-          } else if (existing.docs_access !== newAccess || existing.docs_level !== newDocsLevel || existing.materials_level !== newMatLevel) {
+          } else if (existing.docs_access !== newAccess || existing.docs_level !== newDocsLevel || existing.materials_level !== newMatLevel || existing.sales_level !== newSalesLevel) {
             promises.push(apiFetch(`/users_folders/${existing.id}`, {
               method: 'PUT',
-              body: JSON.stringify({ docs_access: newAccess, docs_level: newDocsLevel, materials_level: newMatLevel }),
+              body: JSON.stringify({ docs_access: newAccess, docs_level: newDocsLevel, materials_level: newMatLevel, sales_level: newSalesLevel }),
             }));
           }
         } else if (anyAccess) {
           promises.push(apiFetch('/users_folders', {
             method: 'POST',
-            body: JSON.stringify({ user_email: userEmail, folder_id: folderId, docs_access: newAccess, docs_level: newDocsLevel, materials_level: newMatLevel }),
+            body: JSON.stringify({ user_email: userEmail, folder_id: folderId, docs_access: newAccess, docs_level: newDocsLevel, materials_level: newMatLevel, sales_level: newSalesLevel }),
           }));
         }
       }
