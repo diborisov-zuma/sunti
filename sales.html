@@ -686,12 +686,18 @@
       const container = document.getElementById(`schedule-detail-${scheduleId}`);
       if (!container) return;
       try {
-        const payments = await apiFetch(`/sales_payments?contract_id=${contractId}`);
+        const [payments, msFiles] = await Promise.all([
+          apiFetch(`/sales_payments?contract_id=${contractId}`),
+          apiFetch(`/payment_schedule_files?schedule_id=${scheduleId}`).catch(() => []),
+        ]);
         const filtered = payments.filter(p => p.schedule_id === scheduleId);
         schedulePayments[scheduleId] = filtered;
 
+        let html = renderFileBlock(msFiles, 'schedule', scheduleId);
+
         if (!filtered.length) {
-          container.innerHTML = `<div style="color:#bbb;font-size:0.82rem;padding:4px">${t('noPayments')}</div>`;
+          html += `<div style="color:#bbb;font-size:0.82rem;padding:4px">${t('noPayments')}</div>`;
+          container.innerHTML = html;
           return;
         }
 
@@ -701,7 +707,7 @@
           try { pmtFilesMap[p.id] = await apiFetch(`/sales_payment_files?payment_id=${p.id}`); } catch(e) { pmtFilesMap[p.id] = []; }
         }));
 
-        let html = `<table class="pmt-table"><thead><tr>
+        html += `<table class="pmt-table"><thead><tr>
           <th>${t('date')}</th><th>${t('amount')}</th><th>${t('salePaymentMethod')}</th>
           <th>${t('account')}</th><th>${t('saleReference')}</th><th>${t('statusLabel')}</th>
           <th>${t('file')}</th><th style="width:60px"></th>
@@ -743,7 +749,7 @@
         return;
       }
       if (action === 'download-file') {
-        const endpoint = btn.dataset.fileType === 'contract' ? 'sales_contract_files' : 'sales_payment_files';
+        const endpoint = btn.dataset.fileType === 'contract' ? 'sales_contract_files' : btn.dataset.fileType === 'schedule' ? 'payment_schedule_files' : 'sales_payment_files';
         try {
           const r = await apiFetch(`/${endpoint}/${btn.dataset.fileId}/signed-download-url`);
           if (r.url) window.open(r.url, '_blank');
@@ -753,7 +759,7 @@
       if (action === 'delete-file') {
         if (!confirm(t('confirmDelete'))) return;
         btn.disabled = true;
-        const endpoint = btn.dataset.fileType === 'contract' ? 'sales_contract_files' : 'sales_payment_files';
+        const endpoint = btn.dataset.fileType === 'contract' ? 'sales_contract_files' : btn.dataset.fileType === 'schedule' ? 'payment_schedule_files' : 'sales_payment_files';
         try {
           await apiFetch(`/${endpoint}/${btn.dataset.fileId}`, { method: 'DELETE' });
           showToast(t('deleted'), 'success');
@@ -1037,6 +1043,10 @@
           endpoint = 'sales_contract_files';
           signBody = { contract_id: ctx.id, file_name: file.name, content_type: contentType };
           regBody = (url) => ({ contract_id: ctx.id, file_name: file.name, file_url: url, file_size: file.size });
+        } else if (ctx.type === 'schedule') {
+          endpoint = 'payment_schedule_files';
+          signBody = { schedule_id: ctx.id, file_name: file.name, content_type: contentType };
+          regBody = (url) => ({ schedule_id: ctx.id, file_name: file.name, file_url: url, file_size: file.size });
         } else {
           endpoint = 'sales_payment_files';
           signBody = { payment_id: ctx.id, file_name: file.name, content_type: contentType };

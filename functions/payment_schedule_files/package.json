@@ -1,0 +1,12 @@
+{
+  "name": "payment_schedule_files",
+  "version": "1.0.0",
+  "main": "index.js",
+  "type": "commonjs",
+  "dependencies": {
+    "@google-cloud/bigquery": "^8.1.1",
+    "@google-cloud/functions-framework": "^5.0.2",
+    "@google-cloud/storage": "^7.16.0",
+    "uuid": "^13.0.0"
+  }
+}

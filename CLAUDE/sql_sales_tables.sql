@@ -119,3 +119,14 @@ CREATE TABLE IF NOT EXISTS `project-9718e7d4-4cd7-4f52-8d6.sunti.sales_payment_f
   uploaded_by STRING,
   uploaded_at TIMESTAMP
 );
+
+-- 8. Payment schedule files (файлы milestones — счета, акты)
+CREATE TABLE IF NOT EXISTS `project-9718e7d4-4cd7-4f52-8d6.sunti.payment_schedule_files` (
+  id STRING NOT NULL,
+  schedule_id STRING,             -- FK → payment_schedules
+  file_name STRING,
+  file_url STRING,
+  file_size INT64,
+  uploaded_by STRING,
+  uploaded_at TIMESTAMP
+);
