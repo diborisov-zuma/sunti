@@ -1,0 +1,904 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sunti — Продажи</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="stylesheet" href="style.css">
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <script src="_i18n.js"></script>
+  <script src="_config.js"></script>
+  <script src="_auth.js"></script>
+  <script src="_header.js"></script>
+  <style>
+    .page-wrap { padding:16px 24px; }
+    .page-toolbar { display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap; }
+    .page-toolbar h2 { font-size:1.1rem;color:#222;flex:1; }
+    .toolbar-right { display:flex;align-items:center;gap:8px;flex-wrap:wrap; }
+
+    select.filter-select {
+      border:1px solid #ddd;border-radius:6px;padding:6px 10px;font-size:0.85rem;color:#333;outline:none;background:#fff;cursor:pointer;
+    }
+    select.filter-select:focus { border-color:#1a73e8; }
+
+    .st-wrap { background:#fff;border:1px solid #e8e8e8;border-radius:10px;overflow:hidden; }
+    .st-table { width:100%;border-collapse:collapse; }
+    .st-table thead { background:#f8f8f8;border-bottom:1px solid #e8e8e8; }
+    .st-table th { padding:10px 14px;font-size:0.78rem;font-weight:600;color:#888;text-align:left;text-transform:uppercase;letter-spacing:0.04em; }
+    .st-table td { padding:11px 14px;font-size:0.88rem;color:#333;border-bottom:1px solid #f0f0f0; }
+    .st-table tr:last-child td { border-bottom:none; }
+    .st-table tr:hover td { background:#fafafa; }
+    .st-table tr.expanded td { background:#f0f4ff; }
+
+    .empty-state { text-align:center;padding:64px 24px;color:#bbb; }
+    .loading { text-align:center;padding:48px;color:#bbb; }
+
+    .expand-btn { background:none;border:none;cursor:pointer;font-size:0.7rem;color:#888;padding:4px; }
+    .detail-row td { padding:0 !important;border-bottom:1px solid #e8e8e8 !important; }
+    .detail-inner { padding:16px 16px 16px 44px;background:#fafcff; }
+
+    .info-grid { display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px 24px;margin-bottom:16px; }
+    .info-item .label { font-size:0.72rem;color:#888;text-transform:uppercase; }
+    .info-item .value { font-size:0.88rem;color:#333;font-weight:500; }
+
+    .sub-table { width:100%;border-collapse:collapse;margin-top:8px; }
+    .sub-table th { padding:6px 10px;font-size:0.72rem;font-weight:600;color:#888;text-align:left;text-transform:uppercase;border-bottom:1px solid #e8e8e8; }
+    .sub-table td { padding:8px 10px;font-size:0.84rem;color:#333;border-bottom:1px solid #f0f0f0; }
+    .sub-table tr:last-child td { border-bottom:none; }
+    .sub-table tr:hover td { background:#f0f4ff; }
+    .sub-table tr.expanded td { background:#e8f0fe; }
+
+    .schedule-detail { padding:12px 12px 12px 36px;background:#e8faed;border-bottom:1px solid #e8e8e8;border-radius:6px;margin:4px 0; }
+    .pmt-table { width:100%;border-collapse:collapse;margin-top:6px; }
+    .pmt-table th { padding:4px 8px;font-size:0.7rem;font-weight:600;color:#888;text-align:left; }
+    .pmt-table td { padding:6px 8px;font-size:0.82rem;color:#333; }
+
+    .badge { display:inline-block;padding:2px 8px;border-radius:10px;font-size:0.72rem;font-weight:600; }
+    .badge-green { background:#e6f4ea;color:#1e8e3e; }
+    .badge-yellow { background:#fef7e0;color:#e37400; }
+    .badge-red { background:#fce8e6;color:#c5221f; }
+    .badge-gray { background:#f0f0f0;color:#888; }
+    .badge-blue { background:#e8f0fe;color:#1a73e8; }
+
+    .field-group { margin-bottom:12px; }
+    .field-group label { display:block;font-size:0.82rem;color:#666;margin-bottom:4px; }
+    .field-group input, .field-group select, .field-group textarea {
+      width:100%;border:1px solid #ddd;border-radius:6px;padding:8px 12px;font-size:0.9rem;outline:none;box-sizing:border-box;background:#fff;
+    }
+    .field-group input:focus, .field-group select:focus { border-color:#1a73e8; }
+    .fields-row { display:grid;grid-template-columns:1fr 1fr;gap:12px; }
+    .fields-row-3 { display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px; }
+
+    .section-title { font-size:0.82rem;font-weight:600;color:#555;margin:16px 0 8px;display:flex;align-items:center;gap:8px; }
+    .section-title::after { content:'';flex:1;height:1px;background:#e8e8e8; }
+
+    .amount-green { color:#1e8e3e; }
+    .amount-red { color:#c5221f; }
+  </style>
+</head>
+<body>
+  <header id="header"></header>
+
+  <div id="guest-view">
+    <h2 id="t-guest-title"></h2>
+    <p id="t-guest-sub"></p>
+  </div>
+
+  <div id="app-view" style="display:none">
+    <div class="page-wrap">
+      <div class="page-toolbar">
+        <h2 id="t-page-title"></h2>
+        <div class="toolbar-right">
+          <select class="filter-select" id="filter-company"><option value="">—</option></select>
+          <select class="filter-select" id="filter-folder"><option value="">—</option></select>
+          <button class="btn btn-primary" id="btn-add-sale" style="display:none"></button>
+        </div>
+      </div>
+      <div class="st-wrap">
+        <table class="st-table">
+          <thead>
+            <tr>
+              <th style="width:30px"></th>
+              <th id="th-buyer"></th>
+              <th id="th-project"></th>
+              <th id="th-status"></th>
+              <th id="th-total"></th>
+              <th id="th-paid"></th>
+              <th id="th-remaining"></th>
+              <th style="width:80px"></th>
+            </tr>
+          </thead>
+          <tbody id="sales-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Sale -->
+  <div class="modal-overlay" id="modal-sale">
+    <div class="modal" style="width:600px;max-width:95vw;max-height:90vh;overflow-y:auto">
+      <h3 id="t-modal-sale-title"></h3>
+      <div class="fields-row">
+        <div class="field-group">
+          <label class="required" id="lbl-buyer"></label>
+          <select id="s-buyer"></select>
+        </div>
+        <div class="field-group">
+          <label class="required" id="lbl-company"></label>
+          <select id="s-company"></select>
+        </div>
+      </div>
+      <div class="fields-row">
+        <div class="field-group">
+          <label class="required" id="lbl-folder"></label>
+          <select id="s-folder"></select>
+        </div>
+        <div class="field-group">
+          <label id="lbl-sale-status"></label>
+          <select id="s-status">
+            <option value="reservation">Reservation</option>
+            <option value="contracted">Contracted</option>
+            <option value="in_progress">In progress</option>
+            <option value="completed">Completed</option>
+            <option value="cancelled">Cancelled</option>
+          </select>
+        </div>
+      </div>
+      <div class="fields-row">
+        <div class="field-group">
+          <label id="lbl-sale-name"></label>
+          <input type="text" id="s-name">
+        </div>
+        <div class="field-group">
+          <label id="lbl-reservation-date"></label>
+          <input type="date" id="s-reservation-date">
+        </div>
+      </div>
+      <div class="fields-row">
+        <div class="field-group">
+          <label id="lbl-reservation-amount"></label>
+          <input type="number" id="s-reservation-amount" min="0" step="0.01">
+        </div>
+        <div class="field-group">
+          <label id="lbl-transfer-date"></label>
+          <input type="date" id="s-transfer-date">
+        </div>
+      </div>
+      <div class="field-group">
+        <label id="lbl-sale-notes"></label>
+        <textarea id="s-notes" rows="2" style="resize:vertical;min-height:40px;width:100%;border:1px solid #ddd;border-radius:6px;padding:8px 12px;font-size:0.9rem;outline:none;box-sizing:border-box"></textarea>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-outline" id="btn-sale-cancel"></button>
+        <button class="btn btn-primary" id="btn-sale-save"></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Sales Contract -->
+  <div class="modal-overlay" id="modal-contract">
+    <div class="modal" style="width:550px;max-width:95vw;max-height:90vh;overflow-y:auto">
+      <h3 id="t-modal-contract-title"></h3>
+      <div class="fields-row">
+        <div class="field-group">
+          <label class="required" id="lbl-contract-type"></label>
+          <select id="sc-type">
+            <option value="land_purchase">Land purchase</option>
+            <option value="construction">Construction</option>
+            <option value="house_purchase">House purchase</option>
+          </select>
+        </div>
+        <div class="field-group">
+          <label id="lbl-contract-number"></label>
+          <input type="text" id="sc-number">
+        </div>
+      </div>
+      <div class="fields-row">
+        <div class="field-group">
+          <label id="lbl-contract-name"></label>
+          <input type="text" id="sc-name">
+        </div>
+        <div class="field-group">
+          <label id="lbl-contract-date"></label>
+          <input type="date" id="sc-date">
+        </div>
+      </div>
+      <div class="fields-row">
+        <div class="field-group">
+          <label id="lbl-contract-amount"></label>
+          <input type="number" id="sc-amount" min="0" step="0.01">
+        </div>
+        <div class="field-group">
+          <label id="lbl-contract-status"></label>
+          <select id="sc-status">
+            <option value="draft">Draft</option>
+            <option value="signed">Signed</option>
+            <option value="active">Active</option>
+            <option value="completed">Completed</option>
+            <option value="terminated">Terminated</option>
+          </select>
+        </div>
+      </div>
+      <div class="field-group">
+        <label id="lbl-contract-notes"></label>
+        <textarea id="sc-notes" rows="2" style="resize:vertical;min-height:40px;width:100%;border:1px solid #ddd;border-radius:6px;padding:8px 12px;font-size:0.9rem;outline:none;box-sizing:border-box"></textarea>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-outline" id="btn-contract-cancel"></button>
+        <button class="btn btn-primary" id="btn-contract-save"></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Payment -->
+  <div class="modal-overlay" id="modal-payment">
+    <div class="modal" style="width:500px;max-width:95vw">
+      <h3 id="t-modal-payment-title"></h3>
+      <div class="fields-row">
+        <div class="field-group">
+          <label class="required" id="lbl-pmt-amount"></label>
+          <input type="number" id="pmt-amount" min="0" step="0.01">
+        </div>
+        <div class="field-group">
+          <label class="required" id="lbl-pmt-date"></label>
+          <input type="date" id="pmt-date">
+        </div>
+      </div>
+      <div class="fields-row">
+        <div class="field-group">
+          <label id="lbl-pmt-method"></label>
+          <select id="pmt-method">
+            <option value="bank_transfer">Bank transfer</option>
+            <option value="cash">Cash</option>
+            <option value="check">Check</option>
+          </select>
+        </div>
+        <div class="field-group">
+          <label id="lbl-pmt-account"></label>
+          <select id="pmt-account"><option value="">—</option></select>
+        </div>
+      </div>
+      <div class="fields-row">
+        <div class="field-group">
+          <label id="lbl-pmt-reference"></label>
+          <input type="text" id="pmt-reference">
+        </div>
+        <div class="field-group">
+          <label id="lbl-pmt-receipt"></label>
+          <input type="text" id="pmt-receipt">
+        </div>
+      </div>
+      <div class="field-group">
+        <label id="lbl-pmt-notes"></label>
+        <input type="text" id="pmt-notes">
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-outline" id="btn-pmt-cancel"></button>
+        <button class="btn btn-primary" id="btn-pmt-save"></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Schedule item -->
+  <div class="modal-overlay" id="modal-schedule">
+    <div class="modal" style="width:500px;max-width:95vw">
+      <h3 id="t-modal-schedule-title"></h3>
+      <div class="fields-row">
+        <div class="field-group">
+          <label class="required" id="lbl-ms-name"></label>
+          <input type="text" id="ms-name">
+        </div>
+        <div class="field-group">
+          <label id="lbl-ms-type"></label>
+          <select id="ms-type">
+            <option value="booking">Booking</option>
+            <option value="signing">Signing</option>
+            <option value="construction">Construction</option>
+            <option value="installment">Installment</option>
+            <option value="transfer">Transfer</option>
+          </select>
+        </div>
+      </div>
+      <div class="fields-row">
+        <div class="field-group">
+          <label class="required" id="lbl-ms-amount"></label>
+          <input type="number" id="ms-amount" min="0" step="0.01">
+        </div>
+        <div class="field-group">
+          <label id="lbl-ms-date"></label>
+          <input type="date" id="ms-date">
+        </div>
+      </div>
+      <div class="field-group">
+        <label id="lbl-ms-notes"></label>
+        <input type="text" id="ms-notes">
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-outline" id="btn-ms-cancel"></button>
+        <button class="btn btn-primary" id="btn-ms-save"></button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    let allSales = [];
+    let buyersCache = [];
+    let companiesCache = [];
+    let foldersCache = [];
+    let accountsCache = [];
+    let expandedSales = {};
+    let expandedContracts = {};
+    let expandedSchedules = {};
+    let saleContracts = {};
+    let contractSchedules = {};
+    let schedulePayments = {};
+    let filterCompany = '';
+    let filterFolder = '';
+    let canEdit = false;
+
+    // Current modal context
+    let currentSaleMode = 'create', currentSaleId = null;
+    let currentContractMode = 'create', currentContractId = null, currentContractSaleId = null;
+    let currentScheduleMode = 'create', currentScheduleId = null, currentScheduleContractId = null;
+    let currentPaymentContractId = null, currentPaymentScheduleId = null;
+
+    function fmt(v) { const n = parseFloat(typeof v === 'object' && v !== null ? v.value : v); return isNaN(n) ? 0 : n; }
+    function fmtMoney(v) { return fmt(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+    function formatDate(val) {
+      if (!val) return '—';
+      const d = new Date(val.value || val);
+      if (isNaN(d)) return '—';
+      return `${String(d.getUTCDate()).padStart(2,'0')}.${String(d.getUTCMonth()+1).padStart(2,'0')}.${d.getUTCFullYear()}`;
+    }
+    function showToast(msg, type) {
+      const el = document.getElementById('toast');
+      el.textContent = msg; el.className = 'toast show' + (type ? ' ' + type : '');
+      clearTimeout(el._t); el._t = setTimeout(() => el.className = 'toast', 3000);
+    }
+    function openModal(id)  { document.getElementById(id).classList.add('open'); }
+    function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+    function statusBadge(status) {
+      const map = {
+        reservation: 'badge-yellow', contracted: 'badge-blue', in_progress: 'badge-blue',
+        completed: 'badge-green', cancelled: 'badge-gray',
+        draft: 'badge-gray', signed: 'badge-blue', active: 'badge-green', terminated: 'badge-red',
+        upcoming: 'badge-gray', due: 'badge-yellow', overdue: 'badge-red',
+        paid: 'badge-green', partially_paid: 'badge-yellow', waived: 'badge-gray',
+      };
+      return `<span class="badge ${map[status] || 'badge-gray'}">${status || '—'}</span>`;
+    }
+
+    function contractTypeLabel(type) {
+      const map = { land_purchase: t('saleLand'), construction: t('saleConstruction'), house_purchase: t('saleHouse') };
+      return map[type] || type || '—';
+    }
+
+    function updateTexts() {
+      document.getElementById('t-guest-title').textContent = t('guestTitle');
+      document.getElementById('t-guest-sub').textContent = t('guestSub');
+      document.getElementById('t-page-title').textContent = t('navSales');
+      document.getElementById('btn-add-sale').textContent = t('saleAdd');
+      document.getElementById('th-buyer').textContent = t('saleBuyer');
+      document.getElementById('th-project').textContent = t('navFolders');
+      document.getElementById('th-status').textContent = t('statusLabel');
+      document.getElementById('th-total').textContent = t('totalAmount');
+      document.getElementById('th-paid').textContent = t('paidAmount');
+      document.getElementById('th-remaining').textContent = t('saleRemaining');
+
+      // Sale modal
+      document.getElementById('t-modal-sale-title').textContent = t('saleAdd');
+      document.getElementById('lbl-buyer').textContent = t('saleBuyer');
+      document.getElementById('lbl-company').textContent = t('company');
+      document.getElementById('lbl-folder').textContent = t('navFolders');
+      document.getElementById('lbl-sale-status').textContent = t('statusLabel');
+      document.getElementById('lbl-sale-name').textContent = t('name');
+      document.getElementById('lbl-reservation-date').textContent = t('saleReservationDate');
+      document.getElementById('lbl-reservation-amount').textContent = t('saleReservationAmount');
+      document.getElementById('lbl-transfer-date').textContent = t('saleTransferDate');
+      document.getElementById('lbl-sale-notes').textContent = t('notes');
+      document.getElementById('btn-sale-cancel').textContent = t('cancel');
+      document.getElementById('btn-sale-save').textContent = t('save');
+
+      // Contract modal
+      document.getElementById('t-modal-contract-title').textContent = t('saleAddContract');
+      document.getElementById('lbl-contract-type').textContent = t('saleContractType');
+      document.getElementById('lbl-contract-number').textContent = t('saleContractNumber');
+      document.getElementById('lbl-contract-name').textContent = t('name');
+      document.getElementById('lbl-contract-date').textContent = t('date');
+      document.getElementById('lbl-contract-amount').textContent = t('totalAmount');
+      document.getElementById('lbl-contract-status').textContent = t('statusLabel');
+      document.getElementById('lbl-contract-notes').textContent = t('notes');
+      document.getElementById('btn-contract-cancel').textContent = t('cancel');
+      document.getElementById('btn-contract-save').textContent = t('save');
+
+      // Payment modal
+      document.getElementById('t-modal-payment-title').textContent = t('saleAddPayment');
+      document.getElementById('lbl-pmt-amount').textContent = t('amount');
+      document.getElementById('lbl-pmt-date').textContent = t('date');
+      document.getElementById('lbl-pmt-method').textContent = t('salePaymentMethod');
+      document.getElementById('lbl-pmt-account').textContent = t('account');
+      document.getElementById('lbl-pmt-reference').textContent = t('saleReference');
+      document.getElementById('lbl-pmt-receipt').textContent = t('saleReceipt');
+      document.getElementById('lbl-pmt-notes').textContent = t('notes');
+      document.getElementById('btn-pmt-cancel').textContent = t('cancel');
+      document.getElementById('btn-pmt-save').textContent = t('save');
+
+      // Schedule modal
+      document.getElementById('t-modal-schedule-title').textContent = t('saleAddMilestone');
+      document.getElementById('lbl-ms-name').textContent = t('name');
+      document.getElementById('lbl-ms-type').textContent = t('saleContractType');
+      document.getElementById('lbl-ms-amount').textContent = t('amount');
+      document.getElementById('lbl-ms-date').textContent = t('date');
+      document.getElementById('lbl-ms-notes').textContent = t('notes');
+      document.getElementById('btn-ms-cancel').textContent = t('cancel');
+      document.getElementById('btn-ms-save').textContent = t('save');
+
+      updateHeaderTexts();
+    }
+
+    // ─── Refs ───
+    async function loadRefs() {
+      [buyersCache, companiesCache, foldersCache, accountsCache] = await Promise.all([
+        apiFetch('/buyers?active=true').catch(() => []),
+        apiFetch('/companies').catch(() => []),
+        apiFetch('/folders').catch(() => []),
+        apiFetch('/company_accounts').catch(() => []),
+      ]);
+      fillCompanyFilter();
+    }
+
+    function fillCompanyFilter() {
+      const sel = document.getElementById('filter-company');
+      sel.innerHTML = `<option value="">${t('allCompanies')}</option>`;
+      companiesCache.forEach(c => { sel.innerHTML += `<option value="${c.id}">${c.name}</option>`; });
+    }
+
+    function fillFolderFilter() {
+      const sel = document.getElementById('filter-folder');
+      sel.innerHTML = `<option value="">${t('allFolders')}</option>`;
+      foldersCache.filter(f => f.status !== 'archive' && (!filterCompany || f.company_id === filterCompany))
+        .forEach(f => { sel.innerHTML += `<option value="${f.id}">${f.name}</option>`; });
+    }
+
+    document.getElementById('filter-company').addEventListener('change', e => {
+      filterCompany = e.target.value;
+      filterFolder = '';
+      fillFolderFilter();
+      loadSales();
+    });
+    document.getElementById('filter-folder').addEventListener('change', e => {
+      filterFolder = e.target.value;
+      loadSales();
+    });
+
+    // ─── Load sales ───
+    async function loadSales() {
+      const tbody = document.getElementById('sales-tbody');
+      tbody.innerHTML = `<tr><td colspan="8" class="loading">${t('loading')}</td></tr>`;
+      try {
+        let url = '/sales?';
+        if (filterCompany) url += `company_id=${filterCompany}&`;
+        if (filterFolder)  url += `folder_id=${filterFolder}&`;
+        allSales = await apiFetch(url);
+        renderSales();
+      } catch(e) { tbody.innerHTML = `<tr><td colspan="8" class="empty-state">${e.message}</td></tr>`; }
+    }
+
+    function renderSales() {
+      const tbody = document.getElementById('sales-tbody');
+      if (!allSales.length) {
+        tbody.innerHTML = `<tr><td colspan="8" class="empty-state">${t('noSales')}</td></tr>`;
+        return;
+      }
+
+      let html = '';
+      allSales.forEach(s => {
+        const isExp = expandedSales[s.id];
+        const total = fmt(s.total_amount);
+        const paid = fmt(s.paid_amount);
+        const remaining = total - paid;
+        html += `<tr class="${isExp ? 'expanded' : ''}" data-sale-id="${s.id}">
+          <td><button class="expand-btn" data-action="toggle-sale" data-id="${s.id}">${isExp ? '▾' : '▸'}</button></td>
+          <td><strong>${s.buyer_name_en || s.buyer_name_th || '—'}</strong></td>
+          <td>${s.folder_name || '—'}</td>
+          <td>${statusBadge(s.status)}</td>
+          <td style="font-weight:500">${fmtMoney(total)}</td>
+          <td class="amount-green" style="font-weight:500">${fmtMoney(paid)}</td>
+          <td class="${remaining > 0 ? 'amount-red' : ''}" style="font-weight:500">${fmtMoney(remaining)}</td>
+          <td>
+            ${canEdit ? `<button class="btn btn-outline" style="padding:2px 8px;font-size:0.75rem" data-action="edit-sale" data-id="${s.id}">${t('edit')}</button>` : ''}
+          </td>
+        </tr>`;
+        if (isExp) {
+          html += `<tr class="detail-row"><td colspan="8"><div class="detail-inner" id="sale-detail-${s.id}"><div class="loading">${t('loading')}</div></div></td></tr>`;
+        }
+      });
+      tbody.innerHTML = html;
+
+      // Load expanded details
+      allSales.forEach(s => { if (expandedSales[s.id]) loadSaleDetail(s.id); });
+    }
+
+    async function loadSaleDetail(saleId) {
+      const container = document.getElementById(`sale-detail-${saleId}`);
+      if (!container) return;
+      const sale = allSales.find(s => s.id === saleId);
+      if (!sale) return;
+
+      try {
+        const contracts = await apiFetch(`/sales_contracts?sale_id=${saleId}`);
+        saleContracts[saleId] = contracts;
+
+        let html = `<div class="info-grid">
+          <div class="info-item"><div class="label">${t('saleBuyer')}</div><div class="value">${sale.buyer_name_en || sale.buyer_name_th || '—'}</div></div>
+          <div class="info-item"><div class="label">${t('company')}</div><div class="value">${sale.company_name || '—'}</div></div>
+          <div class="info-item"><div class="label">${t('saleReservationDate')}</div><div class="value">${formatDate(sale.reservation_date)}</div></div>
+          <div class="info-item"><div class="label">${t('saleTransferDate')}</div><div class="value">${formatDate(sale.transfer_date)}</div></div>
+          ${sale.notes ? `<div class="info-item"><div class="label">${t('notes')}</div><div class="value">${sale.notes}</div></div>` : ''}
+        </div>`;
+
+        html += `<div class="section-title">${t('saleContracts')} (${contracts.length})
+          ${canEdit ? `<button class="btn btn-primary" style="padding:2px 10px;font-size:0.75rem;margin-left:auto" data-action="add-contract" data-sale-id="${saleId}">${t('saleAddContract')}</button>` : ''}
+        </div>`;
+
+        if (contracts.length) {
+          html += `<table class="sub-table"><thead><tr>
+            <th style="width:24px"></th><th>${t('saleContractType')}</th><th>${t('saleContractNumber')}</th>
+            <th>${t('date')}</th><th>${t('totalAmount')}</th><th>${t('paidAmount')}</th>
+            <th>${t('statusLabel')}</th><th style="width:60px"></th>
+          </tr></thead><tbody>`;
+
+          contracts.forEach(c => {
+            const isExpC = expandedContracts[c.id];
+            html += `<tr class="${isExpC ? 'expanded' : ''}">
+              <td><button class="expand-btn" data-action="toggle-contract" data-id="${c.id}" data-sale-id="${saleId}">
+                ${isExpC ? '▾' : '▸'}</button></td>
+              <td>${contractTypeLabel(c.contract_type)}</td>
+              <td>${c.contract_number || '—'}</td>
+              <td>${formatDate(c.date)}</td>
+              <td style="font-weight:500">${fmtMoney(c.total_amount)}</td>
+              <td class="amount-green">${fmtMoney(c.paid_amount)}</td>
+              <td>${statusBadge(c.status)}</td>
+              <td>${canEdit ? `<button class="btn btn-outline" style="padding:1px 6px;font-size:0.72rem" data-action="edit-contract" data-id="${c.id}" data-sale-id="${saleId}">${t('edit')}</button>` : ''}</td>
+            </tr>`;
+            if (isExpC) {
+              html += `<tr class="detail-row"><td colspan="8"><div id="contract-detail-${c.id}" style="padding:12px 12px 12px 32px;background:#f5f8ff"><div class="loading">${t('loading')}</div></div></td></tr>`;
+            }
+          });
+          html += '</tbody></table>';
+        }
+
+        container.innerHTML = html;
+
+        // Load expanded contract details
+        contracts.forEach(c => { if (expandedContracts[c.id]) loadContractDetail(c.id); });
+      } catch(e) { container.innerHTML = `<div class="empty-state">${e.message}</div>`; }
+    }
+
+    async function loadContractDetail(contractId) {
+      const container = document.getElementById(`contract-detail-${contractId}`);
+      if (!container) return;
+
+      try {
+        const schedules = await apiFetch(`/payment_schedules?contract_id=${contractId}`);
+        contractSchedules[contractId] = schedules;
+
+        let html = `<div class="section-title">${t('saleSchedule')} (${schedules.length})
+          ${canEdit ? `<button class="btn btn-primary" style="padding:2px 10px;font-size:0.75rem;margin-left:auto" data-action="add-milestone" data-contract-id="${contractId}">${t('saleAddMilestone')}</button>` : ''}
+        </div>`;
+
+        if (schedules.length) {
+          html += `<table class="sub-table"><thead><tr>
+            <th style="width:24px"></th><th>#</th><th>${t('name')}</th><th>${t('date')}</th>
+            <th>${t('amount')}</th><th>${t('paidAmount')}</th><th>${t('statusLabel')}</th>
+            <th style="width:100px"></th>
+          </tr></thead><tbody>`;
+
+          schedules.forEach((ms, i) => {
+            const isExpS = expandedSchedules[ms.id];
+            html += `<tr class="${isExpS ? 'expanded' : ''}">
+              <td><button class="expand-btn" data-action="toggle-schedule" data-id="${ms.id}" data-contract-id="${contractId}">
+                ${isExpS ? '▾' : '▸'}</button></td>
+              <td>${i + 1}</td>
+              <td>${ms.name || '—'}</td>
+              <td>${formatDate(ms.due_date)}</td>
+              <td style="font-weight:500">${fmtMoney(ms.amount)}</td>
+              <td class="amount-green">${fmtMoney(ms.paid_amount)}</td>
+              <td>${statusBadge(ms.status)}</td>
+              <td>
+                ${canEdit ? `<button class="btn btn-outline" style="padding:1px 6px;font-size:0.72rem" data-action="add-payment" data-contract-id="${contractId}" data-schedule-id="${ms.id}">${t('saleAddPayment')}</button>` : ''}
+              </td>
+            </tr>`;
+            if (isExpS) {
+              html += `<tr class="detail-row"><td colspan="8"><div id="schedule-detail-${ms.id}" class="schedule-detail"><div class="loading">${t('loading')}</div></div></td></tr>`;
+            }
+          });
+          html += '</tbody></table>';
+        }
+
+        // Also button for unscheduled payment
+        if (canEdit) {
+          html += `<div style="margin-top:8px"><button class="btn btn-outline" style="font-size:0.78rem" data-action="add-payment" data-contract-id="${contractId}" data-schedule-id="">${t('saleAddPayment')} (${t('saleUnscheduled')})</button></div>`;
+        }
+
+        container.innerHTML = html;
+        schedules.forEach(ms => { if (expandedSchedules[ms.id]) loadSchedulePayments(ms.id, contractId); });
+      } catch(e) { container.innerHTML = `<div class="empty-state">${e.message}</div>`; }
+    }
+
+    async function loadSchedulePayments(scheduleId, contractId) {
+      const container = document.getElementById(`schedule-detail-${scheduleId}`);
+      if (!container) return;
+      try {
+        const payments = await apiFetch(`/sales_payments?contract_id=${contractId}`);
+        const filtered = payments.filter(p => p.schedule_id === scheduleId);
+        schedulePayments[scheduleId] = filtered;
+
+        if (!filtered.length) {
+          container.innerHTML = `<div style="color:#bbb;font-size:0.82rem;padding:4px">${t('noPayments')}</div>`;
+          return;
+        }
+
+        let html = `<table class="pmt-table"><thead><tr>
+          <th>${t('date')}</th><th>${t('amount')}</th><th>${t('salePaymentMethod')}</th>
+          <th>${t('account')}</th><th>${t('saleReference')}</th><th>${t('statusLabel')}</th>
+        </tr></thead><tbody>`;
+        filtered.forEach(p => {
+          html += `<tr>
+            <td>${formatDate(p.payment_date)}</td>
+            <td class="amount-green" style="font-weight:500">${fmtMoney(p.amount)}</td>
+            <td>${p.payment_method || '—'}</td>
+            <td>${p.account_name || '—'}</td>
+            <td>${p.reference || '—'}</td>
+            <td>${statusBadge(p.status)}</td>
+          </tr>`;
+        });
+        html += '</tbody></table>';
+        container.innerHTML = html;
+      } catch(e) { container.innerHTML = `<div style="color:#c5221f">${e.message}</div>`; }
+    }
+
+    // ─── Actions ───
+    document.addEventListener('click', async e => {
+      const btn = e.target.closest('[data-action]');
+      if (!btn) return;
+      const action = btn.dataset.action;
+
+      if (action === 'toggle-sale') {
+        expandedSales[btn.dataset.id] = !expandedSales[btn.dataset.id];
+        renderSales();
+      }
+      if (action === 'toggle-contract') {
+        expandedContracts[btn.dataset.id] = !expandedContracts[btn.dataset.id];
+        loadSaleDetail(btn.dataset.saleId);
+      }
+      if (action === 'toggle-schedule') {
+        expandedSchedules[btn.dataset.id] = !expandedSchedules[btn.dataset.id];
+        loadContractDetail(btn.dataset.contractId);
+      }
+
+      // ─── Sale CRUD ───
+      if (action === 'edit-sale') {
+        const s = allSales.find(x => x.id === btn.dataset.id);
+        if (!s) return;
+        currentSaleMode = 'edit'; currentSaleId = s.id;
+        document.getElementById('t-modal-sale-title').textContent = t('saleEdit');
+        fillSaleModal(s);
+        openModal('modal-sale');
+      }
+
+      // ─── Contract CRUD ───
+      if (action === 'add-contract') {
+        currentContractMode = 'create'; currentContractId = null;
+        currentContractSaleId = btn.dataset.saleId;
+        document.getElementById('t-modal-contract-title').textContent = t('saleAddContract');
+        ['sc-number','sc-name','sc-amount','sc-notes'].forEach(id => document.getElementById(id).value = '');
+        document.getElementById('sc-type').value = 'land_purchase';
+        document.getElementById('sc-status').value = 'draft';
+        document.getElementById('sc-date').value = '';
+        openModal('modal-contract');
+      }
+      if (action === 'edit-contract') {
+        const contracts = saleContracts[btn.dataset.saleId] || [];
+        const c = contracts.find(x => x.id === btn.dataset.id);
+        if (!c) return;
+        currentContractMode = 'edit'; currentContractId = c.id;
+        currentContractSaleId = btn.dataset.saleId;
+        document.getElementById('t-modal-contract-title').textContent = t('saleEditContract');
+        document.getElementById('sc-type').value = c.contract_type || 'land_purchase';
+        document.getElementById('sc-number').value = c.contract_number || '';
+        document.getElementById('sc-name').value = c.name || '';
+        document.getElementById('sc-date').value = c.date ? (c.date.value || c.date) : '';
+        document.getElementById('sc-amount').value = fmt(c.total_amount);
+        document.getElementById('sc-status').value = c.status || 'draft';
+        document.getElementById('sc-notes').value = c.notes || '';
+        openModal('modal-contract');
+      }
+
+      // ─── Milestone CRUD ───
+      if (action === 'add-milestone') {
+        currentScheduleMode = 'create'; currentScheduleId = null;
+        currentScheduleContractId = btn.dataset.contractId;
+        document.getElementById('t-modal-schedule-title').textContent = t('saleAddMilestone');
+        ['ms-name','ms-amount','ms-date','ms-notes'].forEach(id => document.getElementById(id).value = '');
+        document.getElementById('ms-type').value = 'installment';
+        openModal('modal-schedule');
+      }
+
+      // ─── Payment CRUD ───
+      if (action === 'add-payment') {
+        currentPaymentContractId = btn.dataset.contractId;
+        currentPaymentScheduleId = btn.dataset.scheduleId || '';
+        document.getElementById('t-modal-payment-title').textContent = t('saleAddPayment');
+        ['pmt-amount','pmt-date','pmt-reference','pmt-receipt','pmt-notes'].forEach(id => document.getElementById(id).value = '');
+        document.getElementById('pmt-method').value = 'bank_transfer';
+        // Fill accounts for selected company
+        const accSel = document.getElementById('pmt-account');
+        accSel.innerHTML = '<option value="">—</option>';
+        const companyAccounts = filterCompany ? accountsCache.filter(a => a.company_id === filterCompany) : accountsCache;
+        companyAccounts.forEach(a => { accSel.innerHTML += `<option value="${a.id}">${a.name} (${a.bank_name || ''})</option>`; });
+        openModal('modal-payment');
+      }
+    });
+
+    // ─── Sale modal helpers ───
+    function fillSaleModal(s) {
+      const buyerSel = document.getElementById('s-buyer');
+      buyerSel.innerHTML = '<option value="">—</option>';
+      buyersCache.forEach(b => { buyerSel.innerHTML += `<option value="${b.id}" ${b.id === s?.buyer_id ? 'selected' : ''}>${b.name_en || b.name_th}</option>`; });
+
+      const compSel = document.getElementById('s-company');
+      compSel.innerHTML = '<option value="">—</option>';
+      companiesCache.forEach(c => { compSel.innerHTML += `<option value="${c.id}" ${c.id === s?.company_id ? 'selected' : ''}>${c.name}</option>`; });
+
+      const fSel = document.getElementById('s-folder');
+      fSel.innerHTML = '<option value="">—</option>';
+      foldersCache.filter(f => f.status !== 'archive').forEach(f => { fSel.innerHTML += `<option value="${f.id}" ${f.id === s?.folder_id ? 'selected' : ''}>${f.name}</option>`; });
+
+      document.getElementById('s-status').value = s?.status || 'reservation';
+      document.getElementById('s-name').value = s?.name || '';
+      document.getElementById('s-reservation-date').value = s?.reservation_date ? (s.reservation_date.value || s.reservation_date) : '';
+      document.getElementById('s-reservation-amount').value = s ? fmt(s.reservation_amount) : '';
+      document.getElementById('s-transfer-date').value = s?.transfer_date ? (s.transfer_date.value || s.transfer_date) : '';
+      document.getElementById('s-notes').value = s?.notes || '';
+    }
+
+    // ─── Add sale ───
+    document.getElementById('btn-add-sale').addEventListener('click', () => {
+      currentSaleMode = 'create'; currentSaleId = null;
+      document.getElementById('t-modal-sale-title').textContent = t('saleAdd');
+      fillSaleModal(null);
+      openModal('modal-sale');
+    });
+
+    // ─── Save sale ───
+    document.getElementById('btn-sale-cancel').addEventListener('click', () => closeModal('modal-sale'));
+    document.getElementById('btn-sale-save').addEventListener('click', async () => {
+      const buyer_id = document.getElementById('s-buyer').value;
+      const company_id = document.getElementById('s-company').value;
+      const folder_id = document.getElementById('s-folder').value;
+      if (!buyer_id || !company_id || !folder_id) { showToast(t('fillAllFields'), 'error'); return; }
+
+      const body = {
+        buyer_id, company_id, folder_id,
+        name: document.getElementById('s-name').value.trim(),
+        status: document.getElementById('s-status').value,
+        reservation_date: document.getElementById('s-reservation-date').value,
+        reservation_amount: document.getElementById('s-reservation-amount').value || 0,
+        transfer_date: document.getElementById('s-transfer-date').value,
+        notes: document.getElementById('s-notes').value.trim(),
+      };
+
+      closeModal('modal-sale');
+      try {
+        if (currentSaleMode === 'create') {
+          await apiFetch('/sales', { method: 'POST', body: JSON.stringify(body) });
+        } else {
+          await apiFetch(`/sales/${currentSaleId}`, { method: 'PUT', body: JSON.stringify(body) });
+        }
+        showToast(t('saved'), 'success');
+        loadSales();
+      } catch(e) { showToast(e.message, 'error'); }
+    });
+
+    // ─── Save contract ───
+    document.getElementById('btn-contract-cancel').addEventListener('click', () => closeModal('modal-contract'));
+    document.getElementById('btn-contract-save').addEventListener('click', async () => {
+      const body = {
+        sale_id: currentContractSaleId,
+        contract_type: document.getElementById('sc-type').value,
+        contract_number: document.getElementById('sc-number').value.trim(),
+        name: document.getElementById('sc-name').value.trim(),
+        date: document.getElementById('sc-date').value,
+        total_amount: document.getElementById('sc-amount').value || 0,
+        status: document.getElementById('sc-status').value,
+        notes: document.getElementById('sc-notes').value.trim(),
+      };
+      closeModal('modal-contract');
+      try {
+        if (currentContractMode === 'create') {
+          await apiFetch('/sales_contracts', { method: 'POST', body: JSON.stringify(body) });
+        } else {
+          await apiFetch(`/sales_contracts/${currentContractId}`, { method: 'PUT', body: JSON.stringify(body) });
+        }
+        showToast(t('saved'), 'success');
+        loadSales();
+      } catch(e) { showToast(e.message, 'error'); }
+    });
+
+    // ─── Save milestone ───
+    document.getElementById('btn-ms-cancel').addEventListener('click', () => closeModal('modal-schedule'));
+    document.getElementById('btn-ms-save').addEventListener('click', async () => {
+      const name = document.getElementById('ms-name').value.trim();
+      const amount = document.getElementById('ms-amount').value;
+      if (!name || !amount) { showToast(t('fillAllFields'), 'error'); return; }
+      const body = {
+        contract_id: currentScheduleContractId,
+        name,
+        milestone_type: document.getElementById('ms-type').value,
+        amount,
+        due_date: document.getElementById('ms-date').value,
+        notes: document.getElementById('ms-notes').value.trim(),
+      };
+      closeModal('modal-schedule');
+      try {
+        await apiFetch('/payment_schedules', { method: 'POST', body: JSON.stringify(body) });
+        showToast(t('saved'), 'success');
+        loadContractDetail(currentScheduleContractId);
+      } catch(e) { showToast(e.message, 'error'); }
+    });
+
+    // ─── Save payment ───
+    document.getElementById('btn-pmt-cancel').addEventListener('click', () => closeModal('modal-payment'));
+    document.getElementById('btn-pmt-save').addEventListener('click', async () => {
+      const amount = document.getElementById('pmt-amount').value;
+      const payment_date = document.getElementById('pmt-date').value;
+      if (!amount || !payment_date) { showToast(t('fillAllFields'), 'error'); return; }
+      const body = {
+        contract_id: currentPaymentContractId,
+        schedule_id: currentPaymentScheduleId || null,
+        amount,
+        payment_date,
+        payment_method: document.getElementById('pmt-method').value,
+        account_id: document.getElementById('pmt-account').value,
+        reference: document.getElementById('pmt-reference').value.trim(),
+        receipt_number: document.getElementById('pmt-receipt').value.trim(),
+        notes: document.getElementById('pmt-notes').value.trim(),
+      };
+      closeModal('modal-payment');
+      try {
+        await apiFetch('/sales_payments', { method: 'POST', body: JSON.stringify(body) });
+        showToast(t('saved'), 'success');
+        loadSales();
+      } catch(e) { showToast(e.message, 'error'); }
+    });
+
+    // ─── Keyboard ───
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape') {
+        closeModal('modal-sale'); closeModal('modal-contract');
+        closeModal('modal-payment'); closeModal('modal-schedule');
+      }
+    });
+
+    // ─── Init ───
+    window.onLogin = async () => {
+      updateTexts();
+      canEdit = isAdmin || (currentMe && currentMe.has_sales_access);
+      if (canEdit) document.getElementById('btn-add-sale').style.display = '';
+      await loadRefs();
+      fillFolderFilter();
+      loadSales();
+    };
+    window.onLogout = () => { updateTexts(); };
+    window.onLangChange = () => { updateTexts(); renderSales(); };
+
+    renderHeader('sales');
+    updateTexts();
+  </script>
+</body>
+</html>

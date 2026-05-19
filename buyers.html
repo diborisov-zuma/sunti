@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sunti — Покупатели</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="stylesheet" href="style.css">
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <script src="_i18n.js"></script>
+  <script src="_config.js"></script>
+  <script src="_auth.js"></script>
+  <script src="_header.js"></script>
+  <style>
+    .page-toolbar { display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap; }
+    .page-toolbar h2 { font-size:1.1rem;color:#222;flex:1; }
+    .toolbar-right { display:flex;align-items:center;gap:8px;flex-wrap:wrap; }
+
+    select.filter-select, input.filter-select {
+      border:1px solid #ddd;border-radius:6px;padding:6px 10px;font-size:0.85rem;color:#333;outline:none;background:#fff;
+    }
+    select.filter-select:focus, input.filter-select:focus { border-color:#1a73e8; }
+
+    .ct-wrap { background:#fff;border:1px solid #e8e8e8;border-radius:10px;overflow:hidden; }
+    .ct-table { width:100%;border-collapse:collapse; }
+    .ct-table thead { background:#f8f8f8;border-bottom:1px solid #e8e8e8; }
+    .ct-table th { padding:10px 14px;font-size:0.78rem;font-weight:600;color:#888;text-align:left;text-transform:uppercase;letter-spacing:0.04em; }
+    .ct-table td { padding:11px 14px;font-size:0.88rem;color:#333;border-bottom:1px solid #f0f0f0; }
+    .ct-table tr:last-child td { border-bottom:none; }
+    .ct-table tr:hover td { background:#fafafa; }
+    .ct-table tr.inactive td { opacity:0.5; }
+
+    .empty-state { text-align:center;padding:64px 24px;color:#bbb; }
+    .loading { text-align:center;padding:48px;color:#bbb; }
+
+    .field-group { margin-bottom:12px; }
+    .field-group label { display:block;font-size:0.82rem;color:#666;margin-bottom:4px; }
+    .field-group input, .field-group select, .field-group textarea {
+      width:100%;border:1px solid #ddd;border-radius:6px;padding:8px 12px;font-size:0.9rem;outline:none;box-sizing:border-box;background:#fff;
+    }
+    .field-group input:focus, .field-group select:focus, .field-group textarea:focus { border-color:#1a73e8; }
+    .field-group textarea { resize:vertical;min-height:60px; }
+    .fields-row { display:grid;grid-template-columns:1fr 1fr;gap:12px; }
+    .fields-row-3 { display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px; }
+
+    .badge { display:inline-block;padding:2px 8px;border-radius:10px;font-size:0.72rem;font-weight:600; }
+    .badge-green { background:#e6f4ea;color:#1e8e3e; }
+    .badge-gray { background:#f0f0f0;color:#888; }
+  </style>
+</head>
+<body>
+  <header id="header"></header>
+
+  <div id="guest-view">
+    <h2 id="t-guest-title"></h2>
+    <p id="t-guest-sub"></p>
+  </div>
+
+  <div id="app-view" style="display:none">
+    <div style="padding:24px;max-width:1400px;margin:0 auto">
+      <div class="page-toolbar">
+        <h2 id="t-page-title"></h2>
+        <div class="toolbar-right">
+          <input type="text" class="filter-select" id="filter-search" placeholder="" style="min-width:180px">
+          <select class="filter-select" id="filter-type">
+            <option value=""></option>
+            <option value="individual"></option>
+            <option value="juristic"></option>
+            <option value="foreign_individual"></option>
+            <option value="foreign_juristic"></option>
+          </select>
+          <select class="filter-select" id="filter-active">
+            <option value="true"></option>
+            <option value=""></option>
+            <option value="false"></option>
+          </select>
+          <button class="btn btn-primary" id="btn-add"></button>
+        </div>
+      </div>
+
+      <div class="ct-wrap">
+        <table class="ct-table">
+          <thead>
+            <tr>
+              <th id="th-name"></th>
+              <th id="th-type"></th>
+              <th id="th-contact"></th>
+              <th id="th-nationality"></th>
+              <th id="th-status"></th>
+              <th style="width:120px"></th>
+            </tr>
+          </thead>
+          <tbody id="ct-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Модалка -->
+  <div class="modal-overlay" id="modal-buyer">
+    <div class="modal" style="width:600px;max-width:95vw;max-height:90vh;overflow-y:auto">
+      <h3 id="t-modal-title"></h3>
+
+      <div class="fields-row">
+        <div class="field-group">
+          <label class="required" id="lbl-name-en"></label>
+          <input type="text" id="b-name-en">
+        </div>
+        <div class="field-group">
+          <label id="lbl-name-th"></label>
+          <input type="text" id="b-name-th">
+        </div>
+      </div>
+
+      <div class="fields-row-3">
+        <div class="field-group">
+          <label id="lbl-type"></label>
+          <select id="b-type">
+            <option value="">—</option>
+            <option value="individual"></option>
+            <option value="juristic"></option>
+            <option value="foreign_individual"></option>
+            <option value="foreign_juristic"></option>
+          </select>
+        </div>
+        <div class="field-group">
+          <label id="lbl-nationality"></label>
+          <input type="text" id="b-nationality" placeholder="thai / russian / chinese">
+        </div>
+        <div class="field-group">
+          <label id="lbl-passport"></label>
+          <input type="text" id="b-passport">
+        </div>
+      </div>
+
+      <div class="fields-row-3">
+        <div class="field-group">
+          <label id="lbl-tax-id"></label>
+          <input type="text" id="b-tax-id" maxlength="13">
+        </div>
+        <div class="field-group">
+          <label id="lbl-national-id"></label>
+          <input type="text" id="b-national-id" maxlength="13">
+        </div>
+        <div class="field-group">
+          <label id="lbl-phone"></label>
+          <input type="text" id="b-phone">
+        </div>
+      </div>
+
+      <div class="field-group">
+        <label>Email</label>
+        <input type="email" id="b-email">
+      </div>
+
+      <div class="fields-row">
+        <div class="field-group">
+          <label id="lbl-address-en"></label>
+          <textarea id="b-address-en" rows="2"></textarea>
+        </div>
+        <div class="field-group">
+          <label id="lbl-address-th"></label>
+          <textarea id="b-address-th" rows="2"></textarea>
+        </div>
+      </div>
+
+      <div class="field-group">
+        <label id="lbl-notes"></label>
+        <textarea id="b-notes" rows="2"></textarea>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn btn-outline" id="btn-cancel"></button>
+        <button class="btn btn-primary" id="btn-save"></button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    let allBuyers = [];
+    let currentMode = 'create';
+    let currentId = null;
+    let searchDebounce = null;
+
+    function showToast(msg, type) {
+      const el = document.getElementById('toast');
+      el.textContent = msg; el.className = 'toast show' + (type ? ' ' + type : '');
+      clearTimeout(el._t); el._t = setTimeout(() => el.className = 'toast', 3000);
+    }
+    function openModal(id)  { document.getElementById(id).classList.add('open'); }
+    function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+    function buyerName(b) { return b.name_en || b.name_th || '—'; }
+
+    function typeLabel(type) {
+      const map = { individual: t('typeIndividual'), juristic: t('typeJuristic'),
+                    foreign_individual: t('typeForeignIndividual'), foreign_juristic: t('typeForeignJuristic') };
+      return map[type] || type || '—';
+    }
+
+    function updateTexts() {
+      document.getElementById('t-guest-title').textContent = t('guestTitle');
+      document.getElementById('t-guest-sub').textContent = t('guestSub');
+      document.getElementById('t-page-title').textContent = t('navBuyers');
+      document.getElementById('filter-search').placeholder = t('search');
+      document.getElementById('btn-add').textContent = t('addBuyer');
+      document.getElementById('btn-cancel').textContent = t('cancel');
+      document.getElementById('btn-save').textContent = t('save');
+
+      const ft = document.getElementById('filter-type');
+      ft.options[0].text = t('allTypes');
+      ft.options[1].text = t('typeIndividual');
+      ft.options[2].text = t('typeJuristic');
+      ft.options[3].text = t('typeForeignIndividual');
+      ft.options[4].text = t('typeForeignJuristic');
+
+      const fa = document.getElementById('filter-active');
+      fa.options[0].text = t('active');
+      fa.options[1].text = t('allStatuses');
+      fa.options[2].text = t('inactive');
+
+      document.getElementById('th-name').textContent = t('name');
+      document.getElementById('th-type').textContent = t('contractorType');
+      document.getElementById('th-contact').textContent = t('buyerContact');
+      document.getElementById('th-nationality').textContent = t('buyerNationality');
+      document.getElementById('th-status').textContent = t('statusLabel');
+
+      document.getElementById('lbl-name-en').textContent = t('nameEn');
+      document.getElementById('lbl-name-th').textContent = t('nameTh');
+      document.getElementById('lbl-type').textContent = t('contractorType');
+      document.getElementById('lbl-nationality').textContent = t('buyerNationality');
+      document.getElementById('lbl-passport').textContent = t('buyerPassport');
+      document.getElementById('lbl-tax-id').textContent = t('taxId');
+      document.getElementById('lbl-national-id').textContent = t('nationalId');
+      document.getElementById('lbl-phone').textContent = t('buyerPhone');
+      document.getElementById('lbl-address-en').textContent = t('addressEn');
+      document.getElementById('lbl-address-th').textContent = t('addressTh');
+      document.getElementById('lbl-notes').textContent = t('notes');
+
+      const bt = document.getElementById('b-type');
+      bt.options[1].text = t('typeIndividual');
+      bt.options[2].text = t('typeJuristic');
+      bt.options[3].text = t('typeForeignIndividual');
+      bt.options[4].text = t('typeForeignJuristic');
+
+      updateHeaderTexts();
+    }
+
+    async function loadBuyers() {
+      const tbody = document.getElementById('ct-tbody');
+      tbody.innerHTML = `<tr><td colspan="6" class="loading">${t('loading')}</td></tr>`;
+      try {
+        let url = '/buyers?';
+        const search = document.getElementById('filter-search').value.trim();
+        const type = document.getElementById('filter-type').value;
+        const active = document.getElementById('filter-active').value;
+        if (search) url += `search=${encodeURIComponent(search)}&`;
+        if (type) url += `type=${type}&`;
+        if (active !== '') url += `active=${active}&`;
+        allBuyers = await apiFetch(url);
+        renderTable();
+      } catch(e) {
+        tbody.innerHTML = `<tr><td colspan="6" class="empty-state">${e.message}</td></tr>`;
+      }
+    }
+
+    function renderTable() {
+      const tbody = document.getElementById('ct-tbody');
+      if (!allBuyers.length) {
+        tbody.innerHTML = `<tr><td colspan="6" class="empty-state">${t('noBuyers')}</td></tr>`;
+        return;
+      }
+      tbody.innerHTML = allBuyers.map(b => {
+        const active = b.is_active !== false;
+        const contact = [b.email, b.phone].filter(Boolean).join(' · ') || '—';
+        return `
+        <tr class="${active ? '' : 'inactive'}" data-id="${b.id}">
+          <td><strong>${buyerName(b)}</strong>${b.name_th && b.name_en ? `<br><span style="font-size:0.78rem;color:#888">${b.name_th}</span>` : ''}</td>
+          <td style="font-size:0.82rem">${typeLabel(b.type)}</td>
+          <td style="font-size:0.82rem">${contact}</td>
+          <td style="font-size:0.82rem">${b.nationality || '—'}</td>
+          <td>${active ? `<span class="badge badge-green">${t('active')}</span>` : `<span class="badge badge-gray">${t('inactive')}</span>`}</td>
+          <td>
+            <div style="display:flex;gap:6px;align-items:center;justify-content:flex-end">
+              <button class="btn btn-outline" style="padding:3px 8px;font-size:0.78rem" data-action="edit" data-id="${b.id}">${t('edit')}</button>
+            </div>
+          </td>
+        </tr>`;
+      }).join('');
+    }
+
+    // Filters
+    document.getElementById('filter-search').addEventListener('input', () => {
+      clearTimeout(searchDebounce);
+      searchDebounce = setTimeout(loadBuyers, 300);
+    });
+    document.getElementById('filter-type').addEventListener('change', loadBuyers);
+    document.getElementById('filter-active').addEventListener('change', loadBuyers);
+
+    // Add
+    document.getElementById('btn-add').addEventListener('click', () => {
+      currentMode = 'create'; currentId = null;
+      document.getElementById('t-modal-title').textContent = t('addBuyer');
+      ['b-name-en','b-name-th','b-nationality','b-passport','b-tax-id','b-national-id','b-phone','b-email','b-address-en','b-address-th','b-notes'].forEach(id => document.getElementById(id).value = '');
+      document.getElementById('b-type').value = '';
+      openModal('modal-buyer');
+    });
+
+    // Actions
+    document.addEventListener('click', async e => {
+      const btn = e.target.closest('button[data-action]');
+      if (!btn) return;
+      const action = btn.dataset.action;
+      const id = btn.dataset.id;
+
+      if (action === 'edit') {
+        const b = allBuyers.find(x => x.id === id);
+        if (!b) return;
+        currentMode = 'edit'; currentId = id;
+        document.getElementById('t-modal-title').textContent = t('editBuyer');
+        document.getElementById('b-name-en').value = b.name_en || '';
+        document.getElementById('b-name-th').value = b.name_th || '';
+        document.getElementById('b-type').value = b.type || '';
+        document.getElementById('b-nationality').value = b.nationality || '';
+        document.getElementById('b-passport').value = b.passport_number || '';
+        document.getElementById('b-tax-id').value = b.tax_id || '';
+        document.getElementById('b-national-id').value = b.national_id || '';
+        document.getElementById('b-phone').value = b.phone || '';
+        document.getElementById('b-email').value = b.email || '';
+        document.getElementById('b-address-en').value = b.address_en || '';
+        document.getElementById('b-address-th').value = b.address_th || '';
+        document.getElementById('b-notes').value = b.notes || '';
+        openModal('modal-buyer');
+      }
+    });
+
+    // Save
+    document.getElementById('btn-cancel').addEventListener('click', () => closeModal('modal-buyer'));
+    document.getElementById('btn-save').addEventListener('click', async () => {
+      const name_en = document.getElementById('b-name-en').value.trim();
+      const name_th = document.getElementById('b-name-th').value.trim();
+      if (!name_en && !name_th) {
+        document.getElementById('b-name-en').classList.add('invalid');
+        showToast(t('fillAllFields'), 'error'); return;
+      }
+      document.getElementById('b-name-en').classList.remove('invalid');
+
+      const body = {
+        name_en, name_th,
+        type: document.getElementById('b-type').value,
+        nationality: document.getElementById('b-nationality').value.trim(),
+        passport_number: document.getElementById('b-passport').value.trim(),
+        tax_id: document.getElementById('b-tax-id').value.trim(),
+        national_id: document.getElementById('b-national-id').value.trim(),
+        phone: document.getElementById('b-phone').value.trim(),
+        email: document.getElementById('b-email').value.trim(),
+        address_en: document.getElementById('b-address-en').value.trim(),
+        address_th: document.getElementById('b-address-th').value.trim(),
+        notes: document.getElementById('b-notes').value.trim(),
+      };
+
+      closeModal('modal-buyer');
+      try {
+        if (currentMode === 'create') {
+          await apiFetch('/buyers', { method: 'POST', body: JSON.stringify(body) });
+        } else {
+          await apiFetch(`/buyers/${currentId}`, { method: 'PUT', body: JSON.stringify(body) });
+        }
+        showToast(t('saved'), 'success');
+        loadBuyers();
+      } catch(e) { showToast(e.message, 'error'); }
+    });
+
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape') closeModal('modal-buyer');
+    });
+
+    window.onLogin = async () => { updateTexts(); await loadBuyers(); };
+    window.onLogout = () => { updateTexts(); };
+    window.onLangChange = () => { updateTexts(); renderTable(); };
+
+    renderHeader('buyers');
+    updateTexts();
+  </script>
+</body>
+</html>
