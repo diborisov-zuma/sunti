@@ -35,6 +35,7 @@ exports.users = async (req, res) => {
 
     // GET /users/me — данные текущего пользователя
     if (req.method === 'GET' && req.url.includes('/me')) {
+      // Base query without sales_level (added separately if column exists)
       const [rows] = await bigquery.query({
         query: `SELECT u.id, u.email, u.name, u.telegram_chat_id, u.telegram_username,
                        u.is_admin, u.can_see_salary, u.is_active,
@@ -43,9 +44,7 @@ exports.users = async (req, res) => {
                        (SELECT COUNT(*) FROM \`${PROJECT}.${DATASET}.users_folders\`
                         WHERE user_email = u.email AND docs_level IN ('viewer','editor')) AS docs_folder_count,
                        (SELECT COUNT(*) FROM \`${PROJECT}.${DATASET}.users_folders\`
-                        WHERE user_email = u.email AND materials_level IN ('viewer','editor')) AS materials_folder_count,
-                       (SELECT COUNT(*) FROM \`${PROJECT}.${DATASET}.users_folders\`
-                        WHERE user_email = u.email AND sales_level IN ('viewer','editor')) AS sales_folder_count
+                        WHERE user_email = u.email AND materials_level IN ('viewer','editor')) AS materials_folder_count
                 FROM ${table} u WHERE u.email = @email`,
         params: { email },
       });
@@ -54,7 +53,17 @@ exports.users = async (req, res) => {
       user.has_contracts_access = user.is_admin === true || parseInt(user.editor_folder_count) > 0;
       user.has_docs_access = user.is_admin === true || parseInt(user.docs_folder_count) > 0;
       user.has_materials_access = user.is_admin === true || parseInt(user.materials_folder_count) > 0;
-      user.has_sales_access = user.is_admin === true || parseInt(user.sales_folder_count) > 0;
+      // sales_level may not exist yet — query separately, fallback to 0
+      let salesCount = 0;
+      try {
+        const [sr] = await bigquery.query({
+          query: `SELECT COUNT(*) AS cnt FROM \`${PROJECT}.${DATASET}.users_folders\`
+                  WHERE user_email = @email AND sales_level IN ('viewer','editor')`,
+          params: { email },
+        });
+        salesCount = parseInt(sr[0]?.cnt) || 0;
+      } catch(e) { /* column doesn't exist yet */ }
+      user.has_sales_access = user.is_admin === true || salesCount > 0;
       res.json(user);
       return;
     }
