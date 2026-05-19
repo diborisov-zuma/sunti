@@ -383,66 +383,68 @@
       return map[type] || type || '—';
     }
 
+    function setText(id, text) { const el = document.getElementById(id); if (el) el.textContent = text; }
+
     function updateTexts() {
-      document.getElementById('t-guest-title').textContent = t('guestTitle');
-      document.getElementById('t-guest-sub').textContent = t('guestSub');
-      document.getElementById('t-page-title').textContent = t('navSales');
-      document.getElementById('btn-add-sale').textContent = t('saleAdd');
-      document.getElementById('th-buyer').textContent = t('saleBuyer');
-      document.getElementById('th-project').textContent = t('navFolders');
-      document.getElementById('th-status').textContent = t('statusLabel');
-      document.getElementById('th-total').textContent = t('totalAmount');
-      document.getElementById('th-paid').textContent = t('paidAmount');
-      document.getElementById('th-remaining').textContent = t('saleRemaining');
+      setText('t-guest-title', t('guestTitle'));
+      setText('t-guest-sub', t('guestSub'));
+      setText('t-page-title', t('navSales'));
+      setText('btn-add-sale', t('saleAdd'));
+      setText('th-buyer', t('saleBuyer'));
+      setText('th-project', t('navFolders'));
+      setText('th-status', t('statusLabel'));
+      setText('th-total', t('totalAmount'));
+      setText('th-paid', t('paidAmount'));
+      setText('th-remaining', t('saleRemaining'));
 
       // Sale modal
-      document.getElementById('t-modal-sale-title').textContent = t('saleAdd');
-      document.getElementById('lbl-buyer').textContent = t('saleBuyer');
-      document.getElementById('lbl-company').textContent = t('company');
-      document.getElementById('lbl-folder').textContent = t('navFolders');
-      document.getElementById('lbl-sale-status').textContent = t('statusLabel');
-      document.getElementById('lbl-sale-name').textContent = t('name');
-      document.getElementById('lbl-reservation-date').textContent = t('saleReservationDate');
-      document.getElementById('lbl-total-amount').textContent = t('totalAmount');
-      document.getElementById('lbl-reservation-amount').textContent = t('saleReservationAmount');
-      document.getElementById('lbl-transfer-date').textContent = t('saleTransferDate');
-      document.getElementById('lbl-sale-notes').textContent = t('notes');
-      document.getElementById('btn-sale-cancel').textContent = t('cancel');
-      document.getElementById('btn-sale-save').textContent = t('save');
+      setText('t-modal-sale-title', t('saleAdd'));
+      setText('lbl-buyer', t('saleBuyer'));
+      setText('lbl-company', t('company'));
+      setText('lbl-folder', t('navFolders'));
+      setText('lbl-sale-status', t('statusLabel'));
+      setText('lbl-sale-name', t('name'));
+      setText('lbl-reservation-date', t('saleReservationDate'));
+      setText('lbl-total-amount', t('totalAmount'));
+      setText('lbl-reservation-amount', t('saleReservationAmount'));
+      setText('lbl-transfer-date', t('saleTransferDate'));
+      setText('lbl-sale-notes', t('notes'));
+      setText('btn-sale-cancel', t('cancel'));
+      setText('btn-sale-save', t('save'));
 
       // Contract modal
-      document.getElementById('t-modal-contract-title').textContent = t('saleAddContract');
-      document.getElementById('lbl-contract-type').textContent = t('saleContractType');
-      document.getElementById('lbl-contract-number').textContent = t('saleContractNumber');
-      document.getElementById('lbl-contract-name').textContent = t('name');
-      document.getElementById('lbl-contract-date').textContent = t('date');
-      document.getElementById('lbl-contract-amount').textContent = t('totalAmount');
-      document.getElementById('lbl-contract-status').textContent = t('statusLabel');
-      document.getElementById('lbl-contract-notes').textContent = t('notes');
-      document.getElementById('btn-contract-cancel').textContent = t('cancel');
-      document.getElementById('btn-contract-save').textContent = t('save');
+      setText('t-modal-contract-title', t('saleAddContract'));
+      setText('lbl-contract-type', t('saleContractType'));
+      setText('lbl-contract-number', t('saleContractNumber'));
+      setText('lbl-contract-name', t('name'));
+      setText('lbl-contract-date', t('date'));
+      setText('lbl-contract-amount', t('totalAmount'));
+      setText('lbl-contract-status', t('statusLabel'));
+      setText('lbl-contract-notes', t('notes'));
+      setText('btn-contract-cancel', t('cancel'));
+      setText('btn-contract-save', t('save'));
 
       // Payment modal
-      document.getElementById('t-modal-payment-title').textContent = t('saleAddPayment');
-      document.getElementById('lbl-pmt-amount').textContent = t('amount');
-      document.getElementById('lbl-pmt-date').textContent = t('date');
-      document.getElementById('lbl-pmt-method').textContent = t('salePaymentMethod');
-      document.getElementById('lbl-pmt-account').textContent = t('account');
-      document.getElementById('lbl-pmt-reference').textContent = t('saleReference');
-      document.getElementById('lbl-pmt-receipt').textContent = t('saleReceipt');
-      document.getElementById('lbl-pmt-notes').textContent = t('notes');
-      document.getElementById('btn-pmt-cancel').textContent = t('cancel');
-      document.getElementById('btn-pmt-save').textContent = t('save');
+      setText('t-modal-payment-title', t('saleAddPayment'));
+      setText('lbl-pmt-amount', t('amount'));
+      setText('lbl-pmt-date', t('date'));
+      setText('lbl-pmt-method', t('salePaymentMethod'));
+      setText('lbl-pmt-account', t('account'));
+      setText('lbl-pmt-reference', t('saleReference'));
+      setText('lbl-pmt-receipt', t('saleReceipt'));
+      setText('lbl-pmt-notes', t('notes'));
+      setText('btn-pmt-cancel', t('cancel'));
+      setText('btn-pmt-save', t('save'));
 
       // Schedule modal
-      document.getElementById('t-modal-schedule-title').textContent = t('saleAddMilestone');
-      document.getElementById('lbl-ms-name').textContent = t('name');
-      document.getElementById('lbl-ms-type').textContent = t('saleContractType');
-      document.getElementById('lbl-ms-amount').textContent = t('amount');
-      document.getElementById('lbl-ms-date').textContent = t('date');
-      document.getElementById('lbl-ms-notes').textContent = t('notes');
-      document.getElementById('btn-ms-cancel').textContent = t('cancel');
-      document.getElementById('btn-ms-save').textContent = t('save');
+      setText('t-modal-schedule-title', t('saleAddMilestone'));
+      setText('lbl-ms-name', t('name'));
+      setText('lbl-ms-type', t('saleContractType'));
+      setText('lbl-ms-amount', t('amount'));
+      setText('lbl-ms-date', t('date'));
+      setText('lbl-ms-notes', t('notes'));
+      setText('btn-ms-cancel', t('cancel'));
+      setText('btn-ms-save', t('save'));
 
       updateHeaderTexts();
     }
