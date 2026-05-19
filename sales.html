@@ -621,7 +621,10 @@
               <td class="amount-green">${fmtMoney(ms.paid_amount)}</td>
               <td>${statusBadge(ms.status)}</td>
               <td>
-                ${canEdit ? `<button class="btn btn-outline" style="padding:1px 6px;font-size:0.72rem" data-action="add-payment" data-contract-id="${contractId}" data-schedule-id="${ms.id}">${t('saleAddPayment')}</button>` : ''}
+                ${canEdit ? `
+                  <button class="btn btn-outline" style="padding:1px 6px;font-size:0.72rem" data-action="edit-milestone" data-id="${ms.id}" data-contract-id="${contractId}">${t('edit')}</button>
+                  <button class="btn btn-outline" style="padding:1px 6px;font-size:0.72rem" data-action="add-payment" data-contract-id="${contractId}" data-schedule-id="${ms.id}">${t('saleAddPayment')}</button>
+                ` : ''}
               </td>
             </tr>`;
             if (isExpS) {
@@ -737,6 +740,21 @@
         document.getElementById('t-modal-schedule-title').textContent = t('saleAddMilestone');
         ['ms-name','ms-amount','ms-date','ms-notes'].forEach(id => document.getElementById(id).value = '');
         document.getElementById('ms-type').value = 'installment';
+        openModal('modal-schedule');
+      }
+      if (action === 'edit-milestone') {
+        const cId = btn.dataset.contractId;
+        const schedules = contractSchedules[cId] || [];
+        const ms = schedules.find(x => x.id === btn.dataset.id);
+        if (!ms) return;
+        currentScheduleMode = 'edit'; currentScheduleId = ms.id;
+        currentScheduleContractId = cId;
+        document.getElementById('t-modal-schedule-title').textContent = t('edit');
+        document.getElementById('ms-name').value = ms.name || '';
+        document.getElementById('ms-type').value = ms.milestone_type || 'installment';
+        document.getElementById('ms-amount').value = fmt(ms.amount);
+        document.getElementById('ms-date').value = ms.due_date ? (ms.due_date.value || ms.due_date) : '';
+        document.getElementById('ms-notes').value = ms.notes || '';
         openModal('modal-schedule');
       }
 
@@ -859,7 +877,11 @@
       };
       closeModal('modal-schedule');
       try {
-        await apiFetch('/payment_schedules', { method: 'POST', body: JSON.stringify(body) });
+        if (currentScheduleMode === 'create') {
+          await apiFetch('/payment_schedules', { method: 'POST', body: JSON.stringify(body) });
+        } else {
+          await apiFetch(`/payment_schedules/${currentScheduleId}`, { method: 'PUT', body: JSON.stringify(body) });
+        }
         showToast(t('saved'), 'success');
         loadContractDetail(currentScheduleContractId);
       } catch(e) { showToast(e.message, 'error'); }
