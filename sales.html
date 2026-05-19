@@ -472,10 +472,12 @@
           const size = f.file_size > 1048576 ? (f.file_size/1048576).toFixed(1)+' MB' : Math.round((f.file_size||0)/1024)+' KB';
           html += `<div class="file-row">
             <span class="file-name">📎 ${f.file_name || '—'} <span class="file-size">(${size})</span></span>
-            <button class="btn btn-outline" style="padding:1px 6px;font-size:0.72rem"
-              data-action="download-file" data-file-type="${entityType}" data-file-id="${f.id}">${t('download')}</button>
-            ${canEdit ? `<button class="btn btn-outline" style="padding:1px 6px;font-size:0.72rem;color:#c5221f;border-color:#c5221f"
-              data-action="delete-file" data-file-type="${entityType}" data-file-id="${f.id}" data-file-entity-id="${entityId}">×</button>` : ''}
+            <span style="display:inline-flex;gap:6px;margin-left:30px">
+              <button class="btn btn-outline" style="padding:1px 6px;font-size:0.72rem"
+                data-action="download-file" data-file-type="${entityType}" data-file-id="${f.id}">${t('download')}</button>
+              ${canEdit ? `<button class="btn btn-outline" style="padding:1px 6px;font-size:0.72rem;color:#c5221f;border-color:#c5221f"
+                data-action="delete-file" data-file-type="${entityType}" data-file-id="${f.id}" data-file-entity-id="${entityId}">×</button>` : ''}
+            </span>
           </div>`;
         });
       }
