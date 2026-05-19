@@ -54,8 +54,8 @@
 
     .schedule-detail { padding:16px 16px 16px 40px;background:#e8faed;border-bottom:1px solid #e8e8e8;border-radius:6px;margin:6px 0; }
     .pmt-table { width:100%;border-collapse:collapse;margin-top:8px; }
-    .pmt-table th { padding:14px 14px;font-size:0.7rem;font-weight:600;color:#888;text-align:left; }
-    .pmt-table td { padding:15px 14px;font-size:0.82rem;color:#333; }
+    .pmt-table th { padding:16px 14px;font-size:0.7rem;font-weight:600;color:#888;text-align:left;border-bottom:1px solid #d0d0d0; }
+    .pmt-table td { padding:20px 14px;font-size:0.82rem;color:#333;border-bottom:1px solid #f0f0f0; }
 
     .file-list { margin:8px 0; }
     .file-row { display:flex;align-items:center;gap:8px;padding:5px 0;font-size:0.82rem; }
@@ -356,6 +356,7 @@
     let currentSaleMode = 'create', currentSaleId = null;
     let currentContractMode = 'create', currentContractId = null, currentContractSaleId = null;
     let currentScheduleMode = 'create', currentScheduleId = null, currentScheduleContractId = null;
+    let currentPaymentMode = 'create', currentPaymentId = null;
     let currentPaymentContractId = null, currentPaymentScheduleId = null;
     let fileUploadCtx = null; // { type: 'contract'|'payment', id, reloadFn }
 
@@ -703,7 +704,7 @@
         let html = `<table class="pmt-table"><thead><tr>
           <th>${t('date')}</th><th>${t('amount')}</th><th>${t('salePaymentMethod')}</th>
           <th>${t('account')}</th><th>${t('saleReference')}</th><th>${t('statusLabel')}</th>
-          <th>${t('file')}</th>
+          <th>${t('file')}</th><th style="width:60px"></th>
         </tr></thead><tbody>`;
         filtered.forEach(p => {
           const pFiles = pmtFilesMap[p.id] || [];
@@ -721,6 +722,7 @@
             <td>${p.reference || '—'}</td>
             <td>${statusBadge(p.status)}</td>
             <td>${filesHtml}${canEdit ? `<button class="btn btn-outline" style="padding:1px 6px;font-size:0.68rem;margin-top:2px" data-action="add-file" data-file-type="payment" data-file-entity-id="${p.id}">+ ${t('file')}</button>` : ''}</td>
+            <td>${canEdit ? `<button class="btn btn-outline" style="padding:1px 6px;font-size:0.72rem" data-action="edit-payment" data-id="${p.id}" data-contract-id="${p.contract_id}" data-schedule-id="${p.schedule_id || ''}">${t('edit')}</button>` : ''}</td>
           </tr>`;
         });
         html += '</tbody></table>';
@@ -839,19 +841,45 @@
 
       // ─── Payment CRUD ───
       if (action === 'add-payment') {
+        currentPaymentMode = 'create'; currentPaymentId = null;
         currentPaymentContractId = btn.dataset.contractId;
         currentPaymentScheduleId = btn.dataset.scheduleId || '';
         document.getElementById('t-modal-payment-title').textContent = t('saleAddPayment');
         ['pmt-amount','pmt-date','pmt-reference','pmt-receipt','pmt-notes'].forEach(id => document.getElementById(id).value = '');
         document.getElementById('pmt-method').value = 'bank_transfer';
-        // Fill accounts for selected company
-        const accSel = document.getElementById('pmt-account');
-        accSel.innerHTML = '<option value="">—</option>';
-        const companyAccounts = filterCompany ? accountsCache.filter(a => a.company_id === filterCompany) : accountsCache;
-        companyAccounts.forEach(a => { accSel.innerHTML += `<option value="${a.id}">${a.name} (${a.bank_name || ''})</option>`; });
+        fillPaymentAccounts('');
+        openModal('modal-payment');
+      }
+      if (action === 'edit-payment') {
+        const cId = btn.dataset.contractId;
+        // Find payment in schedulePayments cache
+        let pmt = null;
+        for (const arr of Object.values(schedulePayments)) {
+          pmt = arr.find(p => p.id === btn.dataset.id);
+          if (pmt) break;
+        }
+        if (!pmt) return;
+        currentPaymentMode = 'edit'; currentPaymentId = pmt.id;
+        currentPaymentContractId = cId;
+        currentPaymentScheduleId = pmt.schedule_id || '';
+        document.getElementById('t-modal-payment-title').textContent = t('edit');
+        document.getElementById('pmt-amount').value = fmt(pmt.amount);
+        document.getElementById('pmt-date').value = pmt.payment_date ? (pmt.payment_date.value || pmt.payment_date) : '';
+        document.getElementById('pmt-method').value = pmt.payment_method || 'bank_transfer';
+        fillPaymentAccounts(pmt.account_id || '');
+        document.getElementById('pmt-reference').value = pmt.reference || '';
+        document.getElementById('pmt-receipt').value = pmt.receipt_number || '';
+        document.getElementById('pmt-notes').value = pmt.notes || '';
         openModal('modal-payment');
       }
     });
+
+    function fillPaymentAccounts(selectedId) {
+      const accSel = document.getElementById('pmt-account');
+      accSel.innerHTML = '<option value="">—</option>';
+      const companyAccounts = filterCompany ? accountsCache.filter(a => a.company_id === filterCompany) : accountsCache;
+      companyAccounts.forEach(a => { accSel.innerHTML += `<option value="${a.id}" ${a.id === selectedId ? 'selected' : ''}>${a.name} (${a.bank_name || ''})</option>`; });
+    }
 
     // ─── Sale modal helpers ───
     function fillSaleModal(s) {
@@ -985,7 +1013,11 @@
       };
       closeModal('modal-payment');
       try {
-        await apiFetch('/sales_payments', { method: 'POST', body: JSON.stringify(body) });
+        if (currentPaymentMode === 'create') {
+          await apiFetch('/sales_payments', { method: 'POST', body: JSON.stringify(body) });
+        } else {
+          await apiFetch(`/sales_payments/${currentPaymentId}`, { method: 'PUT', body: JSON.stringify(body) });
+        }
         showToast(t('saved'), 'success');
         loadSales();
       } catch(e) { showToast(e.message, 'error'); }
