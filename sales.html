@@ -36,15 +36,17 @@
 
     .expand-btn { background:none;border:none;cursor:pointer;font-size:0.7rem;color:#888;padding:4px; }
     .detail-row td { padding:0 !important;border-bottom:1px solid #e8e8e8 !important; }
-    .detail-inner { padding:16px 16px 16px 44px;background:#fafcff; }
+    .detail-inner { padding:20px 24px 20px 48px;background:#fafcff; }
+    .ct-row-land td { background:#daf7dd !important; }
+    .ct-row-construction td, .ct-row-house_purchase td { background:#e8eefc !important; }
 
     .info-grid { display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px 24px;margin-bottom:16px; }
     .info-item .label { font-size:0.72rem;color:#888;text-transform:uppercase; }
     .info-item .value { font-size:0.88rem;color:#333;font-weight:500; }
 
     .sub-table { width:100%;border-collapse:collapse;margin-top:8px; }
-    .sub-table th { padding:6px 10px;font-size:0.72rem;font-weight:600;color:#888;text-align:left;text-transform:uppercase;border-bottom:1px solid #e8e8e8; }
-    .sub-table td { padding:8px 10px;font-size:0.84rem;color:#333;border-bottom:1px solid #f0f0f0; }
+    .sub-table th { padding:10px 14px;font-size:0.72rem;font-weight:600;color:#888;text-align:left;text-transform:uppercase;border-bottom:1px solid #e8e8e8; }
+    .sub-table td { padding:10px 14px;font-size:0.84rem;color:#333;border-bottom:1px solid #f0f0f0; }
     .sub-table tr:last-child td { border-bottom:none; }
     .sub-table tr:hover td { background:#f0f4ff; }
     .sub-table tr.expanded td { background:#e8f0fe; }
@@ -155,7 +157,11 @@
           <input type="date" id="s-reservation-date">
         </div>
       </div>
-      <div class="fields-row">
+      <div class="fields-row-3">
+        <div class="field-group">
+          <label id="lbl-total-amount"></label>
+          <input type="number" id="s-total-amount" min="0" step="0.01">
+        </div>
         <div class="field-group">
           <label id="lbl-reservation-amount"></label>
           <input type="number" id="s-reservation-amount" min="0" step="0.01">
@@ -397,6 +403,7 @@
       document.getElementById('lbl-sale-status').textContent = t('statusLabel');
       document.getElementById('lbl-sale-name').textContent = t('name');
       document.getElementById('lbl-reservation-date').textContent = t('saleReservationDate');
+      document.getElementById('lbl-total-amount').textContent = t('totalAmount');
       document.getElementById('lbl-reservation-amount').textContent = t('saleReservationAmount');
       document.getElementById('lbl-transfer-date').textContent = t('saleTransferDate');
       document.getElementById('lbl-sale-notes').textContent = t('notes');
@@ -554,7 +561,8 @@
 
           contracts.forEach(c => {
             const isExpC = expandedContracts[c.id];
-            html += `<tr class="${isExpC ? 'expanded' : ''}">
+            const typeClass = c.contract_type === 'land_purchase' ? 'ct-row-land' : (c.contract_type === 'construction' || c.contract_type === 'house_purchase') ? 'ct-row-construction' : '';
+            html += `<tr class="${typeClass} ${isExpC ? 'expanded' : ''}">
               <td><button class="expand-btn" data-action="toggle-contract" data-id="${c.id}" data-sale-id="${saleId}">
                 ${isExpC ? '▾' : '▸'}</button></td>
               <td>${contractTypeLabel(c.contract_type)}</td>
@@ -762,6 +770,7 @@
       document.getElementById('s-status').value = s?.status || 'reservation';
       document.getElementById('s-name').value = s?.name || '';
       document.getElementById('s-reservation-date').value = s?.reservation_date ? (s.reservation_date.value || s.reservation_date) : '';
+      document.getElementById('s-total-amount').value = s ? fmt(s.total_amount) : '';
       document.getElementById('s-reservation-amount').value = s ? fmt(s.reservation_amount) : '';
       document.getElementById('s-transfer-date').value = s?.transfer_date ? (s.transfer_date.value || s.transfer_date) : '';
       document.getElementById('s-notes').value = s?.notes || '';
@@ -788,6 +797,7 @@
         name: document.getElementById('s-name').value.trim(),
         status: document.getElementById('s-status').value,
         reservation_date: document.getElementById('s-reservation-date').value,
+        total_amount: document.getElementById('s-total-amount').value || 0,
         reservation_amount: document.getElementById('s-reservation-amount').value || 0,
         transfer_date: document.getElementById('s-transfer-date').value,
         notes: document.getElementById('s-notes').value.trim(),
