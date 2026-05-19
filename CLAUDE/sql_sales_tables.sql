@@ -108,3 +108,14 @@ CREATE TABLE IF NOT EXISTS `project-9718e7d4-4cd7-4f52-8d6.sunti.sales_contract_
   uploaded_by STRING,
   uploaded_at TIMESTAMP
 );
+
+-- 7. Sales payment files (файлы платежей — квитанции, подтверждения)
+CREATE TABLE IF NOT EXISTS `project-9718e7d4-4cd7-4f52-8d6.sunti.sales_payment_files` (
+  id STRING NOT NULL,
+  payment_id STRING,              -- FK → sales_payments
+  file_name STRING,
+  file_url STRING,
+  file_size INT64,
+  uploaded_by STRING,
+  uploaded_at TIMESTAMP
+);

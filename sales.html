@@ -54,8 +54,13 @@
 
     .schedule-detail { padding:16px 16px 16px 40px;background:#e8faed;border-bottom:1px solid #e8e8e8;border-radius:6px;margin:6px 0; }
     .pmt-table { width:100%;border-collapse:collapse;margin-top:8px; }
-    .pmt-table th { padding:12px 12px;font-size:0.7rem;font-weight:600;color:#888;text-align:left; }
-    .pmt-table td { padding:13px 12px;font-size:0.82rem;color:#333; }
+    .pmt-table th { padding:14px 14px;font-size:0.7rem;font-weight:600;color:#888;text-align:left; }
+    .pmt-table td { padding:15px 14px;font-size:0.82rem;color:#333; }
+
+    .file-list { margin:8px 0; }
+    .file-row { display:flex;align-items:center;gap:8px;padding:5px 0;font-size:0.82rem; }
+    .file-row .file-name { flex:1;color:#333; }
+    .file-row .file-size { color:#999; }
 
     .badge { display:inline-block;padding:2px 8px;border-radius:10px;font-size:0.72rem;font-weight:600; }
     .badge-green { background:#e6f4ea;color:#1e8e3e; }
@@ -328,6 +333,7 @@
     </div>
   </div>
 
+  <input type="file" id="hidden-file-input" style="display:none">
   <div class="toast" id="toast"></div>
 
   <script>
@@ -351,6 +357,7 @@
     let currentContractMode = 'create', currentContractId = null, currentContractSaleId = null;
     let currentScheduleMode = 'create', currentScheduleId = null, currentScheduleContractId = null;
     let currentPaymentContractId = null, currentPaymentScheduleId = null;
+    let fileUploadCtx = null; // { type: 'contract'|'payment', id, reloadFn }
 
     function fmt(v) { const n = parseFloat(typeof v === 'object' && v !== null ? v.value : v); return isNaN(n) ? 0 : n; }
     function fmtMoney(v) { return fmt(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
@@ -448,6 +455,31 @@
       setText('btn-ms-save', t('save'));
 
       updateHeaderTexts();
+    }
+
+    // ─── Files helper ───
+    function renderFileBlock(files, entityType, entityId) {
+      let html = `<div class="section-title" style="display:flex;justify-content:space-between;align-items:center">
+        <span>${t('file')}</span>
+        ${canEdit ? `<button class="btn btn-outline" style="padding:2px 8px;font-size:0.72rem"
+          data-action="add-file" data-file-type="${entityType}" data-file-entity-id="${entityId}">${t('addFile')}</button>` : ''}
+      </div><div class="file-list">`;
+      if (!files || !files.length) {
+        html += `<div style="color:#ccc;font-size:0.82rem">—</div>`;
+      } else {
+        files.forEach(f => {
+          const size = f.file_size > 1048576 ? (f.file_size/1048576).toFixed(1)+' MB' : Math.round((f.file_size||0)/1024)+' KB';
+          html += `<div class="file-row">
+            <span class="file-name">📎 ${f.file_name || '—'} <span class="file-size">(${size})</span></span>
+            <button class="btn btn-outline" style="padding:1px 6px;font-size:0.72rem"
+              data-action="download-file" data-file-type="${entityType}" data-file-id="${f.id}">${t('download')}</button>
+            ${canEdit ? `<button class="btn btn-outline" style="padding:1px 6px;font-size:0.72rem;color:#c5221f;border-color:#c5221f"
+              data-action="delete-file" data-file-type="${entityType}" data-file-id="${f.id}" data-file-entity-id="${entityId}">×</button>` : ''}
+          </div>`;
+        });
+      }
+      html += '</div>';
+      return html;
     }
 
     // ─── Refs ───
@@ -595,10 +627,15 @@
       if (!container) return;
 
       try {
-        const schedules = await apiFetch(`/payment_schedules?contract_id=${contractId}`);
+        const [schedules, contractFiles] = await Promise.all([
+          apiFetch(`/payment_schedules?contract_id=${contractId}`),
+          apiFetch(`/sales_contract_files?contract_id=${contractId}`).catch(() => []),
+        ]);
         contractSchedules[contractId] = schedules;
 
-        let html = `<div class="section-title">${t('saleSchedule')} (${schedules.length})
+        let html = renderFileBlock(contractFiles, 'contract', contractId);
+
+        html += `<div class="section-title">${t('saleSchedule')} (${schedules.length})
           ${canEdit ? `<button class="btn btn-primary" style="padding:2px 10px;font-size:0.75rem;margin-left:auto" data-action="add-milestone" data-contract-id="${contractId}">${t('saleAddMilestone')}</button>` : ''}
         </div>`;
 
@@ -657,11 +694,25 @@
           return;
         }
 
+        // Load files for each payment
+        const pmtFilesMap = {};
+        await Promise.all(filtered.map(async p => {
+          try { pmtFilesMap[p.id] = await apiFetch(`/sales_payment_files?payment_id=${p.id}`); } catch(e) { pmtFilesMap[p.id] = []; }
+        }));
+
         let html = `<table class="pmt-table"><thead><tr>
           <th>${t('date')}</th><th>${t('amount')}</th><th>${t('salePaymentMethod')}</th>
           <th>${t('account')}</th><th>${t('saleReference')}</th><th>${t('statusLabel')}</th>
+          <th>${t('file')}</th>
         </tr></thead><tbody>`;
         filtered.forEach(p => {
+          const pFiles = pmtFilesMap[p.id] || [];
+          const filesHtml = pFiles.length
+            ? pFiles.map(f => `<span style="font-size:0.78rem">📎 ${f.file_name || '—'}
+                <button class="btn btn-outline" style="padding:0 4px;font-size:0.68rem;margin-left:2px" data-action="download-file" data-file-type="payment" data-file-id="${f.id}">${t('download')}</button>
+                ${canEdit ? `<button class="btn btn-outline" style="padding:0 4px;font-size:0.68rem;color:#c5221f;border-color:#c5221f" data-action="delete-file" data-file-type="payment" data-file-id="${f.id}" data-file-entity-id="${p.id}">×</button>` : ''}
+              </span>`).join('<br>')
+            : '';
           html += `<tr>
             <td>${formatDate(p.payment_date)}</td>
             <td class="amount-green" style="font-weight:500">${fmtMoney(p.amount)}</td>
@@ -669,6 +720,7 @@
             <td>${p.account_name || '—'}</td>
             <td>${p.reference || '—'}</td>
             <td>${statusBadge(p.status)}</td>
+            <td>${filesHtml}${canEdit ? `<button class="btn btn-outline" style="padding:1px 6px;font-size:0.68rem;margin-top:2px" data-action="add-file" data-file-type="payment" data-file-entity-id="${p.id}">+ ${t('file')}</button>` : ''}</td>
           </tr>`;
         });
         html += '</tbody></table>';
@@ -681,6 +733,33 @@
       const btn = e.target.closest('[data-action]');
       if (!btn) return;
       const action = btn.dataset.action;
+
+      // ─── File actions ───
+      if (action === 'add-file') {
+        fileUploadCtx = { type: btn.dataset.fileType, id: btn.dataset.fileEntityId };
+        document.getElementById('hidden-file-input').click();
+        return;
+      }
+      if (action === 'download-file') {
+        const endpoint = btn.dataset.fileType === 'contract' ? 'sales_contract_files' : 'sales_payment_files';
+        try {
+          const r = await apiFetch(`/${endpoint}/${btn.dataset.fileId}/signed-download-url`);
+          if (r.url) window.open(r.url, '_blank');
+        } catch(err) { showToast(err.message, 'error'); }
+        return;
+      }
+      if (action === 'delete-file') {
+        if (!confirm(t('confirmDelete'))) return;
+        btn.disabled = true;
+        const endpoint = btn.dataset.fileType === 'contract' ? 'sales_contract_files' : 'sales_payment_files';
+        try {
+          await apiFetch(`/${endpoint}/${btn.dataset.fileId}`, { method: 'DELETE' });
+          showToast(t('deleted'), 'success');
+          // Reload: find parent contract or payment context and reload
+          loadSales();
+        } catch(err) { showToast(err.message, 'error'); btn.disabled = false; }
+        return;
+      }
 
       if (action === 'toggle-sale') {
         expandedSales[btn.dataset.id] = !expandedSales[btn.dataset.id];
@@ -910,6 +989,42 @@
         showToast(t('saved'), 'success');
         loadSales();
       } catch(e) { showToast(e.message, 'error'); }
+    });
+
+    // ─── File upload handler ───
+    document.getElementById('hidden-file-input').addEventListener('change', async e => {
+      const file = e.target.files[0];
+      e.target.value = '';
+      if (!file || !fileUploadCtx) return;
+      const ctx = fileUploadCtx;
+      showToast(t('uploading'));
+      try {
+        const contentType = file.type || 'application/octet-stream';
+        let endpoint, signBody, regBody;
+        if (ctx.type === 'contract') {
+          endpoint = 'sales_contract_files';
+          signBody = { contract_id: ctx.id, file_name: file.name, content_type: contentType };
+          regBody = (url) => ({ contract_id: ctx.id, file_name: file.name, file_url: url, file_size: file.size });
+        } else {
+          endpoint = 'sales_payment_files';
+          signBody = { payment_id: ctx.id, file_name: file.name, content_type: contentType };
+          regBody = (url) => ({ payment_id: ctx.id, file_name: file.name, file_url: url, file_size: file.size });
+        }
+        const { upload_url, file_url } = await apiFetch(`/${endpoint}/signed-upload-url`, {
+          method: 'POST', body: JSON.stringify(signBody),
+        });
+        await new Promise((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          xhr.open('PUT', upload_url);
+          xhr.setRequestHeader('Content-Type', contentType);
+          xhr.onload = () => xhr.status === 200 ? resolve() : reject(new Error('Upload failed'));
+          xhr.onerror = () => reject(new Error('Upload error'));
+          xhr.send(file);
+        });
+        await apiFetch(`/${endpoint}`, { method: 'POST', body: JSON.stringify(regBody(file_url)) });
+        showToast(t('uploaded'), 'success');
+        loadSales();
+      } catch(err) { showToast(err.message, 'error'); }
     });
 
     // ─── Keyboard ───
