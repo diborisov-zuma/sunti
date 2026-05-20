@@ -471,6 +471,13 @@
       return `<span class="amount-col ${cls}">${fmt(display)}</span>`;
     }
 
+    function canDeleteInvoice(inv) {
+      if (numVal(inv.paid_amount) !== 0) return false;
+      if (isAdmin) return true;
+      const folder = foldersCache.find(f => f.id === inv.folder_id);
+      return folder && folder.docs_access === 'editor';
+    }
+
     function setText(id, val) { const el = document.getElementById(id); if (el) el.textContent = val; }
 
     function updateTexts() {
@@ -1075,7 +1082,10 @@
             <td>${amtCell(inv.total_amount, dir)}</td>
             <td>${amtCell(inv.paid_amount, dir)}</td>
             <td>${statusBadge(inv.status)}</td>
-            <td><button class="btn btn-outline" style="padding:1px 6px;font-size:0.72rem" data-action="unlink-inv" data-inv-id="${inv.id}" data-contract-id="${contractId}">${t('unlinkInvoice')}</button></td>
+            <td style="white-space:nowrap">
+              <button class="btn btn-outline" style="padding:1px 6px;font-size:0.72rem" data-action="unlink-inv" data-inv-id="${inv.id}" data-contract-id="${contractId}">${t('unlinkInvoice')}</button>
+              ${canDeleteInvoice(inv) ? `<button class="btn btn-outline" style="padding:1px 6px;font-size:0.72rem;color:#c5221f;border-color:#c5221f;margin-left:4px" data-action="delete-inv" data-inv-id="${inv.id}" data-contract-id="${contractId}">${t('deleteInvoice')}</button>` : ''}
+            </td>
           </tr>`;
           // Invoice detail row (transactions)
           html += `<tr class="detail-row" style="display:${invExp ? '' : 'none'}" id="inv-detail-${inv.id}">
@@ -1287,6 +1297,24 @@
           showToast(t('saved'), 'success');
           loadContractDetail(contractId);
           loadContracts(); // refresh totals
+        } catch(err) { showToast(err.message, 'error'); btn.disabled = false; }
+      }
+
+      if (action === 'delete-inv') {
+        const invId = btn.dataset.invId;
+        const contractId = btn.dataset.contractId;
+        const invs = contractInvoices[contractId] || [];
+        const inv = invs.find(i => i.id === invId);
+        if (inv && numVal(inv.paid_amount) !== 0) {
+          showToast(t('invoiceHasPayments'), 'error'); return;
+        }
+        if (!confirm(t('confirmDeleteInvoice'))) return;
+        btn.disabled = true;
+        try {
+          await apiFetch(`/invoices/${invId}`, { method: 'DELETE' });
+          showToast(t('deleted'), 'success');
+          loadContractDetail(contractId);
+          loadContracts();
         } catch(err) { showToast(err.message, 'error'); btn.disabled = false; }
       }
 

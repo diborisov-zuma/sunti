@@ -106,6 +106,25 @@ exports.categories = async (req, res) => {
       return;
     }
 
+    // POST /categories — admin, create new category
+    if (req.method === 'POST') {
+      if (!(await isAdmin(email))) { res.status(403).json({ error: 'Forbidden' }); return; }
+      const { name, name_en, name_th, type } = req.body || {};
+      if (!name) { res.status(400).json({ error: 'name is required' }); return; }
+      const id = require('crypto').randomUUID();
+      const [maxRows] = await bigquery.query({
+        query: `SELECT COALESCE(MAX(sort_order), 0) + 1000 AS next_order FROM ${table}`,
+      });
+      const sortOrder = maxRows[0]?.next_order || 1000;
+      await bigquery.query({
+        query: `INSERT INTO ${table} (id, name, name_en, name_th, type, sort_order)
+                VALUES (@id, @name, @name_en, @name_th, NULLIF(@type, ''), @sort_order)`,
+        params: { id, name, name_en: name_en || '', name_th: name_th || '', type: type || '', sort_order: sortOrder },
+      });
+      res.json({ success: true, id });
+      return;
+    }
+
     if (req.method === 'GET') {
       const type = req.query.type;
       let query = `SELECT id, name, name_en, name_th, type, sort_order FROM ${table} ORDER BY sort_order NULLS LAST, type, name`;

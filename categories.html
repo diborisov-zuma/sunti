@@ -67,7 +67,10 @@
 
       <div class="page-header">
         <h1 id="t-page-title"></h1>
-        <button class="btn btn-primary" id="btn-save-all"></button>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-primary" id="btn-add-cat" style="display:none"></button>
+          <button class="btn btn-primary" id="btn-save-all"></button>
+        </div>
       </div>
       <div class="hint" id="t-hint"></div>
       <div class="cat-wrap">
@@ -111,6 +114,9 @@
       setText('t-page-title',   t('navCategories'));
       setText('t-types-title',  t('categoryTypes'));
       document.getElementById('btn-add-type').textContent = t('addType');
+      const btnAddCat = document.getElementById('btn-add-cat');
+      btnAddCat.textContent = t('addCategory');
+      if (isAdmin) btnAddCat.style.display = '';
       setText('t-hint',         t('dragToReorder'));
       setText('t-col-type',     t('categoryType'));
       document.getElementById('btn-save-all').textContent = t('saveAll');
@@ -279,6 +285,19 @@
         showToast(t('saved') + ' · ' + items.length, 'success');
       } catch (err) { showToast(err.message, 'error'); }
       finally { btn.disabled = false; btn.textContent = oldText; }
+    });
+
+    document.getElementById('btn-add-cat').addEventListener('click', async () => {
+      const name = prompt('Название (RU):');
+      if (!name) return;
+      const name_en = prompt('Name (EN):') || '';
+      const name_th = prompt('ชื่อ (TH):') || '';
+      const typeId = prompt('Type (' + types.map(ty => ty.id).join('/') + '):') || '';
+      try {
+        await apiFetch('/categories', { method: 'POST', body: JSON.stringify({ name: name.trim(), name_en: name_en.trim(), name_th: name_th.trim(), type: typeId.trim() }) });
+        await loadAll();
+        showToast(t('saved'), 'success');
+      } catch (err) { showToast(err.message, 'error'); }
     });
 
     document.getElementById('btn-add-type').addEventListener('click', async () => {
