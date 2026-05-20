@@ -62,6 +62,25 @@ function sanitize(name) {
 const docTable = `\`${PROJECT}.${DATASET}.project_docs\``;
 const verTable = `\`${PROJECT}.${DATASET}.project_doc_versions\``;
 const catTable = `\`${PROJECT}.${DATASET}.project_doc_categories\``;
+const vfTable  = `\`${PROJECT}.${DATASET}.project_doc_version_files\``;
+
+let vfTableEnsured = false;
+async function ensureVfTable() {
+  if (vfTableEnsured) return;
+  await bigquery.query({
+    query: `CREATE TABLE IF NOT EXISTS ${vfTable} (
+      id STRING NOT NULL,
+      version_id STRING NOT NULL,
+      document_id STRING NOT NULL,
+      file_url STRING,
+      file_name STRING,
+      file_size INT64,
+      uploaded_by STRING,
+      uploaded_at TIMESTAMP
+    )`,
+  });
+  vfTableEnsured = true;
+}
 
 exports.project_docs = async (req, res) => {
   setCors(res);
@@ -93,31 +112,64 @@ exports.project_docs = async (req, res) => {
       return;
     }
 
-    // GET /project_docs/:id/signed-download-url (version file)
+    // GET /project_docs/:id/signed-download-url (version file — legacy or version_file)
     if (req.method === 'GET' && path.endsWith('/signed-download-url')) {
-      const versionId = path.split('/').filter(Boolean)[0];
-      const [rows] = await bigquery.query({
-        query: `SELECT file_url, file_name FROM ${verTable} WHERE id = @id`,
-        params: { id: versionId },
+      const fileId = path.split('/').filter(Boolean)[0];
+      // Try version_files table first, then fall back to versions table (legacy)
+      await ensureVfTable();
+      let fileUrl, fileName;
+      const [vfRows] = await bigquery.query({
+        query: `SELECT file_url, file_name FROM ${vfTable} WHERE id = @id`,
+        params: { id: fileId },
       });
-      if (!rows.length) { res.status(404).json({ error: 'Not found' }); return; }
-      const parsed = parseKey(rows[0].file_url);
+      if (vfRows.length) {
+        fileUrl = vfRows[0].file_url; fileName = vfRows[0].file_name;
+      } else {
+        const [rows] = await bigquery.query({
+          query: `SELECT file_url, file_name FROM ${verTable} WHERE id = @id`,
+          params: { id: fileId },
+        });
+        if (!rows.length) { res.status(404).json({ error: 'Not found' }); return; }
+        fileUrl = rows[0].file_url; fileName = rows[0].file_name;
+      }
+      const parsed = parseKey(fileUrl);
       if (!parsed) { res.status(500).json({ error: 'Bad file URL' }); return; }
       const [url] = await storage.bucket(parsed.bucket).file(parsed.key).getSignedUrl({
         version: 'v4', action: 'read',
         expires: Date.now() + SIGN_TTL_MS,
-        responseDisposition: `attachment; filename="${encodeURIComponent(rows[0].file_name || 'file')}"`,
+        responseDisposition: `attachment; filename="${encodeURIComponent(fileName || 'file')}"`,
       });
       res.json({ url });
+      return;
+    }
+
+    // GET /project_docs/:verId/files — list files for a version
+    if (req.method === 'GET' && path.endsWith('/files')) {
+      const verId = path.split('/').filter(Boolean)[0];
+      await ensureVfTable();
+      const [rows] = await bigquery.query({
+        query: `SELECT id, file_url, file_name, file_size, uploaded_by, uploaded_at
+                FROM ${vfTable} WHERE version_id = @verId ORDER BY uploaded_at ASC`,
+        params: { verId },
+      });
+      // Also include legacy file from version row itself
+      const [verRows] = await bigquery.query({
+        query: `SELECT id, file_url, file_name, file_size FROM ${verTable} WHERE id = @id AND file_url IS NOT NULL AND file_url != ''`,
+        params: { id: verId },
+      });
+      const legacyFiles = verRows.map(v => ({ id: v.id, file_name: v.file_name, file_size: v.file_size, legacy: true }));
+      res.json([...legacyFiles, ...rows]);
       return;
     }
 
     // GET /project_docs/:docId/versions
     if (req.method === 'GET' && path.endsWith('/versions')) {
       const docId = path.split('/').filter(Boolean)[0];
+      await ensureVfTable();
       const [rows] = await bigquery.query({
-        query: `SELECT id, document_id, version_number, file_name, file_size, notes, uploaded_by, uploaded_at
-                FROM ${verTable} WHERE document_id = @docId ORDER BY version_number DESC`,
+        query: `SELECT v.id, v.document_id, v.version_number, v.file_name, v.file_size, v.notes, v.uploaded_by, v.uploaded_at,
+                       (SELECT COUNT(*) FROM ${vfTable} vf WHERE vf.version_id = v.id) AS files_count
+                FROM ${verTable} v WHERE v.document_id = @docId ORDER BY v.version_number DESC`,
         params: { docId },
       });
       res.json(rows);
@@ -132,6 +184,7 @@ exports.project_docs = async (req, res) => {
       const level = await getDocsLevel(email, folderId);
       if (level === 'none') { res.status(403).json({ error: 'Forbidden' }); return; }
 
+      await ensureVfTable();
       const [rows] = await bigquery.query({
         query: `SELECT d.id, d.folder_id, d.category_id, d.name, d.description,
                        d.current_version, d.sort_order, d.status,
@@ -139,7 +192,8 @@ exports.project_docs = async (req, res) => {
                        c.name AS category_name, c.name_en AS category_name_en,
                        v.file_name AS latest_file_name, v.file_size AS latest_file_size,
                        v.notes AS latest_notes, v.uploaded_at AS latest_uploaded_at,
-                       v.id AS latest_version_id
+                       v.id AS latest_version_id,
+                       (SELECT COUNT(*) FROM ${vfTable} vf WHERE vf.version_id = v.id) AS latest_files_count
                 FROM ${docTable} d
                 LEFT JOIN ${catTable} c ON d.category_id = c.id
                 LEFT JOIN ${verTable} v ON v.document_id = d.id AND v.version_number = d.current_version
@@ -151,8 +205,59 @@ exports.project_docs = async (req, res) => {
       return;
     }
 
+    // POST /project_docs/versions/:verId/add-files — add files to existing version
+    if (req.method === 'POST' && path.includes('/versions/') && path.endsWith('/add-files')) {
+      const parts = path.split('/').filter(Boolean);
+      const verId = parts[parts.indexOf('versions') + 1];
+      const { files } = req.body || {};
+      if (!verId || !files || !files.length) { res.status(400).json({ error: 'version_id and files required' }); return; }
+
+      const [verRows] = await bigquery.query({
+        query: `SELECT v.document_id, d.folder_id FROM ${verTable} v JOIN ${docTable} d ON d.id = v.document_id WHERE v.id = @id`,
+        params: { id: verId },
+      });
+      if (!verRows.length) { res.status(404).json({ error: 'Version not found' }); return; }
+      const level = await getDocsLevel(email, verRows[0].folder_id);
+      if (level !== 'editor') { res.status(403).json({ error: 'Forbidden' }); return; }
+
+      await ensureVfTable();
+      for (const f of files) {
+        const fId = uuidv4();
+        await bigquery.query({
+          query: `INSERT INTO ${vfTable} (id, version_id, document_id, file_url, file_name, file_size, uploaded_by, uploaded_at)
+                  VALUES (@id, @verId, @docId, @file_url, @file_name, @file_size, @email, CURRENT_TIMESTAMP())`,
+          params: { id: fId, verId, docId: verRows[0].document_id, file_url: f.file_url, file_name: f.file_name || '', file_size: parseInt(f.file_size || 0), email },
+        });
+      }
+      res.json({ success: true, count: files.length });
+      return;
+    }
+
+    // DELETE /project_docs/version-files/:fileId
+    if (req.method === 'DELETE' && path.includes('/version-files/')) {
+      const fileId = path.split('/').filter(Boolean).pop();
+      await ensureVfTable();
+      const [rows] = await bigquery.query({
+        query: `SELECT vf.file_url, d.folder_id FROM ${vfTable} vf
+                JOIN ${docTable} d ON d.id = vf.document_id WHERE vf.id = @id`,
+        params: { id: fileId },
+      });
+      if (!rows.length) { res.status(404).json({ error: 'Not found' }); return; }
+      const level = await getDocsLevel(email, rows[0].folder_id);
+      if (level !== 'editor') { res.status(403).json({ error: 'Forbidden' }); return; }
+      // Delete from GCS
+      const parsed = parseKey(rows[0].file_url);
+      if (parsed) {
+        try { await storage.bucket(parsed.bucket).file(parsed.key).delete({ ignoreNotFound: true }); }
+        catch(e) { console.error('GCS delete failed', e.message); }
+      }
+      await bigquery.query({ query: `DELETE FROM ${vfTable} WHERE id = @id`, params: { id: fileId } });
+      res.json({ success: true });
+      return;
+    }
+
     // POST /project_docs — create document
-    if (req.method === 'POST' && !path.endsWith('/versions')) {
+    if (req.method === 'POST' && !path.endsWith('/versions') && !path.endsWith('/add-files') && path !== '/signed-upload-url') {
       const b = req.body || {};
       if (!b.folder_id || !b.name) { res.status(400).json({ error: 'folder_id and name required' }); return; }
 
@@ -173,13 +278,14 @@ exports.project_docs = async (req, res) => {
       return;
     }
 
-    // POST /project_docs/:docId/versions — upload new version
+    // POST /project_docs/:docId/versions — upload new version (supports multiple files)
     if (req.method === 'POST' && path.endsWith('/versions')) {
       const docId = path.split('/').filter(Boolean)[0];
-      const { file_url, file_name, file_size, notes } = req.body || {};
-      if (!docId || !file_url) { res.status(400).json({ error: 'document_id and file_url required' }); return; }
+      const { file_url, file_name, file_size, files, notes } = req.body || {};
+      // Support both legacy single-file and new multi-file format
+      const fileList = files && files.length ? files : (file_url ? [{ file_url, file_name, file_size }] : []);
+      if (!docId || !fileList.length) { res.status(400).json({ error: 'document_id and at least one file required' }); return; }
 
-      // Get doc to check folder access
       const [docRows] = await bigquery.query({
         query: `SELECT folder_id, current_version FROM ${docTable} WHERE id = @id`,
         params: { id: docId },
@@ -192,15 +298,23 @@ exports.project_docs = async (req, res) => {
       const newVersion = (parseInt(docRows[0].current_version) || 0) + 1;
       const verId = uuidv4();
 
+      // Create version row (no file_url — files go to version_files table)
       await bigquery.query({
         query: `INSERT INTO ${verTable} (id, document_id, version_number, file_url, file_name, file_size, notes, uploaded_by, uploaded_at)
-                VALUES (@id, @docId, @ver, @file_url, @file_name, @file_size, NULLIF(@notes,''), @email, CURRENT_TIMESTAMP())`,
-        params: {
-          id: verId, docId, ver: newVersion,
-          file_url, file_name: file_name || '', file_size: parseInt(file_size || 0),
-          notes: notes || '', email,
-        },
+                VALUES (@id, @docId, @ver, NULL, NULL, NULL, NULLIF(@notes,''), @email, CURRENT_TIMESTAMP())`,
+        params: { id: verId, docId, ver: newVersion, notes: notes || '', email },
       });
+
+      // Insert files into version_files table
+      await ensureVfTable();
+      for (const f of fileList) {
+        const fId = uuidv4();
+        await bigquery.query({
+          query: `INSERT INTO ${vfTable} (id, version_id, document_id, file_url, file_name, file_size, uploaded_by, uploaded_at)
+                  VALUES (@id, @verId, @docId, @file_url, @file_name, @file_size, @email, CURRENT_TIMESTAMP())`,
+          params: { id: fId, verId, docId, file_url: f.file_url, file_name: f.file_name || '', file_size: parseInt(f.file_size || 0), email },
+        });
+      }
 
       await bigquery.query({
         query: `UPDATE ${docTable} SET current_version = @ver WHERE id = @id`,
@@ -255,12 +369,17 @@ exports.project_docs = async (req, res) => {
       const level = await getDocsLevel(email, docRows[0].folder_id);
       if (level !== 'editor') { res.status(403).json({ error: 'Forbidden' }); return; }
 
-      // Delete version files from GCS
+      // Delete all files from GCS — from both legacy versions and version_files
+      await ensureVfTable();
       const [versions] = await bigquery.query({
-        query: `SELECT file_url FROM ${verTable} WHERE document_id = @id`,
+        query: `SELECT file_url FROM ${verTable} WHERE document_id = @id AND file_url IS NOT NULL AND file_url != ''`,
         params: { id },
       });
-      for (const v of versions) {
+      const [vfFiles] = await bigquery.query({
+        query: `SELECT file_url FROM ${vfTable} WHERE document_id = @id`,
+        params: { id },
+      });
+      for (const v of [...versions, ...vfFiles]) {
         const parsed = parseKey(v.file_url);
         if (parsed) {
           try { await storage.bucket(parsed.bucket).file(parsed.key).delete({ ignoreNotFound: true }); }
@@ -268,6 +387,7 @@ exports.project_docs = async (req, res) => {
         }
       }
 
+      await bigquery.query({ query: `DELETE FROM ${vfTable} WHERE document_id = @id`, params: { id } });
       await bigquery.query({ query: `DELETE FROM ${verTable} WHERE document_id = @id`, params: { id } });
       await bigquery.query({ query: `DELETE FROM ${docTable} WHERE id = @id`, params: { id } });
       res.json({ success: true });

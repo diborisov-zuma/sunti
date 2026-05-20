@@ -116,13 +116,13 @@
     </div>
   </div>
 
-  <!-- Модалка: загрузить версию -->
+  <!-- Модалка: загрузить версию (мульти-файл) -->
   <div class="modal-overlay" id="modal-version">
-    <div class="modal" style="width:460px;max-width:95vw">
+    <div class="modal" style="width:520px;max-width:95vw">
       <h3 id="t-modal-ver-title"></h3>
       <div class="field-group">
         <label id="lbl-ver-file"></label>
-        <input type="file" id="ver-file" style="padding:6px">
+        <input type="file" id="ver-file" multiple style="padding:6px">
       </div>
       <div class="field-group">
         <label id="lbl-ver-notes"></label>
@@ -131,6 +131,21 @@
       <div class="modal-actions">
         <button class="btn btn-outline" id="btn-ver-cancel"></button>
         <button class="btn btn-primary" id="btn-ver-save"></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Модалка: добавить файлы к существующей версии -->
+  <div class="modal-overlay" id="modal-add-files">
+    <div class="modal" style="width:520px;max-width:95vw">
+      <h3 id="t-modal-addfiles-title"></h3>
+      <div class="field-group">
+        <label id="lbl-addfiles-file"></label>
+        <input type="file" id="addfiles-file" multiple style="padding:6px">
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-outline" id="btn-addfiles-cancel"></button>
+        <button class="btn btn-primary" id="btn-addfiles-save"></button>
       </div>
     </div>
   </div>
@@ -149,6 +164,9 @@
     let currentDocMode = 'create';
     let currentDocId = null;
     let currentVerDocId = null;
+    let currentAddFilesVerId = null;
+    let currentAddFilesDocId = null;
+    let versionFilesCache = {}; // verId → [files]
 
     function fmt(v) { const n=parseFloat(v); return isNaN(n)?'—':n; }
     function formatDate(val) {
@@ -184,6 +202,10 @@
       document.getElementById('lbl-ver-notes').textContent = t('versionNotes');
       document.getElementById('btn-ver-cancel').textContent = t('cancel');
       document.getElementById('btn-ver-save').textContent = t('save');
+      document.getElementById('t-modal-addfiles-title').textContent = t('addFilesToVersion');
+      document.getElementById('lbl-addfiles-file').textContent = t('file');
+      document.getElementById('btn-addfiles-cancel').textContent = t('cancel');
+      document.getElementById('btn-addfiles-save').textContent = t('save');
       updateHeaderTexts();
     }
 
@@ -315,7 +337,7 @@
             <div class="doc-card-name">${d.name || '—'}</div>
             <div style="display:flex;gap:6px;align-items:center">
               <span class="doc-card-version">v${d.current_version || 0}</span>
-              ${d.latest_version_id ? `<button class="btn btn-outline" style="padding:2px 8px;font-size:0.75rem" data-action="download" data-ver-id="${d.latest_version_id}">${t('download')}</button>` : ''}
+              ${d.latest_version_id && d.latest_file_name ? `<button class="btn btn-outline" style="padding:2px 8px;font-size:0.75rem" data-action="download" data-ver-id="${d.latest_version_id}">${t('download')}</button>` : ''}
               ${accessLevel === 'editor' ? `
                 <button class="btn btn-outline" style="padding:2px 8px;font-size:0.75rem" data-action="upload-ver" data-doc-id="${d.id}">${t('uploadVersion')}</button>
                 <button class="btn btn-outline" style="padding:2px 8px;font-size:0.75rem" data-action="edit-doc" data-doc-id="${d.id}">${t('edit')}</button>
@@ -325,7 +347,7 @@
           </div>
           ${catName ? `<div class="doc-card-meta">${catName}</div>` : ''}
           ${d.description ? `<div class="doc-card-desc">${d.description}</div>` : ''}
-          ${d.latest_file_name ? `<div class="doc-card-meta">${d.latest_file_name} · ${formatDate(d.latest_uploaded_at)}${d.latest_notes ? ' · ' + d.latest_notes : ''}</div>` : ''}
+          ${d.latest_files_count > 0 || d.latest_file_name ? `<div class="doc-card-meta">${d.latest_files_count > 0 ? d.latest_files_count + ' ' + t('filesCount') : (d.latest_file_name || '')} · ${formatDate(d.latest_uploaded_at)}${d.latest_notes ? ' · ' + d.latest_notes : ''}</div>` : ''}
           <div style="margin-top:6px">
             <button style="background:none;border:none;cursor:pointer;font-size:0.78rem;color:#1a73e8" data-action="toggle-versions" data-doc-id="${d.id}">${isExp ? '▾' : '▸'} ${t('versionHistory')} ${d.current_version ? '('+d.current_version+')' : ''}</button>
           </div>
@@ -378,16 +400,37 @@
     function renderVersions(docId) {
       const versions = docVersions[docId] || [];
       if (!versions.length) return `<div style="color:#bbb;font-size:0.82rem">—</div>`;
-      return versions.map((v, i) => `
-        <div class="version-row">
-          <span class="v-num">v${v.version_number}</span>
-          ${i === 0 ? `<span class="badge-current">${t('currentVersion')}</span>` : ''}
-          <span class="v-date">${formatDate(v.uploaded_at)}</span>
-          <span class="v-file">${v.file_name || '—'}</span>
-          <span class="v-notes">${v.notes || ''}</span>
-          <button class="btn btn-outline" style="padding:1px 6px;font-size:0.72rem" data-action="download" data-ver-id="${v.id}">${t('download')}</button>
-        </div>
-      `).join('');
+      return versions.map((v, i) => {
+        const fc = parseInt(v.files_count) || 0;
+        const hasLegacyFile = v.file_name && v.file_url;
+        const totalFiles = fc + (hasLegacyFile ? 1 : 0);
+        const filesLoaded = versionFilesCache[v.id];
+        const isFilesOpen = filesLoaded && filesLoaded.length > 0;
+        let html = `<div style="border-bottom:1px solid #f0f0f0;padding:6px 0">
+          <div class="version-row">
+            <span class="v-num">v${v.version_number}</span>
+            ${i === 0 ? `<span class="badge-current">${t('currentVersion')}</span>` : ''}
+            <span class="v-date">${formatDate(v.uploaded_at)}</span>
+            <span class="v-file">${totalFiles} ${t('filesCount')}</span>
+            <span class="v-notes">${v.notes || ''}</span>
+            <button class="btn btn-outline" style="padding:1px 6px;font-size:0.72rem" data-action="show-ver-files" data-ver-id="${v.id}" data-doc-id="${docId}">${isFilesOpen ? '▾' : '▸'} ${t('file')}</button>
+            ${accessLevel === 'editor' ? `<button class="btn btn-outline" style="padding:1px 6px;font-size:0.72rem" data-action="add-ver-files" data-ver-id="${v.id}" data-doc-id="${docId}">${t('addFilesToVersion')}</button>` : ''}
+          </div>`;
+        if (isFilesOpen) {
+          html += `<div style="padding:4px 0 4px 32px" id="ver-files-${v.id}">`;
+          filesLoaded.forEach(f => {
+            const size = f.file_size > 1048576 ? (f.file_size/1048576).toFixed(1)+' MB' : Math.round((f.file_size||0)/1024)+' KB';
+            html += `<div style="display:flex;align-items:center;gap:8px;padding:3px 0;font-size:0.8rem">
+              <span style="flex:1;color:#333">📎 ${f.file_name || '—'} <span style="color:#999">(${size})</span></span>
+              <button class="btn btn-outline" style="padding:1px 6px;font-size:0.7rem" data-action="download" data-ver-id="${f.id}">${t('download')}</button>
+              ${accessLevel === 'editor' && !f.legacy ? `<button class="btn btn-outline" style="padding:1px 6px;font-size:0.7rem;color:#c5221f" data-action="delete-ver-file" data-file-id="${f.id}" data-ver-id="${v.id}" data-doc-id="${docId}">×</button>` : ''}
+            </div>`;
+          });
+          html += `</div>`;
+        }
+        html += `</div>`;
+        return html;
+      }).join('');
     }
 
     // ─── Actions ───
@@ -416,6 +459,48 @@
         document.getElementById('ver-file').value = '';
         document.getElementById('ver-notes').value = '';
         openModal('modal-version');
+      }
+
+      if (action === 'show-ver-files') {
+        const verId = btn.dataset.verId;
+        const docId = btn.dataset.docId;
+        if (versionFilesCache[verId]) {
+          delete versionFilesCache[verId];
+          const el = document.getElementById(`versions-${docId}`);
+          if (el) el.innerHTML = renderVersions(docId);
+        } else {
+          try {
+            const files = await apiFetch(`/project_docs/${verId}/files`);
+            versionFilesCache[verId] = files;
+            const el = document.getElementById(`versions-${docId}`);
+            if (el) el.innerHTML = renderVersions(docId);
+          } catch(e) { showToast(e.message, 'error'); }
+        }
+        return;
+      }
+
+      if (action === 'add-ver-files') {
+        currentAddFilesVerId = btn.dataset.verId;
+        currentAddFilesDocId = btn.dataset.docId;
+        document.getElementById('addfiles-file').value = '';
+        openModal('modal-add-files');
+        return;
+      }
+
+      if (action === 'delete-ver-file') {
+        if (!confirm(t('confirmDelete'))) return;
+        btn.disabled = true;
+        try {
+          await apiFetch(`/project_docs/version-files/${btn.dataset.fileId}`, { method: 'DELETE' });
+          showToast(t('deleted'), 'success');
+          const verId = btn.dataset.verId;
+          const docId = btn.dataset.docId;
+          const files = await apiFetch(`/project_docs/${verId}/files`);
+          versionFilesCache[verId] = files;
+          const el = document.getElementById(`versions-${docId}`);
+          if (el) el.innerHTML = renderVersions(docId);
+        } catch(e) { showToast(e.message, 'error'); btn.disabled = false; }
+        return;
       }
 
       if (action === 'edit-doc') {
@@ -471,33 +556,69 @@
 
     // ─── Upload version ───
 
+    async function uploadFileToGCS(file, folderId, documentId) {
+      const contentType = file.type || 'application/octet-stream';
+      const { upload_url, file_url } = await apiFetch('/project_docs/signed-upload-url', {
+        method: 'POST',
+        body: JSON.stringify({ folder_id: folderId, document_id: documentId, file_name: file.name, content_type: contentType }),
+      });
+      await new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('PUT', upload_url);
+        xhr.setRequestHeader('Content-Type', contentType);
+        xhr.onload = () => xhr.status === 200 ? resolve() : reject(new Error('Upload failed'));
+        xhr.onerror = () => reject(new Error('Upload error'));
+        xhr.send(file);
+      });
+      return { file_url, file_name: file.name, file_size: file.size };
+    }
+
     document.getElementById('btn-ver-cancel').addEventListener('click', () => closeModal('modal-version'));
     document.getElementById('btn-ver-save').addEventListener('click', async () => {
-      const file = document.getElementById('ver-file').files[0];
-      if (!file) { showToast(t('selectFile'), 'error'); return; }
+      const fileList = document.getElementById('ver-file').files;
+      if (!fileList.length) { showToast(t('selectFile'), 'error'); return; }
       closeModal('modal-version');
       showToast(t('uploading'));
       try {
-        const contentType = file.type || 'application/octet-stream';
-        const { upload_url, file_url } = await apiFetch('/project_docs/signed-upload-url', {
-          method: 'POST',
-          body: JSON.stringify({ folder_id: selectedFolder, document_id: currentVerDocId, file_name: file.name, content_type: contentType }),
-        });
-        await new Promise((resolve, reject) => {
-          const xhr = new XMLHttpRequest();
-          xhr.open('PUT', upload_url);
-          xhr.setRequestHeader('Content-Type', contentType);
-          xhr.onload = () => xhr.status === 200 ? resolve() : reject(new Error('Upload failed'));
-          xhr.onerror = () => reject(new Error('Upload error'));
-          xhr.send(file);
-        });
+        const files = [];
+        for (const file of fileList) {
+          const f = await uploadFileToGCS(file, selectedFolder, currentVerDocId);
+          files.push(f);
+        }
         await apiFetch(`/project_docs/${currentVerDocId}/versions`, {
           method: 'POST',
-          body: JSON.stringify({ file_url, file_name: file.name, file_size: file.size, notes: document.getElementById('ver-notes').value.trim() }),
+          body: JSON.stringify({ files, notes: document.getElementById('ver-notes').value.trim() }),
         });
         showToast(t('uploaded'), 'success');
         docVersions[currentVerDocId] = null;
+        versionFilesCache = {};
         expandedDocs[currentVerDocId] = true;
+        loadDocs();
+      } catch(e) { showToast(e.message, 'error'); }
+    });
+
+    // ─── Add files to existing version ───
+    document.getElementById('btn-addfiles-cancel').addEventListener('click', () => closeModal('modal-add-files'));
+    document.getElementById('btn-addfiles-save').addEventListener('click', async () => {
+      const fileList = document.getElementById('addfiles-file').files;
+      if (!fileList.length) { showToast(t('selectFile'), 'error'); return; }
+      closeModal('modal-add-files');
+      showToast(t('uploading'));
+      try {
+        const files = [];
+        for (const file of fileList) {
+          const f = await uploadFileToGCS(file, selectedFolder, currentAddFilesDocId);
+          files.push(f);
+        }
+        await apiFetch(`/project_docs/versions/${currentAddFilesVerId}/add-files`, {
+          method: 'POST',
+          body: JSON.stringify({ files }),
+        });
+        showToast(t('uploaded'), 'success');
+        // Refresh files for this version
+        const vfData = await apiFetch(`/project_docs/${currentAddFilesVerId}/files`);
+        versionFilesCache[currentAddFilesVerId] = vfData;
+        docVersions[currentAddFilesDocId] = null;
         loadDocs();
       } catch(e) { showToast(e.message, 'error'); }
     });
@@ -519,7 +640,7 @@
 
     // ─── Keyboard ───
     document.addEventListener('keydown', e => {
-      if (e.key === 'Escape') { closeModal('modal-doc'); closeModal('modal-version'); }
+      if (e.key === 'Escape') { closeModal('modal-doc'); closeModal('modal-version'); closeModal('modal-add-files'); }
     });
 
     // ─── Init ───
