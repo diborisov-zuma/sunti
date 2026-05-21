@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sunti — Gantt</title>
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="stylesheet" href="style.css">
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="_i18n.js"></script>
+<script src="_config.js"></script>
+<script src="_auth.js"></script>
+<script src="_header.js"></script>
+<style>
+  :root {
+    --gantt-bg: #f5f7fa;
+    --gantt-card: #ffffff;
+    --gantt-border: #e2e8f0;
+    --gantt-text: #0f172a;
+    --gantt-muted: #64748b;
+    --gantt-primary: #0f4c81;
+    --gantt-green: #10b981;
+    --gantt-yellow: #f59e0b;
+    --gantt-red: #ef4444;
+    --gantt-purple: #8b5cf6;
+    --gantt-grey: #94a3b8;
+    --row-h: 40px;
+    --day-w: 6px;
+    --left-w: 300px;
+  }
+
+  .gantt-page { padding: 16px 24px; }
+
+  .gantt-toolbar {
+    display: flex; align-items: center; gap: 12px; margin-bottom: 16px; flex-wrap: wrap;
+  }
+  .gantt-toolbar h2 { font-size: 1.1rem; color: #222; }
+  .gantt-toolbar .spacer { flex: 1; }
+  .gantt-toolbar .legend { display: flex; gap: 14px; align-items: center; font-size: 11px; color: var(--gantt-muted); }
+  .gantt-toolbar .legend .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 4px; vertical-align: middle; }
+
+  select.filter-select {
+    border: 1px solid #ddd; border-radius: 6px; padding: 6px 10px; font-size: 0.85rem; color: #333; outline: none; background: #fff;
+  }
+
+  .gantt-wrap {
+    background: var(--gantt-card);
+    border: 1px solid var(--gantt-border);
+    border-radius: 8px;
+    overflow: hidden;
+    display: grid;
+    grid-template-columns: var(--left-w) 1fr;
+  }
+  .gantt-left { border-right: 1px solid var(--gantt-border); overflow: hidden; }
+  .gantt-right { overflow-x: auto; overflow-y: hidden; }
+  .gantt-right-inner { position: relative; }
+
+  .gantt-header-row {
+    background: #fafbfc;
+    border-bottom: 1px solid var(--gantt-border);
+    font-size: 11px;
+    color: var(--gantt-muted);
+    height: 50px;
+  }
+  .gantt-left .gantt-header-row {
+    padding: 16px 16px 0 16px;
+    font-weight: 600;
+    font-size: 12px;
+    color: var(--gantt-text);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .month-row { display: flex; height: 24px; border-bottom: 1px solid var(--gantt-border); }
+  .month-cell { text-align: center; line-height: 24px; border-right: 1px solid var(--gantt-border); font-weight: 600; color: var(--gantt-text); font-size: 11px; }
+  .week-row { display: flex; height: 26px; }
+  .week-cell { text-align: center; line-height: 26px; border-right: 1px solid #f1f5f9; font-size: 10px; color: var(--gantt-muted); }
+
+  .task-row {
+    height: var(--row-h);
+    padding: 0 16px;
+    display: flex;
+    align-items: center;
+    border-bottom: 1px solid #f1f5f9;
+    cursor: pointer;
+    gap: 8px;
+    font-size: 13px;
+  }
+  .task-row:hover { background: #f8fafc; }
+  .task-row.active { background: #eff6ff; }
+  .task-row .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .task-row .badge {
+    font-size: 10px; padding: 2px 6px; border-radius: 10px;
+    background: #e2e8f0; color: var(--gantt-muted); font-weight: 600;
+  }
+  .task-row .badge.red { background: #fee2e2; color: #991b1b; }
+  .task-row .badge.yellow { background: #fef3c7; color: #92400e; }
+  .task-row .badge.empty { background: #ede9fe; color: #6d28d9; border: 1px dashed var(--gantt-purple); }
+  .task-row.phase {
+    background: #f8fafc; font-weight: 700; text-transform: uppercase;
+    font-size: 11px; color: var(--gantt-muted); letter-spacing: 0.5px;
+  }
+
+  .bar-row { height: var(--row-h); position: relative; border-bottom: 1px solid #f1f5f9; }
+  .bar-row.phase { background: #f8fafc; }
+  .bar {
+    position: absolute; height: 20px; top: 10px; border-radius: 4px;
+    cursor: pointer; box-shadow: 0 1px 2px rgba(0,0,0,0.1); transition: transform 0.1s;
+    background: linear-gradient(135deg, var(--gantt-green), #059669);
+  }
+  .bar:hover { transform: scaleY(1.15); }
+  .bar.critical { box-shadow: 0 0 0 2px var(--gantt-red), 0 1px 4px rgba(239,68,68,0.4); }
+  .bar .bar-label {
+    position: absolute; left: 8px; top: 50%; transform: translateY(-50%);
+    color: white; font-size: 11px; font-weight: 600; white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis; max-width: calc(100% - 16px);
+    text-shadow: 0 1px 1px rgba(0,0,0,0.2);
+  }
+
+  .today-line {
+    position: absolute; top: 0; bottom: 0; width: 2px;
+    background: var(--gantt-red); pointer-events: none; z-index: 10;
+  }
+  .today-label {
+    position: absolute; top: -22px; left: 50%; transform: translateX(-50%);
+    background: var(--gantt-red); color: white; padding: 2px 6px;
+    font-size: 10px; border-radius: 3px; white-space: nowrap; font-weight: 600;
+  }
+
+  .empty-state { text-align: center; padding: 64px 24px; color: #bbb; }
+  .loading { text-align: center; padding: 48px; color: #bbb; }
+</style>
+</head>
+<body>
+  <header id="header"></header>
+
+  <div id="guest-view">
+    <h2 id="t-guest-title"></h2>
+    <p id="t-guest-sub"></p>
+  </div>
+
+  <div id="app-view" style="display:none">
+    <div class="gantt-page">
+      <div class="gantt-toolbar">
+        <h2 id="t-page-title">Gantt</h2>
+        <select class="filter-select" id="filter-company"><option value="">—</option></select>
+        <select class="filter-select" id="filter-folder"><option value="">—</option></select>
+        <div class="spacer"></div>
+        <div class="legend">
+          <span><span class="dot" style="background:var(--gantt-green)"></span>On track</span>
+          <span><span class="dot" style="background:var(--gantt-yellow)"></span>At risk</span>
+          <span><span class="dot" style="background:var(--gantt-red)"></span>Late</span>
+          <span><span class="dot" style="background:var(--gantt-purple)"></span>Slot empty</span>
+        </div>
+      </div>
+
+      <div id="gantt-container">
+        <div class="empty-state" id="gantt-empty">Выберите компанию и проект</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    let companiesCache = [];
+    let foldersCache = [];
+    let phasesData = [];
+    let tasksData = [];
+    let depsData = [];
+    let filterCompany = '';
+    let filterFolder = '';
+
+    function showToast(msg, type) {
+      const el = document.getElementById('toast');
+      el.textContent = msg; el.className = 'toast show' + (type ? ' ' + type : '');
+      clearTimeout(el._t); el._t = setTimeout(() => el.className = 'toast', 3000);
+    }
+
+    function setText(id, val) { const el = document.getElementById(id); if (el) el.textContent = val; }
+
+    function updateTexts() {
+      setText('t-guest-title', t('guestTitle'));
+      setText('t-guest-sub', t('guestSub'));
+      setText('t-page-title', 'Gantt');
+      updateHeaderTexts();
+    }
+
+    // ─── Filters ───
+
+    async function loadRefs() {
+      const [companies, folders] = await Promise.all([
+        apiFetch('/companies').catch(() => []),
+        apiFetch('/folders').catch(() => []),
+      ]);
+      companiesCache = companies;
+      foldersCache = folders;
+      fillCompanyFilter();
+    }
+
+    function fillCompanyFilter() {
+      const sel = document.getElementById('filter-company');
+      sel.innerHTML = `<option value="">${t('selectCompanyFirst')}</option>`;
+      companiesCache.forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c.id; opt.textContent = c.name;
+        sel.appendChild(opt);
+      });
+    }
+
+    function fillFolderFilter() {
+      const sel = document.getElementById('filter-folder');
+      sel.innerHTML = `<option value="">— ${t('allFolders')} —</option>`;
+      const list = filterCompany ? foldersCache.filter(f => f.company_id === filterCompany) : foldersCache;
+      list.forEach(f => {
+        if (f.is_template) return;
+        const opt = document.createElement('option');
+        opt.value = f.id; opt.textContent = f.name;
+        sel.appendChild(opt);
+      });
+    }
+
+    document.getElementById('filter-company').addEventListener('change', e => {
+      filterCompany = e.target.value;
+      filterFolder = '';
+      fillFolderFilter();
+      document.getElementById('gantt-container').innerHTML = '<div class="empty-state">Выберите проект</div>';
+    });
+
+    document.getElementById('filter-folder').addEventListener('change', e => {
+      filterFolder = e.target.value;
+      if (filterFolder) loadGanttData();
+      else document.getElementById('gantt-container').innerHTML = '<div class="empty-state">Выберите проект</div>';
+    });
+
+    // ─── Load data ───
+
+    async function loadGanttData() {
+      const container = document.getElementById('gantt-container');
+      container.innerHTML = '<div class="loading">Загрузка…</div>';
+      try {
+        const [phases, tasks, deps] = await Promise.all([
+          apiFetch(`/phases?folder_id=${filterFolder}`),
+          apiFetch(`/gantt_tasks?folder_id=${filterFolder}`),
+          apiFetch(`/task_dependencies?folder_id=${filterFolder}`),
+        ]);
+        phasesData = phases;
+        tasksData = tasks;
+        depsData = deps;
+        renderGantt();
+      } catch(e) {
+        container.innerHTML = `<div class="empty-state" style="color:#c33">${e.message}</div>`;
+      }
+    }
+
+    // ─── Render Gantt ───
+
+    function renderGantt() {
+      const container = document.getElementById('gantt-container');
+
+      if (!tasksData.length) {
+        container.innerHTML = '<div class="empty-state">Нет задач в этом проекте</div>';
+        return;
+      }
+
+      // Calculate date range
+      let minDate = null, maxDate = null;
+      tasksData.forEach(t => {
+        const s = t.planned_start ? new Date(t.planned_start.value || t.planned_start) : null;
+        const e = t.planned_end ? new Date(t.planned_end.value || t.planned_end) : null;
+        if (s && (!minDate || s < minDate)) minDate = s;
+        if (e && (!maxDate || e > maxDate)) maxDate = e;
+      });
+
+      if (!minDate || !maxDate) {
+        container.innerHTML = '<div class="empty-state">У задач не заданы даты</div>';
+        return;
+      }
+
+      // Add padding: 1 month before, 1 month after
+      const startDate = new Date(minDate.getFullYear(), minDate.getMonth() - 1, 1);
+      const endDate = new Date(maxDate.getFullYear(), maxDate.getMonth() + 2, 0);
+      const totalDays = Math.ceil((endDate - startDate) / 86400000);
+      const dayW = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--day-w'));
+      const totalW = totalDays * dayW;
+
+      const today = new Date();
+      today.setHours(0,0,0,0);
+
+      function dayOffset(date) {
+        return Math.round((new Date(date) - startDate) / 86400000);
+      }
+
+      // Build rows: interleave phases and their tasks
+      const rows = [];
+      phasesData.forEach(phase => {
+        rows.push({ type: 'phase', data: phase });
+        tasksData.filter(t => t.phase_id === phase.id).forEach(task => {
+          rows.push({ type: 'task', data: task });
+        });
+      });
+      // Tasks without phase
+      const orphanTasks = tasksData.filter(t => !phasesData.some(p => p.id === t.phase_id));
+      orphanTasks.forEach(task => rows.push({ type: 'task', data: task }));
+
+      // Left panel
+      let leftHTML = `<div class="gantt-left"><div class="gantt-header-row">${t('name')}</div>`;
+      rows.forEach(row => {
+        if (row.type === 'phase') {
+          const p = row.data;
+          const name = p['name_' + currentLang] || p.name || p.name_en || '—';
+          leftHTML += `<div class="task-row phase"><span class="name">${name}</span></div>`;
+        } else {
+          const tk = row.data;
+          const name = tk['name_' + currentLang] || tk.name || tk.name_en || '—';
+          leftHTML += `<div class="task-row" data-task-id="${tk.id}">
+            <span class="name">${name}</span>
+          </div>`;
+        }
+      });
+      leftHTML += '</div>';
+
+      // Right panel
+      let rightHTML = `<div class="gantt-right"><div class="gantt-right-inner" style="width:${totalW}px">`;
+
+      // Month header
+      rightHTML += '<div class="gantt-header-row"><div class="month-row">';
+      let cursor = new Date(startDate);
+      while (cursor < endDate) {
+        const next = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1);
+        const spanDays = Math.min(Math.ceil((next - cursor) / 86400000), totalDays - dayOffset(cursor));
+        if (spanDays <= 0) break;
+        const label = cursor.toLocaleDateString('ru-RU', { month: 'short', year: '2-digit' });
+        rightHTML += `<div class="month-cell" style="width:${spanDays * dayW}px">${label}</div>`;
+        cursor = next;
+      }
+      rightHTML += '</div>';
+
+      // Week header
+      rightHTML += '<div class="week-row">';
+      const weeks = Math.ceil(totalDays / 7);
+      for (let i = 0; i < weeks; i++) rightHTML += `<div class="week-cell" style="width:${7 * dayW}px">W${i + 1}</div>`;
+      rightHTML += '</div></div>';
+
+      // Today line
+      const todayOff = dayOffset(today);
+      if (todayOff >= 0 && todayOff <= totalDays) {
+        const todayLabel = today.toLocaleDateString('ru-RU', { day: '2-digit', month: 'short' });
+        rightHTML += `<div class="today-line" style="left:${todayOff * dayW}px"><div class="today-label">${todayLabel}</div></div>`;
+      }
+
+      // Bars
+      rows.forEach(row => {
+        if (row.type === 'phase') {
+          rightHTML += '<div class="bar-row phase"></div>';
+          return;
+        }
+        const tk = row.data;
+        const s = tk.planned_start ? new Date(tk.planned_start.value || tk.planned_start) : null;
+        const e = tk.planned_end ? new Date(tk.planned_end.value || tk.planned_end) : null;
+
+        rightHTML += '<div class="bar-row">';
+        if (s && e) {
+          const left = dayOffset(s) * dayW;
+          const width = Math.max((dayOffset(e) - dayOffset(s) + 1) * dayW, 4);
+          const critical = tk.is_critical ? ' critical' : '';
+          const name = tk['name_' + currentLang] || tk.name || tk.name_en || '';
+          rightHTML += `<div class="bar${critical}" style="left:${left}px;width:${width}px">
+            <div class="bar-label">${name}</div>
+          </div>`;
+        }
+        rightHTML += '</div>';
+      });
+
+      rightHTML += '</div></div>';
+
+      container.innerHTML = `<div class="gantt-wrap">${leftHTML}${rightHTML}</div>`;
+
+      // Sync scroll
+      const ganttRight = container.querySelector('.gantt-right');
+      if (ganttRight && todayOff > 0) {
+        const scrollTo = Math.max(0, todayOff * dayW - ganttRight.clientWidth / 3);
+        ganttRight.scrollLeft = scrollTo;
+      }
+    }
+
+    // ─── Init ───
+
+    window.onLogin = async () => {
+      updateTexts();
+      await loadRefs();
+    };
+    window.onLogout = () => { updateTexts(); };
+    window.onLangChange = () => {
+      updateTexts();
+      if (tasksData.length) renderGantt();
+    };
+
+    renderHeader('gantt');
+    updateTexts();
+  </script>
+</body>
+</html>

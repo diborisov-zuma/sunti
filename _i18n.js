@@ -264,6 +264,7 @@ const i18n = {
 
     // Контракты
     navContracts: 'Контракты',
+    navGantt: 'Строительство',
     contracts: 'Контракты',
     contract: 'Контракт',
     createContract: 'Создать контракт',
@@ -754,6 +755,7 @@ const i18n = {
 
     // Contracts
     navContracts: 'Contracts',
+    navGantt: 'Construction',
     contracts: 'Contracts',
     contract: 'Contract',
     createContract: 'Create contract',
@@ -1244,6 +1246,7 @@ const i18n = {
 
     // สัญญา
     navContracts: 'สัญญา',
+    navGantt: 'การก่อสร้าง',
     contracts: 'สัญญา',
     contract: 'สัญญา',
     createContract: 'สร้างสัญญา',

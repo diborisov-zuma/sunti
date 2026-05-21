@@ -7,8 +7,9 @@ function renderHeader(activePage) {
 
     <nav class="nav">
       <div class="nav-dropdown" id="nav-finance-group" style="display:none">
-        <a class="nav-link ${['contracts','ctc','contractors','invoices','finance','sales','ai'].includes(activePage) ? 'active' : ''}" id="t-nav-finance-group"></a>
+        <a class="nav-link ${['contracts','ctc','contractors','invoices','finance','sales','ai','gantt'].includes(activePage) ? 'active' : ''}" id="t-nav-finance-group"></a>
         <div class="nav-dropdown-menu">
+          <a href="gantt.html"        class="${activePage === 'gantt'        ? 'active' : ''}" id="t-nav-gantt" style="display:none"></a>
           <a href="contracts.html"    class="${activePage === 'contracts'    ? 'active' : ''}" id="t-nav-contracts" style="display:none"></a>
           <a href="ctc.html"          class="${activePage === 'ctc'          ? 'active' : ''}" id="t-nav-ctc" style="display:none"></a>
           <a href="contractors.html"  class="${activePage === 'contractors'  ? 'active' : ''}" id="t-nav-contractors2" style="display:none"></a>
@@ -153,6 +154,12 @@ function updateHeaderTexts() {
     nai.textContent = t('navAi');
     const meAi = typeof currentMe !== 'undefined' ? currentMe : null;
     nai.style.display = (meAi && (meAi.is_admin === true || meAi.has_contracts_access === true)) ? '' : 'none';
+  }
+  const ngantt = document.getElementById('t-nav-gantt');
+  if (ngantt) {
+    ngantt.textContent = t('navGantt');
+    const meG = typeof currentMe !== 'undefined' ? currentMe : null;
+    ngantt.style.display = (meG && (meG.is_admin === true || meG.has_contracts_access === true)) ? '' : 'none';
   }
   const nct = document.getElementById('t-nav-contracts');
   if (nct) {
