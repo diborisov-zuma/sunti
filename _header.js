@@ -25,10 +25,11 @@ function renderHeader(activePage) {
       <a href="statements.html" class="nav-link ${activePage === 'statements' ? 'active' : ''}" id="t-nav-statements"></a>
       <a href="ai_chat.html" class="nav-link ${activePage === 'ai_chat' ? 'active' : ''}" id="t-nav-ai-chat" style="display:none"></a>
       <div class="nav-dropdown" id="nav-settings" style="display:none">
-        <a class="nav-link ${['folders','companies','users','categories','portal','buyers'].includes(activePage) ? 'active' : ''}" id="t-nav-settings">⚙</a>
+        <a class="nav-link ${['folders','companies','users','categories','portal','buyers','templates'].includes(activePage) ? 'active' : ''}" id="t-nav-settings">⚙</a>
         <div class="nav-dropdown-menu">
           <a href="folders.html"      class="${activePage === 'folders'      ? 'active' : ''}" id="t-nav-folders"></a>
           <a href="companies.html"    class="${activePage === 'companies'    ? 'active' : ''}" id="t-nav-companies"></a>
+          <a href="templates.html"    class="${activePage === 'templates'    ? 'active' : ''}" id="t-nav-templates"></a>
           <a href="users.html"        class="${activePage === 'users'        ? 'active' : ''}" id="t-nav-users"></a>
           <a href="categories.html"   class="${activePage === 'categories'   ? 'active' : ''}" id="t-nav-categories"></a>
           <a href="buyers.html"       class="${activePage === 'buyers'       ? 'active' : ''}" id="t-nav-buyers"></a>
@@ -202,6 +203,8 @@ function updateHeaderTexts() {
     naic.style.display = (meAic && meAic.is_admin === true) ? '' : 'none';
   }
   if (nc) nc.textContent = t('navCompanies');
+  const ntpl = document.getElementById('t-nav-templates');
+  if (ntpl) ntpl.textContent = t('navTemplates');
   if (nu) nu.textContent = t('navUsers');
   if (ncat) ncat.textContent = t('navCategories');
   const nportal = document.getElementById('t-nav-portal');

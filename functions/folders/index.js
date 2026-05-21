@@ -47,7 +47,7 @@ exports.folders = async (req, res) => {
       const coTable = `\`${PROJECT}.${DATASET}.companies\``;
       if (user?.is_admin) {
         const [rows] = await bigquery.query({
-          query: `SELECT f.id, f.name, f.\`order\`, f.status, f.company_id, co.name AS company_name
+          query: `SELECT f.id, f.name, f.\`order\`, f.status, f.company_id, co.name AS company_name, IFNULL(f.is_template, FALSE) AS is_template
                   FROM ${table} f
                   LEFT JOIN ${coTable} co ON co.id = f.company_id
                   ORDER BY f.\`order\` ASC`,
@@ -55,7 +55,7 @@ exports.folders = async (req, res) => {
         res.json(rows);
       } else {
         const [rows] = await bigquery.query({
-          query: `SELECT f.id, f.name, f.\`order\`, f.status, f.company_id, co.name AS company_name, uf.docs_access
+          query: `SELECT f.id, f.name, f.\`order\`, f.status, f.company_id, co.name AS company_name, uf.docs_access, IFNULL(f.is_template, FALSE) AS is_template
                   FROM ${table} f
                   INNER JOIN \`${PROJECT}.${DATASET}.users_folders\` uf
                     ON uf.folder_id = f.id
@@ -75,16 +75,16 @@ exports.folders = async (req, res) => {
       const user = await getUserInfo(email);
       if (!user?.is_admin) { res.status(403).json({ error: 'Forbidden' }); return; }
 
-      const { name, order, status, company_id } = req.body;
+      const { name, order, status, company_id, is_template } = req.body;
       if (!name || order === undefined || !status) {
         res.status(400).json({ error: 'name, order and status are required' });
         return;
       }
       const id = uuidv4();
       await bigquery.query({
-        query: `INSERT INTO ${table} (id, name, \`order\`, status, company_id, created_at, created_by)
-                VALUES (@id, @name, @order, @status, NULLIF(@company_id, ''), CURRENT_TIMESTAMP(), @created_by)`,
-        params: { id, name, order: parseInt(order), status, company_id: company_id || '', created_by: email },
+        query: `INSERT INTO ${table} (id, name, \`order\`, status, company_id, is_template, created_at, created_by)
+                VALUES (@id, @name, @order, @status, NULLIF(@company_id, ''), @is_template, CURRENT_TIMESTAMP(), @created_by)`,
+        params: { id, name, order: parseInt(order), status, company_id: company_id || '', is_template: is_template === true, created_by: email },
       });
       res.json({ success: true, id, name });
       return;

@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sunti — Шаблоны</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="stylesheet" href="style.css">
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <script src="_i18n.js"></script>
+  <script src="_config.js"></script>
+  <script src="_auth.js"></script>
+  <script src="_header.js"></script>
+  <style>
+    .page-content { max-width: 1100px; margin: 32px auto; padding: 0 24px; }
+    .page-header { display:flex;align-items:center;justify-content:space-between;margin-bottom:20px; }
+    .page-header h1 { font-size:1.2rem;color:#222; }
+    .empty-state { text-align:center;padding:48px 24px;color:#bbb; }
+
+    /* Template list */
+    .tpl-list { display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px;margin-bottom:32px; }
+    .tpl-card {
+      background:#fff;border:1px solid #e8e8e8;border-radius:10px;padding:18px;cursor:pointer;transition:border-color 0.15s;
+    }
+    .tpl-card:hover { border-color:#1a73e8; }
+    .tpl-card.active { border-color:#1a73e8;box-shadow:0 0 0 2px rgba(26,115,232,0.15); }
+    .tpl-card-name { font-size:1rem;font-weight:600;color:#222;margin-bottom:6px; }
+    .tpl-card-meta { font-size:0.82rem;color:#999; }
+
+    /* Editor section */
+    .editor { display:none; }
+    .editor.open { display:block; }
+    .editor-header { display:flex;align-items:center;gap:12px;margin-bottom:16px; }
+    .editor-header h2 { font-size:1.05rem;color:#222;flex:1; }
+    .editor-back { background:none;border:1px solid #ddd;border-radius:6px;padding:6px 12px;cursor:pointer;font-size:0.85rem;color:#666; }
+
+    .phase-block { background:#fff;border:1px solid #e8e8e8;border-radius:10px;margin-bottom:16px;overflow:hidden; }
+    .phase-header {
+      background:#f8f8f8;padding:10px 16px;display:flex;align-items:center;gap:10px;
+      border-bottom:1px solid #e8e8e8;font-size:0.85rem;font-weight:600;color:#555;
+    }
+    .phase-header .phase-name { flex:1; }
+    .phase-header .phase-actions { display:flex;gap:6px; }
+
+    .task-list { padding:0; }
+    .task-item {
+      display:grid;grid-template-columns:40px 1fr 80px 80px 80px;gap:8px;align-items:center;
+      padding:8px 16px;border-bottom:1px solid #f0f0f0;font-size:0.85rem;
+    }
+    .task-item:last-child { border-bottom:none; }
+    .task-item .sort-handle { color:#ccc;cursor:grab;text-align:center; }
+    .task-item .task-name { color:#333; }
+    .task-item .task-dur { color:#888;text-align:center; }
+    .task-item .task-deps { color:#1a73e8;font-size:0.78rem; }
+    .task-item .task-actions { display:flex;gap:4px;justify-content:flex-end; }
+
+    .add-row { padding:8px 16px; }
+    .add-row button { font-size:0.82rem; }
+
+    /* Modal */
+    .field-group { margin-bottom:12px; }
+    .field-group label { display:block;font-size:0.82rem;color:#666;margin-bottom:4px; }
+    .field-group input, .field-group select { width:100%;border:1px solid #ddd;border-radius:6px;padding:8px 12px;font-size:0.9rem;outline:none;box-sizing:border-box;background:#fff; }
+    .field-group input:focus, .field-group select:focus { border-color:#1a73e8; }
+    .fields-row { display:grid;grid-template-columns:1fr 1fr;gap:12px; }
+    .fields-row-3 { display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px; }
+  </style>
+</head>
+<body>
+  <header id="header"></header>
+
+  <div id="guest-view">
+    <h2 id="t-guest-title"></h2>
+    <p id="t-guest-sub"></p>
+  </div>
+
+  <div id="app-view">
+    <div class="page-content">
+
+      <!-- Template list -->
+      <div id="tpl-list-view">
+        <div class="page-header">
+          <h1 id="t-page-title"></h1>
+          <button class="btn btn-primary" id="btn-add-tpl"></button>
+        </div>
+        <div class="tpl-list" id="tpl-list"></div>
+      </div>
+
+      <!-- Template editor -->
+      <div class="editor" id="tpl-editor">
+        <div class="editor-header">
+          <button class="editor-back" id="btn-back">← Назад</button>
+          <h2 id="editor-title"></h2>
+          <button class="btn btn-primary" id="btn-add-phase"></button>
+        </div>
+        <div id="phases-container"></div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Modal: phase -->
+  <div class="modal-overlay" id="modal-phase">
+    <div class="modal" style="width:480px;max-width:95vw">
+      <h3 id="t-modal-phase-title"></h3>
+      <div class="fields-row-3">
+        <div class="field-group"><label>RU</label><input type="text" id="ph-name"></div>
+        <div class="field-group"><label>EN</label><input type="text" id="ph-name-en"></div>
+        <div class="field-group"><label>TH</label><input type="text" id="ph-name-th"></div>
+      </div>
+      <div class="field-group"><label>Sort order</label><input type="number" id="ph-sort" min="0" value="0"></div>
+      <div class="modal-actions">
+        <button class="btn btn-outline" id="btn-ph-cancel"></button>
+        <button class="btn btn-primary" id="btn-ph-save"></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: task -->
+  <div class="modal-overlay" id="modal-task">
+    <div class="modal" style="width:560px;max-width:95vw">
+      <h3 id="t-modal-task-title"></h3>
+      <div class="fields-row-3">
+        <div class="field-group"><label>RU</label><input type="text" id="tk-name"></div>
+        <div class="field-group"><label>EN</label><input type="text" id="tk-name-en"></div>
+        <div class="field-group"><label>TH</label><input type="text" id="tk-name-th"></div>
+      </div>
+      <div class="fields-row">
+        <div class="field-group"><label id="lbl-tk-dur"></label><input type="number" id="tk-dur" min="1" value="14"></div>
+        <div class="field-group"><label>Sort order</label><input type="number" id="tk-sort" min="0" value="0"></div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-outline" id="btn-tk-cancel"></button>
+        <button class="btn btn-primary" id="btn-tk-save"></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: dependency -->
+  <div class="modal-overlay" id="modal-dep">
+    <div class="modal" style="width:480px;max-width:95vw">
+      <h3 id="t-modal-dep-title"></h3>
+      <div class="fields-row">
+        <div class="field-group"><label>Predecessor</label><select id="dep-pred"></select></div>
+        <div class="field-group"><label>Successor</label><select id="dep-succ"></select></div>
+      </div>
+      <div class="fields-row">
+        <div class="field-group"><label>Type</label>
+          <select id="dep-type">
+            <option value="FS">FS (Finish → Start)</option>
+            <option value="SS">SS (Start → Start)</option>
+            <option value="FF">FF (Finish → Finish)</option>
+            <option value="SF">SF (Start → Finish)</option>
+          </select>
+        </div>
+        <div class="field-group"><label>Lag (days)</label><input type="number" id="dep-lag" value="0"></div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-outline" id="btn-dep-cancel"></button>
+        <button class="btn btn-primary" id="btn-dep-save"></button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    let templates = [];
+    let currentTplId = null;
+    let phasesData = [];
+    let tasksData = [];
+    let depsData = [];
+    let editPhaseId = null;
+    let editTaskId = null;
+    let editTaskPhaseId = null;
+
+    function showToast(msg, type) {
+      const el = document.getElementById('toast');
+      el.textContent = msg; el.className = 'toast show' + (type ? ' ' + type : '');
+      clearTimeout(el._t); el._t = setTimeout(() => el.className = 'toast', 3000);
+    }
+    function openModal(id) { document.getElementById(id).classList.add('open'); }
+    function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+    function setText(id, v) { const el = document.getElementById(id); if (el) el.textContent = v; }
+    function taskLabel(tk) { return tk['name_' + currentLang] || tk.name || tk.name_en || '—'; }
+    function phaseLabel(p) { return p['name_' + currentLang] || p.name || p.name_en || '—'; }
+
+    function updateTexts() {
+      setText('t-guest-title', t('guestTitle'));
+      setText('t-guest-sub', t('guestSub'));
+      setText('t-page-title', t('navTemplates'));
+      document.getElementById('btn-add-tpl').textContent = '+ ' + t('navTemplates');
+      document.getElementById('btn-add-phase').textContent = '+ Phase';
+      setText('t-modal-phase-title', 'Phase');
+      setText('t-modal-task-title', 'Task');
+      setText('t-modal-dep-title', 'Dependency');
+      setText('lbl-tk-dur', t('duration') || 'Duration (days)');
+      setText('btn-ph-cancel', t('cancel'));
+      setText('btn-ph-save', t('save'));
+      setText('btn-tk-cancel', t('cancel'));
+      setText('btn-tk-save', t('save'));
+      setText('btn-dep-cancel', t('cancel'));
+      setText('btn-dep-save', t('save'));
+      updateHeaderTexts();
+    }
+
+    // ─── Template list ───
+
+    async function loadTemplates() {
+      try {
+        const folders = await apiFetch('/folders');
+        templates = folders.filter(f => f.is_template === true);
+        renderTemplates();
+      } catch(e) { showToast(e.message, 'error'); }
+    }
+
+    function renderTemplates() {
+      const list = document.getElementById('tpl-list');
+      if (!templates.length) {
+        list.innerHTML = '<div class="empty-state">Нет шаблонов</div>';
+        return;
+      }
+      list.innerHTML = templates.map(tpl => `
+        <div class="tpl-card" data-tpl-id="${tpl.id}">
+          <div class="tpl-card-name">${tpl.name || '—'}</div>
+          <div class="tpl-card-meta">ID: ${tpl.id.substring(0,8)}…</div>
+        </div>
+      `).join('');
+    }
+
+    document.getElementById('tpl-list').addEventListener('click', e => {
+      const card = e.target.closest('.tpl-card');
+      if (!card) return;
+      openEditor(card.dataset.tplId);
+    });
+
+    document.getElementById('btn-add-tpl').addEventListener('click', async () => {
+      const name = prompt('Template name (RU):');
+      if (!name) return;
+      try {
+        await apiFetch('/folders', {
+          method: 'POST',
+          body: JSON.stringify({ name, order: 0, status: 'active', is_template: true }),
+        });
+        showToast(t('saved'), 'success');
+        await loadTemplates();
+      } catch(e) { showToast(e.message, 'error'); }
+    });
+
+    // ─── Editor ───
+
+    async function openEditor(tplId) {
+      currentTplId = tplId;
+      const tpl = templates.find(t => t.id === tplId);
+      document.getElementById('editor-title').textContent = tpl ? tpl.name : '—';
+      document.getElementById('tpl-list-view').style.display = 'none';
+      document.getElementById('tpl-editor').classList.add('open');
+      await loadEditorData();
+    }
+
+    function closeEditor() {
+      currentTplId = null;
+      document.getElementById('tpl-editor').classList.remove('open');
+      document.getElementById('tpl-list-view').style.display = '';
+    }
+
+    document.getElementById('btn-back').addEventListener('click', closeEditor);
+
+    async function loadEditorData() {
+      try {
+        const [phases, tasks, deps] = await Promise.all([
+          apiFetch(`/phases?folder_id=${currentTplId}`),
+          apiFetch(`/gantt_tasks?folder_id=${currentTplId}`),
+          apiFetch(`/task_dependencies?folder_id=${currentTplId}`),
+        ]);
+        phasesData = phases;
+        tasksData = tasks;
+        depsData = deps;
+        renderEditor();
+      } catch(e) { showToast(e.message, 'error'); }
+    }
+
+    function renderEditor() {
+      const container = document.getElementById('phases-container');
+      if (!phasesData.length) {
+        container.innerHTML = '<div class="empty-state">Нет фаз. Добавьте первую фазу.</div>';
+        return;
+      }
+
+      container.innerHTML = phasesData.map(phase => {
+        const pTasks = tasksData.filter(t => t.phase_id === phase.id);
+        return `
+          <div class="phase-block">
+            <div class="phase-header">
+              <span class="phase-name">${phaseLabel(phase)} <span style="color:#bbb;font-weight:400">(${pTasks.length})</span></span>
+              <div class="phase-actions">
+                <button class="btn btn-outline" style="padding:3px 8px;font-size:0.78rem" data-action="edit-phase" data-id="${phase.id}">✎</button>
+                <button class="btn btn-outline" style="padding:3px 8px;font-size:0.78rem;color:#c5221f" data-action="delete-phase" data-id="${phase.id}">×</button>
+              </div>
+            </div>
+            <div class="task-list">
+              ${pTasks.length ? pTasks.map(tk => {
+                const deps = depsData.filter(d => d.successor_id === tk.id);
+                const depLabels = deps.map(d => {
+                  const pred = tasksData.find(t => t.id === d.predecessor_id);
+                  return pred ? taskLabel(pred) : '?';
+                }).join(', ');
+                return `<div class="task-item">
+                  <span class="sort-handle">⋮⋮</span>
+                  <span class="task-name">${taskLabel(tk)}</span>
+                  <span class="task-dur">${tk.duration_days || '—'}д</span>
+                  <span class="task-deps">${depLabels || '—'}</span>
+                  <span class="task-actions">
+                    <button class="btn btn-outline" style="padding:2px 6px;font-size:0.72rem" data-action="add-dep" data-task-id="${tk.id}">⛓</button>
+                    <button class="btn btn-outline" style="padding:2px 6px;font-size:0.72rem" data-action="edit-task" data-id="${tk.id}" data-phase-id="${phase.id}">✎</button>
+                    <button class="btn btn-outline" style="padding:2px 6px;font-size:0.72rem;color:#c5221f" data-action="delete-task" data-id="${tk.id}">×</button>
+                  </span>
+                </div>`;
+              }).join('') : '<div style="padding:12px 16px;color:#bbb;font-size:0.82rem">—</div>'}
+            </div>
+            <div class="add-row">
+              <button class="btn btn-outline" style="font-size:0.82rem" data-action="add-task" data-phase-id="${phase.id}">+ Task</button>
+            </div>
+          </div>`;
+      }).join('');
+    }
+
+    // ─── Actions ───
+
+    document.addEventListener('click', async e => {
+      const btn = e.target.closest('[data-action]');
+      if (!btn) return;
+      const action = btn.dataset.action;
+
+      // Phase
+      if (action === 'edit-phase') {
+        editPhaseId = btn.dataset.id;
+        const ph = phasesData.find(p => p.id === editPhaseId);
+        document.getElementById('ph-name').value = ph?.name || '';
+        document.getElementById('ph-name-en').value = ph?.name_en || '';
+        document.getElementById('ph-name-th').value = ph?.name_th || '';
+        document.getElementById('ph-sort').value = ph?.sort_order || 0;
+        openModal('modal-phase');
+      }
+
+      if (action === 'delete-phase') {
+        if (!confirm(t('confirmDelete'))) return;
+        btn.disabled = true;
+        try {
+          await apiFetch(`/phases/${btn.dataset.id}`, { method: 'DELETE' });
+          showToast(t('deleted'), 'success');
+          await loadEditorData();
+        } catch(e) { showToast(e.message, 'error'); btn.disabled = false; }
+      }
+
+      // Task
+      if (action === 'add-task') {
+        editTaskId = null;
+        editTaskPhaseId = btn.dataset.phaseId;
+        document.getElementById('tk-name').value = '';
+        document.getElementById('tk-name-en').value = '';
+        document.getElementById('tk-name-th').value = '';
+        document.getElementById('tk-dur').value = '14';
+        document.getElementById('tk-sort').value = '0';
+        openModal('modal-task');
+      }
+
+      if (action === 'edit-task') {
+        editTaskId = btn.dataset.id;
+        editTaskPhaseId = btn.dataset.phaseId;
+        const tk = tasksData.find(t => t.id === editTaskId);
+        document.getElementById('tk-name').value = tk?.name || '';
+        document.getElementById('tk-name-en').value = tk?.name_en || '';
+        document.getElementById('tk-name-th').value = tk?.name_th || '';
+        document.getElementById('tk-dur').value = tk?.duration_days || 14;
+        document.getElementById('tk-sort').value = tk?.sort_order || 0;
+        openModal('modal-task');
+      }
+
+      if (action === 'delete-task') {
+        if (!confirm(t('confirmDelete'))) return;
+        btn.disabled = true;
+        try {
+          await apiFetch(`/gantt_tasks/${btn.dataset.id}`, { method: 'DELETE' });
+          showToast(t('deleted'), 'success');
+          await loadEditorData();
+        } catch(e) { showToast(e.message, 'error'); btn.disabled = false; }
+      }
+
+      // Dependency
+      if (action === 'add-dep') {
+        const taskId = btn.dataset.taskId;
+        document.getElementById('dep-succ').value = taskId;
+        fillDepSelects(taskId);
+        openModal('modal-dep');
+      }
+    });
+
+    // ─── Phase modal ───
+
+    document.getElementById('btn-add-phase').addEventListener('click', () => {
+      editPhaseId = null;
+      document.getElementById('ph-name').value = '';
+      document.getElementById('ph-name-en').value = '';
+      document.getElementById('ph-name-th').value = '';
+      document.getElementById('ph-sort').value = phasesData.length * 1000;
+      openModal('modal-phase');
+    });
+
+    document.getElementById('btn-ph-cancel').addEventListener('click', () => closeModal('modal-phase'));
+    document.getElementById('btn-ph-save').addEventListener('click', async () => {
+      const name = document.getElementById('ph-name').value.trim();
+      if (!name) { showToast(t('fillAllFields'), 'error'); return; }
+      closeModal('modal-phase');
+      try {
+        const body = {
+          folder_id: currentTplId,
+          name,
+          name_en: document.getElementById('ph-name-en').value.trim(),
+          name_th: document.getElementById('ph-name-th').value.trim(),
+          sort_order: parseInt(document.getElementById('ph-sort').value) || 0,
+        };
+        if (editPhaseId) {
+          await apiFetch(`/phases/${editPhaseId}`, { method: 'PUT', body: JSON.stringify(body) });
+        } else {
+          await apiFetch('/phases', { method: 'POST', body: JSON.stringify(body) });
+        }
+        showToast(t('saved'), 'success');
+        await loadEditorData();
+      } catch(e) { showToast(e.message, 'error'); }
+    });
+
+    // ─── Task modal ───
+
+    document.getElementById('btn-tk-cancel').addEventListener('click', () => closeModal('modal-task'));
+    document.getElementById('btn-tk-save').addEventListener('click', async () => {
+      const name = document.getElementById('tk-name').value.trim();
+      if (!name) { showToast(t('fillAllFields'), 'error'); return; }
+      closeModal('modal-task');
+      try {
+        const body = {
+          phase_id: editTaskPhaseId,
+          name,
+          name_en: document.getElementById('tk-name-en').value.trim(),
+          name_th: document.getElementById('tk-name-th').value.trim(),
+          duration_days: parseInt(document.getElementById('tk-dur').value) || 14,
+          sort_order: parseInt(document.getElementById('tk-sort').value) || 0,
+          is_critical: false,
+        };
+        if (editTaskId) {
+          await apiFetch(`/gantt_tasks/${editTaskId}`, { method: 'PUT', body: JSON.stringify(body) });
+        } else {
+          await apiFetch('/gantt_tasks', { method: 'POST', body: JSON.stringify(body) });
+        }
+        showToast(t('saved'), 'success');
+        await loadEditorData();
+      } catch(e) { showToast(e.message, 'error'); }
+    });
+
+    // ─── Dependency modal ───
+
+    function fillDepSelects(succId) {
+      const predSel = document.getElementById('dep-pred');
+      const succSel = document.getElementById('dep-succ');
+      const opts = tasksData.map(tk => `<option value="${tk.id}">${taskLabel(tk)}</option>`).join('');
+      predSel.innerHTML = opts;
+      succSel.innerHTML = opts;
+      if (succId) succSel.value = succId;
+    }
+
+    document.getElementById('btn-dep-cancel').addEventListener('click', () => closeModal('modal-dep'));
+    document.getElementById('btn-dep-save').addEventListener('click', async () => {
+      const pred = document.getElementById('dep-pred').value;
+      const succ = document.getElementById('dep-succ').value;
+      if (!pred || !succ || pred === succ) { showToast('Select different tasks', 'error'); return; }
+      closeModal('modal-dep');
+      try {
+        await apiFetch('/task_dependencies', {
+          method: 'POST',
+          body: JSON.stringify({
+            predecessor_id: pred,
+            successor_id: succ,
+            type: document.getElementById('dep-type').value,
+            lag_days: parseInt(document.getElementById('dep-lag').value) || 0,
+          }),
+        });
+        showToast(t('saved'), 'success');
+        await loadEditorData();
+      } catch(e) { showToast(e.message, 'error'); }
+    });
+
+    // ─── Keyboard ───
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape') { closeModal('modal-phase'); closeModal('modal-task'); closeModal('modal-dep'); }
+    });
+
+    // ─── Init ───
+    window.onLogin = async () => {
+      updateTexts();
+      if (!isAdmin) {
+        document.getElementById('app-view').innerHTML = '<div class="empty-state" style="margin-top:60px">403 — admins only</div>';
+        return;
+      }
+      await loadTemplates();
+    };
+    window.onLogout = () => { updateTexts(); };
+    window.onLangChange = () => { updateTexts(); if (currentTplId) renderEditor(); else renderTemplates(); };
+
+    renderHeader('templates');
+    updateTexts();
+  </script>
+</body>
+</html>
