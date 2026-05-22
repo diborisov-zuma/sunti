@@ -220,7 +220,7 @@
   }
   .sp-head .sp-close:hover { background: #e2e8f0; color: #333; }
   .sp-head .sp-phase { font-size: 10px; color: var(--gantt-muted); text-transform: uppercase; letter-spacing: 0.5px; }
-  .sp-head h2 { font-size: 16px; margin: 4px 0 10px; color: var(--gantt-text); }
+  .sp-head h2 { font-size: 20px; margin: 4px 0 10px; color: var(--gantt-text); font-weight: 700; }
   .sp-head .sp-meta { display: flex; gap: 16px; font-size: 12px; color: var(--gantt-muted); flex-wrap: wrap; }
   .sp-head .sp-meta .label { font-weight: 600; color: var(--gantt-text); margin-right: 3px; }
   .sp-head .sp-critical { display: inline-block; background: var(--gantt-red); color: white; font-size: 10px; padding: 2px 6px; border-radius: 4px; font-weight: 700; margin-left: 8px; }
@@ -361,7 +361,7 @@
 
   <!-- Modal: task -->
   <div class="modal-overlay" id="modal-task">
-    <div class="modal" style="width:900px;max-width:95vw;max-height:90vh;display:flex;flex-direction:column">
+    <div class="modal" style="width:1200px;max-width:95vw;max-height:90vh;display:flex;flex-direction:column">
       <h3 id="t-modal-task-title" style="padding:16px 20px 0;margin:0">Task</h3>
       <div style="padding:0 20px 20px;overflow-y:auto;flex:1">
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-top:12px">
@@ -379,9 +379,9 @@
         </div>
         <div style="margin-top:12px"><h4 style="font-size:0.82rem;color:#555;margin:0 0 8px;text-transform:uppercase;letter-spacing:0.5px">Notes</h4></div>
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
-          <div class="field-group"><label>RU <button class="translate-btn" data-src="ru" data-fields="g-tk-notes" data-targets="g-tk-notes-en:en,g-tk-notes-th:th" title="Translate to EN + TH">🌐</button></label><textarea id="g-tk-notes" rows="2" style="resize:vertical"></textarea></div>
-          <div class="field-group"><label>EN <button class="translate-btn" data-src="en" data-fields="g-tk-notes-en" data-targets="g-tk-notes:ru,g-tk-notes-th:th" title="Translate to RU + TH">🌐</button></label><textarea id="g-tk-notes-en" rows="2" style="resize:vertical"></textarea></div>
-          <div class="field-group"><label>TH <button class="translate-btn" data-src="th" data-fields="g-tk-notes-th" data-targets="g-tk-notes:ru,g-tk-notes-en:en" title="Translate to RU + EN">🌐</button></label><textarea id="g-tk-notes-th" rows="2" style="resize:vertical"></textarea></div>
+          <div class="field-group"><label>RU <button class="translate-btn" data-src="ru" data-fields="g-tk-notes" data-targets="g-tk-notes-en:en,g-tk-notes-th:th" title="Translate to EN + TH">🌐</button></label><textarea id="g-tk-notes" rows="5" style="resize:vertical;min-height:100px"></textarea></div>
+          <div class="field-group"><label>EN <button class="translate-btn" data-src="en" data-fields="g-tk-notes-en" data-targets="g-tk-notes:ru,g-tk-notes-th:th" title="Translate to RU + TH">🌐</button></label><textarea id="g-tk-notes-en" rows="5" style="resize:vertical;min-height:100px"></textarea></div>
+          <div class="field-group"><label>TH <button class="translate-btn" data-src="th" data-fields="g-tk-notes-th" data-targets="g-tk-notes:ru,g-tk-notes-en:en" title="Translate to RU + EN">🌐</button></label><textarea id="g-tk-notes-th" rows="5" style="resize:vertical;min-height:100px"></textarea></div>
         </div>
 
         <!-- Materials section -->
@@ -1109,6 +1109,25 @@
 
     // ─── Translate ───
 
+    // Update translate button visibility: show only when source has text AND all targets empty
+    function updateTranslateButtons() {
+      document.querySelectorAll('.translate-btn').forEach(btn => {
+        const srcField = document.getElementById(btn.dataset.fields);
+        const srcText = srcField ? srcField.value.trim() : '';
+        const targets = btn.dataset.targets.split(',');
+        const allTargetsEmpty = targets.every(t => {
+          const el = document.getElementById(t.split(':')[0]);
+          return !el || !el.value.trim();
+        });
+        btn.style.display = (srcText && allTargetsEmpty) ? '' : 'none';
+      });
+    }
+
+    // Listen for input on all translatable fields
+    document.addEventListener('input', e => {
+      if (e.target.closest('#modal-task')) updateTranslateButtons();
+    });
+
     document.addEventListener('click', async e => {
       const btn = e.target.closest('.translate-btn');
       if (!btn) return;
@@ -1116,9 +1135,9 @@
       e.stopPropagation();
       const srcField = document.getElementById(btn.dataset.fields);
       const text = srcField ? srcField.value.trim() : '';
-      if (!text) { showToast('Fill the field first', 'error'); return; }
+      if (!text) return;
       const srcLang = btn.dataset.src;
-      const targets = btn.dataset.targets.split(','); // "g-tk-name-en:en,g-tk-name-th:th"
+      const targets = btn.dataset.targets.split(',');
       const targetLangs = targets.map(t => t.split(':')[1]);
       btn.classList.add('loading');
       try {
@@ -1132,6 +1151,7 @@
             const el = document.getElementById(fieldId);
             if (el && resp.translations[lang]) el.value = resp.translations[lang];
           });
+          updateTranslateButtons();
         }
       } catch(err) { showToast(err.message, 'error'); }
       btn.classList.remove('loading');
@@ -1165,6 +1185,12 @@
 
       // Body
       let html = '';
+
+      // Notes (first, right under the header)
+      const noteText = tk['notes_' + currentLang] || tk.notes || tk.notes_en || '';
+      if (noteText) {
+        html += `<div style="font-size:13px;color:#444;line-height:1.6;white-space:pre-wrap;margin-bottom:16px;padding:10px 14px;background:#f8fafc;border-radius:6px;border-left:3px solid #3b82f6">${noteText}</div>`;
+      }
 
       // Dependencies
       const predsOf = depsData.filter(d => d.successor_id === taskId);
@@ -1276,14 +1302,6 @@
       });
       html += '</div>';
 
-      // Notes
-      const noteText = tk['notes_' + currentLang] || tk.notes || tk.notes_en || '';
-      if (noteText) {
-        html += '<div class="sp-section"><h3>Notes</h3>';
-        html += `<div style="font-size:12px;color:#444;line-height:1.5;white-space:pre-wrap">${noteText}</div>`;
-        html += '</div>';
-      }
-
       // Comments placeholder
       html += '<div class="sp-section"><h3>Comments</h3>';
       html += '<div style="color:#bbb;font-size:12px;font-style:italic">Coming soon</div>';
@@ -1324,6 +1342,7 @@
         contractsCache = [];
         setText('t-modal-task-title', 'New Task');
         openModal('modal-task');
+        updateTranslateButtons();
       }
 
       if (action === 'open-dep') {
@@ -1364,6 +1383,7 @@
         contractsCache = [];
         setText('t-modal-task-title', 'Edit Task');
         openModal('modal-task');
+        updateTranslateButtons();
         loadTaskMaterials(tk.id);
       }
     });
