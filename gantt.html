@@ -214,9 +214,10 @@
     position: relative; flex-shrink: 0;
   }
   .sp-head .sp-close {
-    position: absolute; top: 12px; right: 12px; background: #f1f5f9; border: 1px solid #e2e8f0;
+    background: #f1f5f9; border: 1px solid #e2e8f0;
     font-size: 18px; color: var(--gantt-muted); cursor: pointer; line-height: 1;
-    width: 32px; height: 32px; border-radius: 6px; display: flex; align-items: center; justify-content: center;
+    width: 32px; height: 32px; min-width: 32px; border-radius: 6px; display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
   }
   .sp-head .sp-close:hover { background: #e2e8f0; color: #333; }
   .sp-head .sp-phase { font-size: 10px; color: var(--gantt-muted); text-transform: uppercase; letter-spacing: 0.5px; }
@@ -520,10 +521,12 @@
   <div id="sp-overlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;z-index:85" onclick="closeSidePanel()"></div>
   <div class="side-panel" id="side-panel">
     <div class="sp-head">
-      <button class="sp-close" id="sp-close">×</button>
       <div class="sp-phase" id="sp-phase"></div>
       <h2 id="sp-title"></h2>
-      <div class="sp-meta" id="sp-meta"></div>
+      <div style="display:flex;align-items:center;gap:12px">
+        <div class="sp-meta" id="sp-meta" style="flex:1"></div>
+        <button class="sp-close" id="sp-close">×</button>
+      </div>
     </div>
     <div class="sp-body" id="sp-body"></div>
   </div>
