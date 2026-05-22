@@ -65,11 +65,25 @@
               <tr><td>6</td><td>Заказано, не успевают</td><td>В процессе</td><td>ETA &gt; начала работ</td><td>&#128308; Красный</td><td>Срыв: материал опаздывает</td></tr>
               <tr><td>7</td><td>На объекте</td><td>На объекте</td><td>—</td><td>&#128994; Зелёный</td><td>Готово</td></tr>
               <tr><td>8</td><td>Смонтировано</td><td>Смонтировано</td><td>—</td><td>&#128994; Зелёный</td><td>Готово</td></tr>
+              <tr><td>9</td><td>Только работы</td><td>Любой</td><td>Срок производства = 0 и срок доставки = 0</td><td>Нет ромба</td><td>Контракт на работы, не на поставку</td></tr>
+            </tbody>
+          </table>
+          <h4 style="margin-top:16px">Статус контракта</h4>
+          <table class="help-table">
+            <thead><tr><th>Статус контракта</th><th>Влияние на ромб</th><th>Пояснение</th></tr></thead>
+            <tbody>
+              <tr><td>Смета</td><td>⚪ Серый</td><td>Только планируем</td></tr>
+              <tr><td>Подтверждён</td><td>Обычная логика</td><td>Проверяет сроки производства и доставки</td></tr>
+              <tr><td>На складе</td><td>🔵/🟡/🔴</td><td>Производство не нужно, учитывается только срок доставки</td></tr>
+              <tr><td>Доставлен</td><td>🟢 Зелёный</td><td>Материал на объекте</td></tr>
+              <tr><td>Завершён</td><td>🟢 Зелёный</td><td>Контракт закрыт</td></tr>
+              <tr><td>Отменён</td><td>⚪ Серый</td><td>Контракт отменён</td></tr>
             </tbody>
           </table>
           <div class="help-note">Материал нужен к началу работ (задачи), а не к окончанию.</div>
           <div class="help-note">Дедлайн заказа = начало работ − срок производства − срок доставки.</div>
           <div class="help-note">ETA вычисляется автоматически из текущего этапа и оставшихся сроков.</div>
+          <div class="help-note">Если у контракта срок производства = 0 и срок доставки = 0 — это работы. Ромб не показывается, но стоимость видна в панели задачи. Чтобы напомнить о закупке (например, краска) — поставьте срок доставки &gt; 0.</div>
         </div>
       </div>
 
@@ -90,11 +104,25 @@
               <tr><td>6</td><td>Ordered, won't make it</td><td>In progress</td><td>ETA &gt; work start</td><td>&#128308; Red</td><td>Overdue: material is late</td></tr>
               <tr><td>7</td><td>On site</td><td>On site</td><td>—</td><td>&#128994; Green</td><td>Ready</td></tr>
               <tr><td>8</td><td>Installed</td><td>Installed</td><td>—</td><td>&#128994; Green</td><td>Ready</td></tr>
+              <tr><td>9</td><td>Work only</td><td>Any</td><td>Production time = 0 and delivery time = 0</td><td>No marker</td><td>Work contract, not material delivery</td></tr>
+            </tbody>
+          </table>
+          <h4 style="margin-top:16px">Contract Status</h4>
+          <table class="help-table">
+            <thead><tr><th>Contract status</th><th>Marker effect</th><th>Explanation</th></tr></thead>
+            <tbody>
+              <tr><td>Estimate</td><td>⚪ Grey</td><td>Planning stage only</td></tr>
+              <tr><td>Confirmed</td><td>Normal logic</td><td>Checks production and delivery times</td></tr>
+              <tr><td>In stock</td><td>🔵/🟡/🔴</td><td>No production needed, only delivery time matters</td></tr>
+              <tr><td>Delivered</td><td>🟢 Green</td><td>Material on site</td></tr>
+              <tr><td>Completed</td><td>🟢 Green</td><td>Contract closed</td></tr>
+              <tr><td>Cancelled</td><td>⚪ Grey</td><td>Contract cancelled</td></tr>
             </tbody>
           </table>
           <div class="help-note">Material is needed by the task start date, not the end date.</div>
           <div class="help-note">Order deadline = work start − production time − delivery time.</div>
           <div class="help-note">ETA is calculated automatically from the current stage and remaining lead times.</div>
+          <div class="help-note">If a contract has production time = 0 and delivery time = 0 — it's a work-only contract. No delivery marker is shown, but the cost is visible in the task panel. To set a reminder for purchasing (e.g. paint) — set delivery time &gt; 0.</div>
         </div>
       </div>
 
@@ -115,11 +143,25 @@
               <tr><td>6</td><td>สั่งแล้ว ไม่ทัน</td><td>กำลังดำเนินการ</td><td>ETA &gt; เริ่มงาน</td><td>&#128308; แดง</td><td>ล่าช้า: วัสดุมาช้า</td></tr>
               <tr><td>7</td><td>อยู่ที่ไซต์</td><td>อยู่ที่ไซต์</td><td>—</td><td>&#128994; เขียว</td><td>พร้อม</td></tr>
               <tr><td>8</td><td>ติดตั้งแล้ว</td><td>ติดตั้งแล้ว</td><td>—</td><td>&#128994; เขียว</td><td>พร้อม</td></tr>
+              <tr><td>9</td><td>งานเท่านั้น</td><td>ใดก็ได้</td><td>ระยะเวลาผลิต = 0 และระยะเวลาจัดส่ง = 0</td><td>ไม่มีเครื่องหมาย</td><td>สัญญาจ้างงาน ไม่ใช่การจัดส่งวัสดุ</td></tr>
+            </tbody>
+          </table>
+          <h4 style="margin-top:16px">สถานะสัญญา</h4>
+          <table class="help-table">
+            <thead><tr><th>สถานะสัญญา</th><th>ผลต่อเครื่องหมาย</th><th>คำอธิบาย</th></tr></thead>
+            <tbody>
+              <tr><td>ประมาณการ</td><td>⚪ เทา</td><td>ขั้นตอนวางแผนเท่านั้น</td></tr>
+              <tr><td>ยืนยันแล้ว</td><td>ตามปกติ</td><td>ตรวจสอบระยะเวลาผลิตและจัดส่ง</td></tr>
+              <tr><td>ในสต็อก</td><td>🔵/🟡/🔴</td><td>ไม่ต้องผลิต ดูเฉพาะระยะเวลาจัดส่ง</td></tr>
+              <tr><td>จัดส่งแล้ว</td><td>🟢 เขียว</td><td>วัสดุอยู่ที่ไซต์</td></tr>
+              <tr><td>เสร็จสิ้น</td><td>🟢 เขียว</td><td>ปิดสัญญาแล้ว</td></tr>
+              <tr><td>ยกเลิก</td><td>⚪ เทา</td><td>ยกเลิกสัญญา</td></tr>
             </tbody>
           </table>
           <div class="help-note">วัสดุต้องพร้อมก่อนวันเริ่มงาน ไม่ใช่วันสิ้นสุด</div>
           <div class="help-note">กำหนดสั่งซื้อ = วันเริ่มงาน − ระยะเวลาผลิต − ระยะเวลาจัดส่ง</div>
           <div class="help-note">ETA คำนวณอัตโนมัติจากขั้นตอนปัจจุบันและระยะเวลาที่เหลือ</div>
+          <div class="help-note">ถ้าสัญญามีระยะเวลาผลิต = 0 และระยะเวลาจัดส่ง = 0 — เป็นสัญญาจ้างงาน ไม่แสดงเครื่องหมายจัดส่ง แต่ต้นทุนจะแสดงในแผงงาน หากต้องการเตือนเรื่องการจัดซื้อ (เช่น สี) — ตั้งระยะเวลาจัดส่ง &gt; 0</div>
         </div>
       </div>
 
