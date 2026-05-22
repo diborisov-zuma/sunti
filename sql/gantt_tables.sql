@@ -58,6 +58,14 @@ CREATE TABLE IF NOT EXISTS `project-9718e7d4-4cd7-4f52-8d6.sunti.delivery_schedu
   notes STRING
 );
 
+-- 3a. Add notes fields to tasks
+ALTER TABLE `project-9718e7d4-4cd7-4f52-8d6.sunti.tasks`
+ADD COLUMN IF NOT EXISTS notes STRING;
+ALTER TABLE `project-9718e7d4-4cd7-4f52-8d6.sunti.tasks`
+ADD COLUMN IF NOT EXISTS notes_en STRING;
+ALTER TABLE `project-9718e7d4-4cd7-4f52-8d6.sunti.tasks`
+ADD COLUMN IF NOT EXISTS notes_th STRING;
+
 -- 5a. Add contract_id to delivery_schedule (whole-contract delivery tracking)
 ALTER TABLE `project-9718e7d4-4cd7-4f52-8d6.sunti.delivery_schedule`
 ADD COLUMN IF NOT EXISTS contract_id STRING;

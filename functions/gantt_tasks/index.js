@@ -53,6 +53,7 @@ exports.gantt_tasks = async (req, res) => {
         query: `SELECT t.id, t.phase_id, t.name, t.name_en, t.name_th,
                        t.planned_start, t.planned_end, t.actual_start, t.actual_end,
                        t.duration_days, t.is_critical, t.sort_order,
+                       t.notes, t.notes_en, t.notes_th,
                        p.name AS phase_name, p.name_en AS phase_name_en, p.name_th AS phase_name_th
                 FROM ${table} t
                 JOIN ${phasesTbl} p ON t.phase_id = p.id
@@ -77,14 +78,15 @@ exports.gantt_tasks = async (req, res) => {
         query: `INSERT INTO ${table}
                   (id, phase_id, name, name_en, name_th,
                    planned_start, planned_end, actual_start, actual_end,
-                   duration_days, is_critical, sort_order)
+                   duration_days, is_critical, sort_order, notes, notes_en, notes_th)
                 VALUES
                   (@id, @phase_id, @name, NULLIF(@name_en,''), NULLIF(@name_th,''),
                    IF(@planned_start = '', NULL, DATE(@planned_start)),
                    IF(@planned_end = '', NULL, DATE(@planned_end)),
                    IF(@actual_start = '', NULL, DATE(@actual_start)),
                    IF(@actual_end = '', NULL, DATE(@actual_end)),
-                   @duration_days, @is_critical, @sort_order)`,
+                   @duration_days, @is_critical, @sort_order,
+                   NULLIF(@notes,''), NULLIF(@notes_en,''), NULLIF(@notes_th,''))`,
         params: {
           id,
           phase_id:      b.phase_id,
@@ -98,6 +100,9 @@ exports.gantt_tasks = async (req, res) => {
           duration_days: b.duration_days != null ? b.duration_days : 0,
           is_critical:   !!b.is_critical,
           sort_order:    b.sort_order != null ? b.sort_order : 0,
+          notes:         b.notes || '',
+          notes_en:      b.notes_en || '',
+          notes_th:      b.notes_th || '',
         },
       });
       res.json({ success: true, id });
@@ -123,7 +128,10 @@ exports.gantt_tasks = async (req, res) => {
                     actual_end    = IF(@actual_end = '', NULL, DATE(@actual_end)),
                     duration_days = @duration_days,
                     is_critical   = @is_critical,
-                    sort_order    = @sort_order
+                    sort_order    = @sort_order,
+                    notes         = NULLIF(@notes,''),
+                    notes_en      = NULLIF(@notes_en,''),
+                    notes_th      = NULLIF(@notes_th,'')
                 WHERE id = @id`,
         params: {
           id,
@@ -137,6 +145,9 @@ exports.gantt_tasks = async (req, res) => {
           actual_end:    b.actual_end || '',
           duration_days: b.duration_days != null ? b.duration_days : 0,
           is_critical:   b.is_critical !== undefined ? !!b.is_critical : false,
+          notes:         b.notes || '',
+          notes_en:      b.notes_en || '',
+          notes_th:      b.notes_th || '',
           sort_order:    b.sort_order != null ? b.sort_order : 0,
         },
       });

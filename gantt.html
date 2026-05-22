@@ -283,6 +283,13 @@
   .sp-comment .author { font-weight: 600; color: #333; }
   .sp-comment .date { color: #999; font-size: 11px; margin-left: 6px; }
   .sp-comment .text { margin-top: 3px; color: #555; }
+  .translate-btn {
+    background: none; border: none; cursor: pointer; font-size: 14px;
+    padding: 0 2px; opacity: 0.5; vertical-align: middle;
+  }
+  .translate-btn:hover { opacity: 1; }
+  .translate-btn.loading { opacity: 0.3; pointer-events: none; animation: pulse 1s infinite; }
+  @keyframes pulse { 0%,100% { opacity:0.3; } 50% { opacity:0.6; } }
 </style>
 </head>
 <body>
@@ -358,9 +365,9 @@
       <h3 id="t-modal-task-title" style="padding:16px 20px 0;margin:0">Task</h3>
       <div style="padding:0 20px 20px;overflow-y:auto;flex:1">
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-top:12px">
-          <div class="field-group"><label>RU</label><input type="text" id="g-tk-name"></div>
-          <div class="field-group"><label>EN</label><input type="text" id="g-tk-name-en"></div>
-          <div class="field-group"><label>TH</label><input type="text" id="g-tk-name-th"></div>
+          <div class="field-group"><label>RU <button class="translate-btn" data-src="ru" data-fields="g-tk-name" data-targets="g-tk-name-en:en,g-tk-name-th:th" title="Translate to EN + TH">🌐</button></label><input type="text" id="g-tk-name"></div>
+          <div class="field-group"><label>EN <button class="translate-btn" data-src="en" data-fields="g-tk-name-en" data-targets="g-tk-name:ru,g-tk-name-th:th" title="Translate to RU + TH">🌐</button></label><input type="text" id="g-tk-name-en"></div>
+          <div class="field-group"><label>TH <button class="translate-btn" data-src="th" data-fields="g-tk-name-th" data-targets="g-tk-name:ru,g-tk-name-en:en" title="Translate to RU + EN">🌐</button></label><input type="text" id="g-tk-name-th"></div>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
           <div class="field-group"><label>Start</label><input type="date" id="g-tk-start"></div>
@@ -369,6 +376,12 @@
         </div>
         <div class="field-group" style="margin-top:4px">
           <label><input type="checkbox" id="g-tk-critical" style="width:auto;margin-right:6px">Critical path</label>
+        </div>
+        <div style="margin-top:12px"><h4 style="font-size:0.82rem;color:#555;margin:0 0 8px;text-transform:uppercase;letter-spacing:0.5px">Notes</h4></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
+          <div class="field-group"><label>RU <button class="translate-btn" data-src="ru" data-fields="g-tk-notes" data-targets="g-tk-notes-en:en,g-tk-notes-th:th" title="Translate to EN + TH">🌐</button></label><textarea id="g-tk-notes" rows="2" style="resize:vertical"></textarea></div>
+          <div class="field-group"><label>EN <button class="translate-btn" data-src="en" data-fields="g-tk-notes-en" data-targets="g-tk-notes:ru,g-tk-notes-th:th" title="Translate to RU + TH">🌐</button></label><textarea id="g-tk-notes-en" rows="2" style="resize:vertical"></textarea></div>
+          <div class="field-group"><label>TH <button class="translate-btn" data-src="th" data-fields="g-tk-notes-th" data-targets="g-tk-notes:ru,g-tk-notes-en:en" title="Translate to RU + EN">🌐</button></label><textarea id="g-tk-notes-th" rows="2" style="resize:vertical"></textarea></div>
         </div>
 
         <!-- Materials section -->
@@ -1094,6 +1107,36 @@
 
     // ─── Side panel ───
 
+    // ─── Translate ───
+
+    document.addEventListener('click', async e => {
+      const btn = e.target.closest('.translate-btn');
+      if (!btn) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const srcField = document.getElementById(btn.dataset.fields);
+      const text = srcField ? srcField.value.trim() : '';
+      if (!text) { showToast('Fill the field first', 'error'); return; }
+      const srcLang = btn.dataset.src;
+      const targets = btn.dataset.targets.split(','); // "g-tk-name-en:en,g-tk-name-th:th"
+      const targetLangs = targets.map(t => t.split(':')[1]);
+      btn.classList.add('loading');
+      try {
+        const resp = await apiFetch('/translate', {
+          method: 'POST',
+          body: JSON.stringify({ text, source_lang: srcLang, target_langs: targetLangs }),
+        });
+        if (resp.translations) {
+          targets.forEach(t => {
+            const [fieldId, lang] = t.split(':');
+            const el = document.getElementById(fieldId);
+            if (el && resp.translations[lang]) el.value = resp.translations[lang];
+          });
+        }
+      } catch(err) { showToast(err.message, 'error'); }
+      btn.classList.remove('loading');
+    });
+
     document.getElementById('sp-close').addEventListener('click', closeSidePanel);
 
     function closeSidePanel() {
@@ -1233,6 +1276,14 @@
       });
       html += '</div>';
 
+      // Notes
+      const noteText = tk['notes_' + currentLang] || tk.notes || tk.notes_en || '';
+      if (noteText) {
+        html += '<div class="sp-section"><h3>Notes</h3>';
+        html += `<div style="font-size:12px;color:#444;line-height:1.5;white-space:pre-wrap">${noteText}</div>`;
+        html += '</div>';
+      }
+
       // Comments placeholder
       html += '<div class="sp-section"><h3>Comments</h3>';
       html += '<div style="color:#bbb;font-size:12px;font-style:italic">Coming soon</div>';
@@ -1266,6 +1317,9 @@
         document.getElementById('g-tk-dur').value = '14';
         document.getElementById('g-tk-sort').value = '0';
         document.getElementById('g-tk-critical').checked = false;
+        document.getElementById('g-tk-notes').value = '';
+        document.getElementById('g-tk-notes-en').value = '';
+        document.getElementById('g-tk-notes-th').value = '';
         document.getElementById('task-materials-list').innerHTML = '<div style="color:#bbb;font-size:0.82rem">' + t('ganttSaveTaskFirst') + '</div>';
         contractsCache = [];
         setText('t-modal-task-title', 'New Task');
@@ -1304,6 +1358,9 @@
         document.getElementById('g-tk-dur').value = tk.duration_days || 14;
         document.getElementById('g-tk-sort').value = tk.sort_order || 0;
         document.getElementById('g-tk-critical').checked = tk.is_critical === true;
+        document.getElementById('g-tk-notes').value = tk.notes || '';
+        document.getElementById('g-tk-notes-en').value = tk.notes_en || '';
+        document.getElementById('g-tk-notes-th').value = tk.notes_th || '';
         contractsCache = [];
         setText('t-modal-task-title', 'Edit Task');
         openModal('modal-task');
@@ -1372,6 +1429,9 @@
           duration_days: durDays,
           sort_order: parseInt(document.getElementById('g-tk-sort').value) || 0,
           is_critical: document.getElementById('g-tk-critical').checked,
+          notes: document.getElementById('g-tk-notes').value.trim(),
+          notes_en: document.getElementById('g-tk-notes-en').value.trim(),
+          notes_th: document.getElementById('g-tk-notes-th').value.trim(),
         };
         if (editTaskId) {
           await apiFetch(`/gantt_tasks/${editTaskId}`, { method: 'PUT', body: JSON.stringify(body) });
