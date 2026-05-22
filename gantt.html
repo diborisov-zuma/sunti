@@ -49,14 +49,21 @@
     border-radius: 8px;
     display: grid;
     grid-template-columns: var(--left-w) 1fr;
-    height: calc(100vh - 220px);
-    min-height: 300px;
   }
-  .gantt-left { border-right: 1px solid var(--gantt-border); overflow-y: auto; overflow-x: hidden; }
-  .gantt-right { overflow: auto; }
-  .gantt-right-inner { position: relative; min-height: 100%; }
-  .gantt-left .gantt-header-row { position: sticky; top: 0; z-index: 5; background: #fafbfc; }
-  .gantt-right .gantt-header-row { position: sticky; top: 0; z-index: 5; background: #fafbfc; }
+  .gantt-left { border-right: 1px solid var(--gantt-border); }
+  .gantt-right { overflow-x: auto; }
+  .gantt-right-inner { position: relative; }
+  .gantt-sticky-header {
+    position: sticky; top: 0; z-index: 20; background: #fafbfc;
+    display: grid; grid-template-columns: var(--left-w) 1fr;
+    border-bottom: 1px solid var(--gantt-border);
+  }
+  .gantt-sticky-header .gantt-header-left {
+    padding: 16px 16px 0 16px; font-weight: 600; font-size: 12px;
+    color: var(--gantt-text); text-transform: uppercase; letter-spacing: 0.5px;
+    height: 50px; border-right: 1px solid var(--gantt-border);
+  }
+  .gantt-sticky-header .gantt-header-right { overflow: hidden; height: 50px; }
 
   .gantt-header-row {
     background: #fafbfc;
@@ -763,8 +770,31 @@
         return Math.round((new Date(date) - startDate) / 86400000);
       }
 
+      // Build header HTML (months + weeks)
+      let headerMonths = '';
+      let cursor2 = new Date(startDate);
+      while (cursor2 < endDate) {
+        const next = new Date(cursor2.getFullYear(), cursor2.getMonth() + 1, 1);
+        const spanDays = Math.min(Math.ceil((next - cursor2) / 86400000), totalDays - dayOffset(cursor2));
+        if (spanDays <= 0) break;
+        const label = cursor2.toLocaleDateString('ru-RU', { month: 'short', year: '2-digit' });
+        headerMonths += `<div class="month-cell" style="width:${spanDays * dayW}px">${label}</div>`;
+        cursor2 = next;
+      }
+      let headerWeeks = '';
+      const weeks2 = Math.ceil(totalDays / 7);
+      for (let i = 0; i < weeks2; i++) headerWeeks += `<div class="week-cell" style="width:${7 * dayW}px">W${i + 1}</div>`;
+
+      const stickyHeaderHTML = `<div class="gantt-sticky-header">
+        <div class="gantt-header-left">${t('name')}</div>
+        <div class="gantt-header-right" id="gantt-header-scroll"><div style="width:${totalW}px">
+          <div class="month-row">${headerMonths}</div>
+          <div class="week-row">${headerWeeks}</div>
+        </div></div>
+      </div>`;
+
       // Left panel
-      let leftHTML = `<div class="gantt-left"><div class="gantt-header-row">${t('name')}</div>`;
+      let leftHTML = '<div class="gantt-left">';
       rows.forEach((row, ri) => {
         if (row.type === 'phase') {
           const p = row.data;
@@ -789,27 +819,8 @@
       });
       leftHTML += '</div>';
 
-      // Right panel
-      let rightHTML = `<div class="gantt-right"><div class="gantt-right-inner" style="width:${totalW}px">`;
-
-      // Month header
-      rightHTML += '<div class="gantt-header-row"><div class="month-row">';
-      let cursor = new Date(startDate);
-      while (cursor < endDate) {
-        const next = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1);
-        const spanDays = Math.min(Math.ceil((next - cursor) / 86400000), totalDays - dayOffset(cursor));
-        if (spanDays <= 0) break;
-        const label = cursor.toLocaleDateString('ru-RU', { month: 'short', year: '2-digit' });
-        rightHTML += `<div class="month-cell" style="width:${spanDays * dayW}px">${label}</div>`;
-        cursor = next;
-      }
-      rightHTML += '</div>';
-
-      // Week header
-      rightHTML += '<div class="week-row">';
-      const weeks = Math.ceil(totalDays / 7);
-      for (let i = 0; i < weeks; i++) rightHTML += `<div class="week-cell" style="width:${7 * dayW}px">W${i + 1}</div>`;
-      rightHTML += '</div></div>';
+      // Right panel (no header — it's in the sticky bar above)
+      let rightHTML = `<div class="gantt-right" id="gantt-body-scroll"><div class="gantt-right-inner" style="width:${totalW}px">`;
 
       // Today line
       const todayOff = dayOffset(today);
@@ -860,20 +871,25 @@
 
       rightHTML += '</div></div>';
 
-      container.innerHTML = `<div class="gantt-wrap">${leftHTML}${rightHTML}</div>`;
+      container.innerHTML = `${stickyHeaderHTML}<div class="gantt-wrap">${leftHTML}${rightHTML}</div>`;
 
-      // Sync scroll (horizontal → today, vertical → left+right)
-      const ganttLeft = container.querySelector('.gantt-left');
-      const ganttRight = container.querySelector('.gantt-right');
-      if (ganttRight && todayOff > 0) {
-        const scrollTo = Math.max(0, todayOff * dayW - ganttRight.clientWidth / 3);
-        ganttRight.scrollLeft = scrollTo;
-      }
-      // Sync vertical scroll between left and right panels
-      if (ganttLeft && ganttRight) {
+      // Sync horizontal scroll: header ↔ body
+      const headerScroll = document.getElementById('gantt-header-scroll');
+      const bodyScroll = document.getElementById('gantt-body-scroll');
+      if (headerScroll && bodyScroll) {
         let syncing = false;
-        ganttLeft.addEventListener('scroll', () => { if (!syncing) { syncing = true; ganttRight.scrollTop = ganttLeft.scrollTop; syncing = false; } });
-        ganttRight.addEventListener('scroll', () => { if (!syncing) { syncing = true; ganttLeft.scrollTop = ganttRight.scrollTop; syncing = false; } });
+        bodyScroll.addEventListener('scroll', () => {
+          if (!syncing) { syncing = true; headerScroll.scrollLeft = bodyScroll.scrollLeft; syncing = false; }
+        });
+        headerScroll.addEventListener('scroll', () => {
+          if (!syncing) { syncing = true; bodyScroll.scrollLeft = headerScroll.scrollLeft; syncing = false; }
+        });
+        // Scroll to today
+        if (todayOff > 0) {
+          const scrollTo = Math.max(0, todayOff * dayW - bodyScroll.clientWidth / 3);
+          bodyScroll.scrollLeft = scrollTo;
+          headerScroll.scrollLeft = scrollTo;
+        }
       }
 
       // Sync hover: highlight matching row in both panels
