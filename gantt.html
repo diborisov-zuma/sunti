@@ -238,7 +238,7 @@
 
       <div id="view-gantt">
         <div id="gantt-container">
-          <div class="empty-state" id="gantt-empty">Выберите компанию и проект</div>
+          <div class="empty-state" id="gantt-empty"></div>
         </div>
       </div>
 
@@ -288,11 +288,11 @@
         <!-- Materials section -->
         <div style="margin-top:20px;padding-top:16px;border-top:1px solid #e8e8e8">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-            <h4 style="font-size:0.85rem;color:#555;margin:0;text-transform:uppercase;letter-spacing:0.5px">Материалы</h4>
+            <h4 id="t-gantt-materials" style="font-size:0.85rem;color:#555;margin:0;text-transform:uppercase;letter-spacing:0.5px"></h4>
             <div style="display:flex;gap:6px">
-              <button class="btn btn-primary" style="font-size:0.78rem;padding:4px 10px" id="btn-add-mat-contract">+ Позиция</button>
-              <button class="btn btn-outline" style="font-size:0.78rem;padding:4px 10px" id="btn-add-mat-whole">+ Весь контракт</button>
-              <button class="btn btn-outline" style="font-size:0.78rem;padding:4px 10px;color:#8b5cf6;border-color:#8b5cf6" id="btn-add-mat-slot">+ Слот</button>
+              <button class="btn btn-primary" style="font-size:0.78rem;padding:4px 10px" id="btn-add-mat-contract"></button>
+              <button class="btn btn-outline" style="font-size:0.78rem;padding:4px 10px" id="btn-add-mat-whole"></button>
+              <button class="btn btn-outline" style="font-size:0.78rem;padding:4px 10px;color:#8b5cf6;border-color:#8b5cf6" id="btn-add-mat-slot"></button>
             </div>
           </div>
           <div id="task-materials-list"></div>
@@ -308,30 +308,30 @@
   <!-- Modal: add material from contract (position or whole) -->
   <div class="modal-overlay" id="modal-mat-contract">
     <div class="modal" style="width:1000px;max-width:95vw;max-height:90vh;display:flex;flex-direction:column">
-      <h3 style="padding:16px 20px 0;margin:0" id="mat-modal-title">Привязать контракт</h3>
+      <h3 style="padding:16px 20px 0;margin:0" id="mat-modal-title"></h3>
       <div style="padding:12px 20px 20px;overflow-y:auto;flex:1">
         <!-- Search -->
         <div class="field-group">
-          <input type="text" id="mat-contract-search" placeholder="Поиск по названию контракта или поставщику..." style="font-size:0.9rem">
+          <input type="text" id="mat-contract-search" style="font-size:0.9rem">
         </div>
         <!-- Contract list -->
         <div id="mat-contract-list" style="max-height:250px;overflow-y:auto;border:1px solid #e8e8e8;border-radius:8px;margin-bottom:12px"></div>
         <!-- Line items (only for position mode) -->
         <div id="mat-lineitem-section" style="display:none">
-          <div class="field-group"><label>Позиция контракта</label>
-            <select id="mat-lineitem-select" style="font-size:0.9rem"><option value="">— Выберите позицию —</option></select>
+          <div class="field-group"><label id="t-mat-contract-position"></label>
+            <select id="mat-lineitem-select" style="font-size:0.9rem"><option value=""></option></select>
           </div>
         </div>
         <!-- Common fields -->
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
-          <div class="field-group"><label>Кол-во</label><input type="number" id="mat-qty" min="0" step="0.01"></div>
-          <div class="field-group"><label>Ед. изм.</label><input type="text" id="mat-unit" placeholder="м³, шт, м²"></div>
-          <div class="field-group"><label>Нужно к дате</label><input type="date" id="mat-required-by"></div>
+          <div class="field-group"><label id="t-mat-qty"></label><input type="number" id="mat-qty" min="0" step="0.01"></div>
+          <div class="field-group"><label id="t-mat-unit"></label><input type="text" id="mat-unit"></div>
+          <div class="field-group"><label id="t-mat-required-by"></label><input type="date" id="mat-required-by"></div>
         </div>
-        <div class="field-group"><label>Примечание</label><input type="text" id="mat-notes"></div>
+        <div class="field-group"><label id="t-mat-notes"></label><input type="text" id="mat-notes"></div>
         <div class="modal-actions">
-          <button class="btn btn-outline" id="btn-mat-contract-cancel">Отмена</button>
-          <button class="btn btn-primary" id="btn-mat-contract-save">Привязать</button>
+          <button class="btn btn-outline" id="btn-mat-contract-cancel"></button>
+          <button class="btn btn-primary" id="btn-mat-contract-save"></button>
         </div>
       </div>
     </div>
@@ -340,18 +340,18 @@
   <!-- Modal: add slot -->
   <div class="modal-overlay" id="modal-mat-slot">
     <div class="modal" style="width:500px;max-width:95vw">
-      <h3 style="padding:16px 20px 0;margin:0">Создать слот (без контракта)</h3>
+      <h3 id="t-slot-title" style="padding:16px 20px 0;margin:0"></h3>
       <div style="padding:12px 20px 20px">
-        <div class="field-group"><label>Категория / что нужно</label><input type="text" id="slot-category" placeholder="Bathroom suite, Kitchen appliances..."></div>
+        <div class="field-group"><label id="t-slot-category"></label><input type="text" id="slot-category" placeholder="Bathroom suite, Kitchen appliances..."></div>
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
-          <div class="field-group"><label>Кол-во</label><input type="number" id="slot-qty" min="0" step="0.01"></div>
-          <div class="field-group"><label>Ед. изм.</label><input type="text" id="slot-unit" placeholder="шт, м²"></div>
-          <div class="field-group"><label>Нужно к дате</label><input type="date" id="slot-required-by"></div>
+          <div class="field-group"><label id="t-slot-qty"></label><input type="number" id="slot-qty" min="0" step="0.01"></div>
+          <div class="field-group"><label id="t-slot-unit"></label><input type="text" id="slot-unit"></div>
+          <div class="field-group"><label id="t-slot-required-by"></label><input type="date" id="slot-required-by"></div>
         </div>
-        <div class="field-group"><label>Примечание</label><input type="text" id="slot-notes"></div>
+        <div class="field-group"><label id="t-slot-notes"></label><input type="text" id="slot-notes"></div>
         <div class="modal-actions">
-          <button class="btn btn-outline" id="btn-mat-slot-cancel">Отмена</button>
-          <button class="btn btn-primary" id="btn-mat-slot-save">Создать слот</button>
+          <button class="btn btn-outline" id="btn-mat-slot-cancel"></button>
+          <button class="btn btn-primary" id="btn-mat-slot-save"></button>
         </div>
       </div>
     </div>
@@ -360,14 +360,14 @@
   <!-- Modal: dependency -->
   <div class="modal-overlay" id="modal-dep">
     <div class="modal" style="width:560px;max-width:95vw">
-      <h3 style="padding:16px 20px 0;margin:0">Зависимость</h3>
+      <h3 id="t-dep-title" style="padding:16px 20px 0;margin:0"></h3>
       <div style="padding:12px 20px 20px">
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-          <div class="field-group"><label>Предшественник</label><select id="dep-pred"></select></div>
-          <div class="field-group"><label>Текущая задача</label><select id="dep-succ" disabled></select></div>
+          <div class="field-group"><label id="t-dep-predecessor"></label><select id="dep-pred"></select></div>
+          <div class="field-group"><label id="t-dep-current-task"></label><select id="dep-succ" disabled></select></div>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-          <div class="field-group"><label>Тип</label>
+          <div class="field-group"><label id="t-dep-type"></label>
             <select id="dep-type">
               <option value="FS">FS (Finish → Start)</option>
               <option value="SS">SS (Start → Start)</option>
@@ -375,12 +375,12 @@
               <option value="SF">SF (Start → Finish)</option>
             </select>
           </div>
-          <div class="field-group"><label>Lag (дни)</label><input type="number" id="dep-lag" value="0"></div>
+          <div class="field-group"><label>Lag</label><input type="number" id="dep-lag" value="0"></div>
         </div>
         <div id="dep-existing-list" style="margin-bottom:12px"></div>
         <div class="modal-actions">
-          <button class="btn btn-outline" id="btn-dep-cancel">Отмена</button>
-          <button class="btn btn-primary" id="btn-dep-save">Добавить</button>
+          <button class="btn btn-outline" id="btn-dep-cancel"></button>
+          <button class="btn btn-primary" id="btn-dep-save"></button>
         </div>
       </div>
     </div>
@@ -389,29 +389,29 @@
   <!-- Modal: delivery batch -->
   <div class="modal-overlay" id="modal-delivery">
     <div class="modal" style="width:600px;max-width:95vw">
-      <h3 style="padding:16px 20px 0;margin:0">Партия поставки</h3>
+      <h3 id="t-ds-title" style="padding:16px 20px 0;margin:0"></h3>
       <div style="padding:12px 20px 20px">
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
-          <div class="field-group"><label>Кол-во</label><input type="number" id="ds-qty" min="0" step="0.01"></div>
-          <div class="field-group"><label>Ед. изм.</label><input type="text" id="ds-unit"></div>
+          <div class="field-group"><label id="t-ds-qty"></label><input type="number" id="ds-qty" min="0" step="0.01"></div>
+          <div class="field-group"><label id="t-ds-unit"></label><input type="text" id="ds-unit"></div>
           <div class="field-group"><label>Batch #</label><input type="number" id="ds-batch" min="1" value="1"></div>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-          <div class="field-group"><label>Срок производства (дни)</label><input type="number" id="ds-prod-days" min="0" value="0"></div>
-          <div class="field-group"><label>Срок доставки (дни)</label><input type="number" id="ds-del-days" min="0" value="0"></div>
+          <div class="field-group"><label id="t-ds-prod-days"></label><input type="number" id="ds-prod-days" min="0" value="0"></div>
+          <div class="field-group"><label id="t-ds-del-days"></label><input type="number" id="ds-del-days" min="0" value="0"></div>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-          <div class="field-group"><label>Начало производства</label><input type="date" id="ds-prod-start"></div>
-          <div class="field-group"><label>Окончание производства</label><input type="date" id="ds-prod-end"></div>
+          <div class="field-group"><label id="t-ds-prod-start"></label><input type="date" id="ds-prod-start"></div>
+          <div class="field-group"><label id="t-ds-prod-end"></label><input type="date" id="ds-prod-end"></div>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-          <div class="field-group"><label>Начало доставки</label><input type="date" id="ds-del-start"></div>
-          <div class="field-group"><label>Получено (факт)</label><input type="date" id="ds-del-end"></div>
+          <div class="field-group"><label id="t-ds-del-start"></label><input type="date" id="ds-del-start"></div>
+          <div class="field-group"><label id="t-ds-del-end"></label><input type="date" id="ds-del-end"></div>
         </div>
-        <div class="field-group"><label>Примечание</label><input type="text" id="ds-notes"></div>
+        <div class="field-group"><label id="t-ds-notes"></label><input type="text" id="ds-notes"></div>
         <div class="modal-actions">
-          <button class="btn btn-outline" id="btn-ds-cancel">Отмена</button>
-          <button class="btn btn-primary" id="btn-ds-save">Сохранить</button>
+          <button class="btn btn-outline" id="btn-ds-cancel"></button>
+          <button class="btn btn-primary" id="btn-ds-save"></button>
         </div>
       </div>
     </div>
@@ -483,10 +483,56 @@
       setText('t-guest-title', t('guestTitle'));
       setText('t-guest-sub', t('guestSub'));
       setText('t-page-title', 'Gantt');
+      setText('gantt-empty', t('ganttSelectCompanyProject'));
       setText('btn-gph-cancel', t('cancel'));
       setText('btn-gph-save', t('save'));
       setText('btn-gtk-cancel', t('cancel'));
       setText('btn-gtk-save', t('save'));
+      // Materials section
+      setText('t-gantt-materials', t('ganttMaterials'));
+      setText('btn-add-mat-contract', t('ganttAddPosition'));
+      setText('btn-add-mat-whole', t('ganttAddWholeContract'));
+      setText('btn-add-mat-slot', t('ganttAddSlot'));
+      // Contract modal
+      setText('mat-modal-title', t('ganttLinkContract'));
+      const matSearchEl = document.getElementById('mat-contract-search');
+      if (matSearchEl) matSearchEl.placeholder = t('ganttSearchContracts');
+      setText('t-mat-contract-position', t('ganttContractPosition'));
+      setText('t-mat-qty', t('ganttQty'));
+      setText('t-mat-unit', t('ganttUnit'));
+      setText('t-mat-required-by', t('ganttRequiredBy'));
+      setText('t-mat-notes', t('ganttNotes'));
+      setText('btn-mat-contract-cancel', t('cancel'));
+      setText('btn-mat-contract-save', t('ganttLink'));
+      // Slot modal
+      setText('t-slot-title', t('ganttSlotTitle'));
+      setText('t-slot-category', t('ganttSlotCategory'));
+      setText('t-slot-qty', t('ganttQty'));
+      setText('t-slot-unit', t('ganttUnit'));
+      setText('t-slot-required-by', t('ganttRequiredBy'));
+      setText('t-slot-notes', t('ganttNotes'));
+      setText('btn-mat-slot-cancel', t('cancel'));
+      setText('btn-mat-slot-save', t('ganttCreateSlot'));
+      // Dependency modal
+      setText('t-dep-title', t('ganttDependency'));
+      setText('t-dep-predecessor', t('ganttPredecessor'));
+      setText('t-dep-current-task', t('ganttCurrentTask'));
+      setText('t-dep-type', t('direction'));
+      setText('btn-dep-cancel', t('cancel'));
+      setText('btn-dep-save', t('ganttAddDep'));
+      // Delivery batch modal
+      setText('t-ds-title', t('ganttDeliveryBatch'));
+      setText('t-ds-qty', t('ganttQty'));
+      setText('t-ds-unit', t('ganttUnit'));
+      setText('t-ds-prod-days', t('ganttProductionDays'));
+      setText('t-ds-del-days', t('ganttDeliveryDays'));
+      setText('t-ds-prod-start', t('ganttProductionStart'));
+      setText('t-ds-prod-end', t('ganttProductionEnd'));
+      setText('t-ds-del-start', t('ganttDeliveryStart'));
+      setText('t-ds-del-end', t('ganttDeliveryEnd'));
+      setText('t-ds-notes', t('ganttNotes'));
+      setText('btn-ds-cancel', t('cancel'));
+      setText('btn-ds-save', t('save'));
       updateHeaderTexts();
     }
 
@@ -528,7 +574,7 @@
       filterCompany = e.target.value;
       filterFolder = '';
       fillFolderFilter();
-      document.getElementById('gantt-container').innerHTML = '<div class="empty-state">Выберите проект</div>';
+      document.getElementById('gantt-container').innerHTML = '<div class="empty-state">' + t('ganttSelectProject') + '</div>';
       document.getElementById('dash-widget').style.display = 'none';
       document.getElementById('gantt-tabs').style.display = 'none';
       document.getElementById('view-gantt').style.display = '';
@@ -541,7 +587,7 @@
       if (filterFolder) {
         loadGanttData();
       } else {
-        document.getElementById('gantt-container').innerHTML = '<div class="empty-state">Выберите проект</div>';
+        document.getElementById('gantt-container').innerHTML = '<div class="empty-state">' + t('ganttSelectProject') + '</div>';
         document.getElementById('dash-widget').style.display = 'none';
         document.getElementById('gantt-tabs').style.display = 'none';
         document.getElementById('view-gantt').style.display = '';
@@ -553,7 +599,7 @@
 
     async function loadGanttData() {
       const container = document.getElementById('gantt-container');
-      container.innerHTML = '<div class="loading">Загрузка…</div>';
+      container.innerHTML = '<div class="loading">' + t('loading') + '</div>';
       try {
         const [phases, tasks, deps, matReqs] = await Promise.all([
           apiFetch(`/phases?folder_id=${filterFolder}`),
@@ -666,11 +712,12 @@
       }
     }
 
-    const lifecycleLabels = {
-      planned: 'Не заказан', quoted: 'КП получено', in_production: 'В производстве',
-      produced: 'Произведено', on_delivery: 'В доставке', in_transit: 'На складе',
-      on_site: 'На объекте', installed: 'Смонтировано'
+    const lifecycleLabelsI18n = {
+      ru: { planned: 'Не заказан', quoted: 'КП получено', in_production: 'В производстве', produced: 'Произведено', on_delivery: 'В доставке', in_transit: 'На складе', on_site: 'На объекте', installed: 'Смонтировано' },
+      en: { planned: 'Not ordered', quoted: 'Quoted', in_production: 'In production', produced: 'Produced', on_delivery: 'In delivery', in_transit: 'In transit', on_site: 'On site', installed: 'Installed' },
+      th: { planned: 'ยังไม่สั่ง', quoted: 'ได้ใบเสนอราคา', in_production: 'กำลังผลิต', produced: 'ผลิตแล้ว', on_delivery: 'กำลังจัดส่ง', in_transit: 'ระหว่างขนส่ง', on_site: 'ที่หน้างาน', installed: 'ติดตั้งแล้ว' },
     };
+    const lifecycleLabels = new Proxy({}, { get(_, key) { return (lifecycleLabelsI18n[currentLang] || lifecycleLabelsI18n.en)[key] || key; } });
 
     function getTaskRisk(taskId) {
       const mats = allMaterialReqs.filter(m => m.task_id === taskId);
@@ -691,7 +738,7 @@
       const container = document.getElementById('gantt-container');
 
       if (!tasksData.length && !phasesData.length) {
-        container.innerHTML = '<div class="empty-state">Нет задач. Добавьте фазу кнопкой "+ Phase"</div>';
+        container.innerHTML = '<div class="empty-state">' + t('ganttNoTasks') + '</div>';
         return;
       }
 
@@ -748,8 +795,8 @@
               <span class="name">${name}</span>
               ${listRiskBadge}
               ${tkDepLabel ? `<span style="color:#1a73e8;font-size:0.72rem;margin-right:4px" title="Depends on: ${tkDepLabel}">⛓ ${tkDeps.length}</span>` : ''}
-              <button class="dep-btn" data-action="open-dep" data-task-id="${tk.id}" title="Зависимости">⛓</button>
-              <span style="color:#bbb;font-size:0.78rem">${tk.duration_days || '—'}д</span></div>`;
+              <button class="dep-btn" data-action="open-dep" data-task-id="${tk.id}" title="${t('ganttDependency')}">⛓</button>
+              <span style="color:#bbb;font-size:0.78rem">${tk.duration_days || '—'}d</span></div>`;
           }
         });
         listHTML += '</div></div>';
@@ -814,7 +861,7 @@
             <span class="name">${name}</span>
             ${ganttRiskBadge}
             ${tkDeps.length ? `<span style="color:#1a73e8;font-size:0.72rem">⛓${tkDeps.length}</span>` : ''}
-            <button class="dep-btn" data-action="open-dep" data-task-id="${tk.id}" title="Зависимости">⛓</button>
+            <button class="dep-btn" data-action="open-dep" data-task-id="${tk.id}" title="${t('ganttDependency')}">⛓</button>
           </div>`;
         }
       });
@@ -924,7 +971,7 @@
         document.getElementById('g-tk-dur').value = '14';
         document.getElementById('g-tk-sort').value = '0';
         document.getElementById('g-tk-critical').checked = false;
-        document.getElementById('task-materials-list').innerHTML = '<div style="color:#bbb;font-size:0.82rem">Сначала сохраните задачу</div>';
+        document.getElementById('task-materials-list').innerHTML = '<div style="color:#bbb;font-size:0.82rem">' + t('ganttSaveTaskFirst') + '</div>';
         contractsCache = [];
         setText('t-modal-task-title', 'New Task');
         openModal('modal-task');
@@ -1045,7 +1092,7 @@
 
     async function loadTaskMaterials(taskId) {
       const list = document.getElementById('task-materials-list');
-      if (!taskId) { list.innerHTML = '<div style="color:#bbb;font-size:0.82rem">Сначала сохраните задачу</div>'; return; }
+      if (!taskId) { list.innerHTML = '<div style="color:#bbb;font-size:0.82rem">' + t('ganttSaveTaskFirst') + '</div>'; return; }
       try {
         taskMaterials = await apiFetch(`/material_requirements?task_id=${taskId}`);
         // Load delivery schedules for materials in this task (by line_item_id and contract_id)
@@ -1066,7 +1113,7 @@
     function renderTaskMaterials() {
       const list = document.getElementById('task-materials-list');
       if (!taskMaterials.length) {
-        list.innerHTML = '<div style="color:#bbb;font-size:0.82rem">Нет привязанных материалов</div>';
+        list.innerHTML = '<div style="color:#bbb;font-size:0.82rem">' + t('ganttNoMaterials') + '</div>';
         return;
       }
       const fmtAmt = v => { const n = parseFloat(v?.value ?? v ?? 0); return isNaN(n)||n===0 ? '' : n.toLocaleString('en-US',{minimumFractionDigits:2}); };
@@ -1103,7 +1150,7 @@
               const lcColor = (lc === 'on_site' || lc === 'installed') ? 'green' : ((lc === 'on_delivery' || lc === 'in_transit') ? 'yellow' : '');
               return `<div class="ds-batch-row">
                 <span>Batch ${b.batch_number || (idx+1)}: ${b.qty || '?'} ${b.unit || ''}</span>
-                <span>prod ${b.production_days || 0}д · del ${b.delivery_days || 0}д</span>
+                <span>prod ${b.production_days || 0}d · del ${b.delivery_days || 0}d</span>
                 <span class="ds-lc ${lcColor}">${lifecycleLabels[lc] || lc}</span>
                 <span>ETA ${etaStr}</span>
                 <button class="btn btn-outline" style="padding:1px 5px;font-size:0.68rem" data-action="edit-ds" data-ds-id="${b.id}" data-line-item-id="${m.line_item_id || ''}" data-contract-id="${m.contract_id || ''}">✎</button>
@@ -1112,14 +1159,14 @@
             }).join('');
           }
           const addAttrs = m.line_item_id ? `data-line-item-id="${m.line_item_id}"` : `data-contract-id="${m.contract_id}"`;
-          batchesHTML += `<div style="padding:2px 12px 2px 24px"><button class="btn btn-outline" style="font-size:0.72rem;padding:2px 8px;color:var(--gantt-primary)" data-action="add-ds" ${addAttrs}>+ Добавить партию</button></div>`;
+          batchesHTML += `<div style="padding:2px 12px 2px 24px"><button class="btn btn-outline" style="font-size:0.72rem;padding:2px 8px;color:var(--gantt-primary)" data-action="add-ds" ${addAttrs}>${t('ganttAddBatch')}</button></div>`;
         }
 
         return `<div style="margin-bottom:6px;background:#fafafa;border-radius:6px;${border};font-size:0.85rem">
           <div style="display:flex;align-items:center;gap:10px;padding:8px 12px;">
             <div style="flex:1">
               <div>${name}</div>
-              <div style="color:#999;font-size:0.78rem">${contractor ? contractor + ' · ' : ''}${m.qty || '—'} ${m.unit || ''} · к ${date}${amount ? ' · <strong style="color:#333">'+amount+'</strong>' : ''}</div>
+              <div style="color:#999;font-size:0.78rem">${contractor ? contractor + ' · ' : ''}${m.qty || '—'} ${m.unit || ''} · ${date}${amount ? ' · <strong style="color:#333">'+amount+'</strong>' : ''}</div>
             </div>
             ${lifecycle}
             <button class="btn btn-outline" style="padding:2px 6px;font-size:0.7rem;color:#c5221f" data-action="delete-mat" data-mat-id="${m.id}">×</button>
@@ -1171,7 +1218,7 @@
         return name.includes(q) || contractor.includes(q) || ref.includes(q);
       });
       if (!filtered.length) {
-        list.innerHTML = '<div style="padding:16px;color:#bbb;text-align:center">Контракты не найдены</div>';
+        list.innerHTML = '<div style="padding:16px;color:#bbb;text-align:center">' + t('ganttContractsNotFound') + '</div>';
         return;
       }
       const fmt = v => { const n = parseFloat(v?.value ?? v ?? 0); return isNaN(n) ? '—' : n.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2}); };
@@ -1188,18 +1235,18 @@
       }).join('');
       // Show selected count for whole mode
       if (matMode === 'whole' && selectedContractIds.size > 0) {
-        list.insertAdjacentHTML('beforeend', `<div style="padding:8px 14px;font-size:0.78rem;color:#1a73e8;font-weight:600;border-top:1px solid #e8e8e8">Выбрано: ${selectedContractIds.size}</div>`);
+        list.insertAdjacentHTML('beforeend', `<div style="padding:8px 14px;font-size:0.78rem;color:#1a73e8;font-weight:600;border-top:1px solid #e8e8e8">${t('ganttSelected')}: ${selectedContractIds.size}</div>`);
       }
     }
 
     function openContractPicker(mode) {
-      if (!editTaskId) { showToast('Сначала сохраните задачу', 'error'); return; }
+      if (!editTaskId) { showToast(t('ganttSaveTaskFirst'), 'error'); return; }
       matMode = mode;
       selectedContractId = null;
       selectedContractIds = new Set();
-      document.getElementById('mat-modal-title').textContent = mode === 'whole' ? 'Привязать весь контракт' : 'Привязать позицию контракта';
+      document.getElementById('mat-modal-title').textContent = mode === 'whole' ? t('ganttLinkWholeContract') : t('ganttLinkPosition');
       document.getElementById('mat-lineitem-section').style.display = mode === 'position' ? '' : 'none';
-      document.getElementById('mat-lineitem-select').innerHTML = '<option value="">— Сначала выберите контракт —</option>';
+      document.getElementById('mat-lineitem-select').innerHTML = '<option value="">' + t('ganttSelectContract') + '</option>';
       document.getElementById('mat-contract-search').value = '';
       document.getElementById('mat-qty').value = '';
       document.getElementById('mat-unit').value = '';
@@ -1243,19 +1290,19 @@
 
       if (matMode === 'position') {
         const sel = document.getElementById('mat-lineitem-select');
-        sel.innerHTML = '<option value="">Загрузка...</option>';
+        sel.innerHTML = '<option value="">' + t('loading') + '</option>';
         try {
           if (!contractItemsCache[selectedContractId]) {
             contractItemsCache[selectedContractId] = await apiFetch(`/contract_items?contract_id=${selectedContractId}`);
           }
           const items = contractItemsCache[selectedContractId];
-          sel.innerHTML = '<option value="">— Выберите позицию —</option>';
+          sel.innerHTML = '<option value="">' + t('ganttSelectPosition') + '</option>';
           items.forEach(it => {
             const label = it.description || `Line ${it.sort_order || '?'}`;
             const amt = it.amount ? ` (${parseFloat(it.amount?.value ?? it.amount ?? 0).toLocaleString('en-US',{minimumFractionDigits:2})})` : '';
             sel.innerHTML += `<option value="${it.id}">${label}${amt}</option>`;
           });
-        } catch(err) { sel.innerHTML = '<option value="">Ошибка загрузки</option>'; }
+        } catch(err) { sel.innerHTML = '<option value="">Error</option>'; }
       }
     });
 
@@ -1267,9 +1314,9 @@
       const notes = document.getElementById('mat-notes').value || '';
 
       if (matMode === 'position') {
-        if (!selectedContractId) { showToast('Выберите контракт', 'error'); return; }
+        if (!selectedContractId) { showToast(t('ganttSelectContract'), 'error'); return; }
         const lineItemId = document.getElementById('mat-lineitem-select').value;
-        if (!lineItemId) { showToast('Выберите позицию контракта', 'error'); return; }
+        if (!lineItemId) { showToast(t('ganttSelectPosition'), 'error'); return; }
         closeModal('modal-mat-contract');
         try {
           await apiFetch('/material_requirements', {
@@ -1286,7 +1333,7 @@
         } catch(e) { showToast(e.message, 'error'); }
       } else {
         // Whole contract mode — multi-select
-        if (!selectedContractIds.size) { showToast('Выберите хотя бы один контракт', 'error'); return; }
+        if (!selectedContractIds.size) { showToast(t('ganttSelectContract'), 'error'); return; }
         closeModal('modal-mat-contract');
         try {
           // Create material_requirements + empty delivery batch for each
@@ -1300,7 +1347,7 @@
               body: JSON.stringify({ contract_id: cId, batch_number: 1, qty: qty || '0', unit: unit || '' }),
             });
           }
-          showToast(`${selectedContractIds.size} контрактов привязано`, 'success');
+          showToast(selectedContractIds.size + ' ' + t('ganttContractsLinked'), 'success');
           await loadTaskMaterials(editTaskId);
         } catch(e) { showToast(e.message, 'error'); }
       }
@@ -1309,7 +1356,7 @@
     // ─── Add slot ───
 
     document.getElementById('btn-add-mat-slot').addEventListener('click', () => {
-      if (!editTaskId) { showToast('Сначала сохраните задачу', 'error'); return; }
+      if (!editTaskId) { showToast(t('ganttSaveTaskFirst'), 'error'); return; }
       document.getElementById('slot-category').value = '';
       document.getElementById('slot-qty').value = '';
       document.getElementById('slot-unit').value = '';
@@ -1321,7 +1368,7 @@
     document.getElementById('btn-mat-slot-cancel').addEventListener('click', () => closeModal('modal-mat-slot'));
     document.getElementById('btn-mat-slot-save').addEventListener('click', async () => {
       const category = document.getElementById('slot-category').value.trim();
-      if (!category) { showToast('Укажите категорию', 'error'); return; }
+      if (!category) { showToast(t('ganttSlotCategory'), 'error'); return; }
       closeModal('modal-mat-slot');
       try {
         await apiFetch('/material_requirements', {
@@ -1350,7 +1397,7 @@
 
       // Fill predecessor select (all tasks except this one)
       const predSel = document.getElementById('dep-pred');
-      predSel.innerHTML = '<option value="">— Выберите —</option>';
+      predSel.innerHTML = '<option value="">—</option>';
       tasksData.forEach(t => {
         if (t.id === taskId) return;
         const label = t['name_' + currentLang] || t.name || t.name_en || '?';
@@ -1374,15 +1421,15 @@
       const existing = depsData.filter(d => d.successor_id === taskId);
       const container = document.getElementById('dep-existing-list');
       if (!existing.length) {
-        container.innerHTML = '<div style="color:#bbb;font-size:0.82rem;margin-bottom:8px">Нет зависимостей</div>';
+        container.innerHTML = '<div style="color:#bbb;font-size:0.82rem;margin-bottom:8px">' + t('ganttNoDeps') + '</div>';
         return;
       }
-      container.innerHTML = '<div style="font-size:0.78rem;color:#888;text-transform:uppercase;margin-bottom:6px;font-weight:600">Текущие зависимости</div>' +
+      container.innerHTML = '<div style="font-size:0.78rem;color:#888;text-transform:uppercase;margin-bottom:6px;font-weight:600">' + t('ganttCurrentDeps') + '</div>' +
         existing.map(d => {
           const pred = tasksData.find(t => t.id === d.predecessor_id);
           const predName = pred ? (pred['name_'+currentLang] || pred.name || '?') : '?';
           return `<div style="display:flex;align-items:center;gap:8px;padding:5px 8px;background:#f8f8f8;border-radius:6px;margin-bottom:4px;font-size:0.82rem">
-            <span style="flex:1"><strong>${predName}</strong> → ${d.type || 'FS'}${d.lag_days ? ' +' + d.lag_days + 'д' : ''}</span>
+            <span style="flex:1"><strong>${predName}</strong> → ${d.type || 'FS'}${d.lag_days ? ' +' + d.lag_days + 'd' : ''}</span>
             <button class="btn btn-outline" style="padding:1px 6px;font-size:0.7rem;color:#c5221f" data-action="delete-dep" data-dep-id="${d.id}">×</button>
           </div>`;
         }).join('');
@@ -1391,7 +1438,7 @@
     document.getElementById('btn-dep-cancel').addEventListener('click', () => closeModal('modal-dep'));
     document.getElementById('btn-dep-save').addEventListener('click', async () => {
       const pred = document.getElementById('dep-pred').value;
-      if (!pred) { showToast('Выберите предшественника', 'error'); return; }
+      if (!pred) { showToast(t('ganttPredecessor'), 'error'); return; }
       try {
         await apiFetch('/task_dependencies', {
           method: 'POST',
@@ -1458,11 +1505,11 @@
 
       const delDs = e.target.closest('[data-action="delete-ds"]');
       if (delDs) {
-        if (!confirm('Удалить партию?')) return;
+        if (!confirm(t('ganttDeleteBatch'))) return;
         delDs.disabled = true;
         try {
           await apiFetch(`/delivery_schedule/${delDs.dataset.dsId}`, { method: 'DELETE' });
-          showToast('Удалено', 'success');
+          showToast(t('deleted'), 'success');
           await loadTaskMaterials(editTaskId);
         } catch(err) { showToast(err.message, 'error'); delDs.disabled = false; }
         return;
@@ -1533,7 +1580,7 @@
       const total = reds.length + slots.length + yellows.length;
       if (!total) { widget.style.display = 'none'; return; }
       widget.style.display = 'flex';
-      document.getElementById('dw-title').textContent = `Требует внимания: ${total}`;
+      document.getElementById('dw-title').textContent = `⚠ ${total}`;
       const parts = [];
       if (reds.length) parts.push(`🔴 ${reds.length} late/too late`);
       if (yellows.length) parts.push(`🟡 ${yellows.length} at risk`);
@@ -1600,12 +1647,12 @@
       }
 
       if (!rows.length) {
-        tableWrap.innerHTML = '<div style="text-align:center;padding:32px;color:#bbb">Нет материалов</div>';
+        tableWrap.innerHTML = '<div style="text-align:center;padding:32px;color:#bbb">' + t('ganttNoMaterials') + '</div>';
         return;
       }
 
       let html = `<table class="proc-table"><thead><tr>
-        <th>Материал / Слот</th><th>Контракт</th><th>Lifecycle</th><th>Need by</th><th>ETA</th><th>Margin</th><th>Risk</th>
+        <th>${t('ganttMaterials')}</th><th>${t('contract')}</th><th>Lifecycle</th><th>Need by</th><th>ETA</th><th>Margin</th><th>Risk</th>
       </tr></thead><tbody>`;
 
       rows.forEach(r => {
@@ -1615,7 +1662,7 @@
         const lc = r.ds.length ? lifecycleLabels[computeLifecycle(r.ds[0])] || computeLifecycle(r.ds[0]) : '—';
         const needByStr = r.needBy ? r.needBy.toLocaleDateString('ru-RU', { day:'2-digit', month:'2-digit', year:'2-digit' }) : '—';
         const etaStr = r.worstETA ? r.worstETA.toLocaleDateString('ru-RU', { day:'2-digit', month:'2-digit', year:'2-digit' }) : '—';
-        const marginStr = r.margin !== null ? (r.margin >= 0 ? `+${r.margin}д` : `${r.margin}д`) : '—';
+        const marginStr = r.margin !== null ? (r.margin >= 0 ? `+${r.margin}d` : `${r.margin}d`) : '—';
         const marginColor = r.margin !== null ? (r.margin < 0 ? 'color:#ef4444' : (r.margin < 7 ? 'color:#f59e0b' : 'color:#10b981')) : '';
 
         html += `<tr>
