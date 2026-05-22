@@ -371,7 +371,7 @@
           <div class="field-group"><label>TH <button class="translate-btn" data-src="th" data-fields="g-tk-name-th" data-targets="g-tk-name:ru,g-tk-name-en:en" title="Translate to RU + EN">🌐</button></label><input type="text" id="g-tk-name-th"></div>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
-          <div class="field-group"><label>Start</label><input type="date" id="g-tk-start"></div>
+          <div class="field-group"><label>Start</label><input type="date" id="g-tk-start" lang="en-GB"></div>
           <div class="field-group"><label>Duration (days)</label><input type="number" id="g-tk-dur" min="1" value="14"></div>
           <div class="field-group"><label>Sort order</label><input type="number" id="g-tk-sort" min="0" value="0"></div>
         </div>
@@ -426,7 +426,7 @@
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
           <div class="field-group"><label id="t-mat-qty"></label><input type="number" id="mat-qty" min="0" step="0.01"></div>
           <div class="field-group"><label id="t-mat-unit"></label><input type="text" id="mat-unit"></div>
-          <div class="field-group"><label id="t-mat-required-by"></label><input type="date" id="mat-required-by"></div>
+          <div class="field-group"><label id="t-mat-required-by"></label><input type="date" id="mat-required-by" lang="en-GB"></div>
         </div>
         <div class="field-group"><label id="t-mat-notes"></label><input type="text" id="mat-notes"></div>
         <div class="modal-actions">
@@ -446,7 +446,7 @@
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
           <div class="field-group"><label id="t-slot-qty"></label><input type="number" id="slot-qty" min="0" step="0.01"></div>
           <div class="field-group"><label id="t-slot-unit"></label><input type="text" id="slot-unit"></div>
-          <div class="field-group"><label id="t-slot-required-by"></label><input type="date" id="slot-required-by"></div>
+          <div class="field-group"><label id="t-slot-required-by"></label><input type="date" id="slot-required-by" lang="en-GB"></div>
         </div>
         <div class="field-group"><label id="t-slot-notes"></label><input type="text" id="slot-notes"></div>
         <div class="modal-actions">
@@ -501,12 +501,12 @@
           <div class="field-group"><label id="t-ds-del-days"></label><input type="number" id="ds-del-days" min="0" value="0"></div>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-          <div class="field-group"><label id="t-ds-prod-start"></label><input type="date" id="ds-prod-start"></div>
-          <div class="field-group"><label id="t-ds-prod-end"></label><input type="date" id="ds-prod-end"></div>
+          <div class="field-group"><label id="t-ds-prod-start"></label><input type="date" id="ds-prod-start" lang="en-GB"></div>
+          <div class="field-group"><label id="t-ds-prod-end"></label><input type="date" id="ds-prod-end" lang="en-GB"></div>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-          <div class="field-group"><label id="t-ds-del-start"></label><input type="date" id="ds-del-start"></div>
-          <div class="field-group"><label id="t-ds-del-end"></label><input type="date" id="ds-del-end"></div>
+          <div class="field-group"><label id="t-ds-del-start"></label><input type="date" id="ds-del-start" lang="en-GB"></div>
+          <div class="field-group"><label id="t-ds-del-end"></label><input type="date" id="ds-del-end" lang="en-GB"></div>
         </div>
         <div class="field-group"><label id="t-ds-notes"></label><input type="text" id="ds-notes"></div>
         <div class="modal-actions">
@@ -958,7 +958,8 @@
         const next = new Date(cursor2.getFullYear(), cursor2.getMonth() + 1, 1);
         const spanDays = Math.min(Math.ceil((next - cursor2) / 86400000), totalDays - dayOffset(cursor2));
         if (spanDays <= 0) break;
-        const label = cursor2.toLocaleDateString('ru-RU', { month: 'short', year: '2-digit' });
+        const langLocale = currentLang === 'ru' ? 'ru-RU' : (currentLang === 'th' ? 'th-TH' : 'en-GB');
+        const label = cursor2.toLocaleDateString(langLocale, { month: 'short', year: '2-digit' });
         headerMonths += `<div class="month-cell" style="width:${spanDays * dayW}px">${label}</div>`;
         cursor2 = next;
       }
