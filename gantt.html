@@ -902,7 +902,7 @@
         // Delivery markers (diamonds) on bar row
         const taskMatsForBar = allMaterialReqs.filter(m => m.task_id === tk.id);
         taskMatsForBar.forEach(m => {
-          if (!m.line_item_id) return;
+          if (!m.line_item_id && !m.contract_id) return;
           const dsArr = m.line_item_id ? (allDeliverySchedules[m.line_item_id] || []) : (m.contract_id ? (allDeliverySchedules['c_' + m.contract_id] || []) : []);
           dsArr.forEach(d => {
             const eta = computeETA(d);
