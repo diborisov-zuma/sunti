@@ -887,10 +887,10 @@
         const s = tk.planned_start ? new Date(tk.planned_start.value || tk.planned_start) : null;
         const endRaw = tk.planned_end || tk._computed_end;
         const e = endRaw ? new Date(endRaw.value || endRaw) : null;
+        const barEnd = e || s;
 
         rightHTML += `<div class="bar-row" data-row-idx="${ri}">`;
         if (s) {
-          const barEnd = e || s;
           const left = dayOffset(s) * dayW;
           const width = Math.max((dayOffset(barEnd) - dayOffset(s) + 1) * dayW, 4);
           const critical = tk.is_critical ? ' critical' : '';
@@ -909,8 +909,23 @@
             const lc = computeLifecycle(d);
             const off = dayOffset(eta);
             if (off >= 0 && off <= totalDays) {
-              const markerColor = (lc === 'on_site' || lc === 'installed') ? 'green' : ((lc === 'on_delivery' || lc === 'in_transit') ? 'yellow' : 'grey');
-              rightHTML += `<div class="delivery-marker ${markerColor}" style="left:${off * dayW}px" title="${m.contract_item_name || m.category || '?'}: ${lifecycleLabels[lc] || lc}"></div>`;
+              // Determine marker color based on lifecycle + risk
+              let markerColor;
+              const needBy = m.required_by_date ? new Date(m.required_by_date.value || m.required_by_date) : barEnd;
+              const isLate = needBy && eta > needBy;
+              if (lc === 'on_site' || lc === 'installed') {
+                markerColor = 'green';
+              } else if (lc === 'on_delivery' || lc === 'in_transit') {
+                markerColor = isLate ? 'red' : 'yellow';
+              } else {
+                // Not ordered yet — check if order deadline passed
+                const prodDays = parseInt(d.production_days) || 0;
+                const delDays = parseInt(d.delivery_days) || 0;
+                const orderDeadline = needBy ? new Date(needBy) : null;
+                if (orderDeadline) orderDeadline.setDate(orderDeadline.getDate() - prodDays - delDays);
+                markerColor = (orderDeadline && today > orderDeadline) ? 'red' : 'grey';
+              }
+              rightHTML += `<div class="delivery-marker ${markerColor}" style="left:${off * dayW}px" title="${m.contract_item_name || m.contract_name || m.category || '?'}: ${lifecycleLabels[lc] || lc}"></div>`;
             }
           });
         });
