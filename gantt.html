@@ -284,6 +284,15 @@
   .sp-comment .author { font-weight: 600; color: #333; }
   .sp-comment .date { color: #999; font-size: 11px; margin-left: 6px; }
   .sp-comment .text { margin-top: 3px; color: #555; }
+  .dep-phase-group { font-size:10px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:0.5px;padding:8px 12px;background:#f8f8f8;border-bottom:1px solid #e8e8e8; }
+  .dep-task-pick {
+    display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid #f0f0f0;
+    cursor:pointer;font-size:0.85rem;transition:background 0.1s;
+  }
+  .dep-task-pick:hover { background:#ebffee; }
+  .dep-task-pick:last-child { border-bottom:none; }
+  .dep-task-pick .dt-name { flex:1;color:#333; }
+  .dep-task-pick .dt-dates { font-size:0.75rem;color:#999;white-space:nowrap; }
   .translate-btn {
     background: none; border: none; cursor: pointer; font-size: 14px;
     padding: 0 2px; opacity: 0.5; vertical-align: middle;
@@ -459,12 +468,24 @@
 
   <!-- Modal: dependency -->
   <div class="modal-overlay" id="modal-dep">
-    <div class="modal" style="width:560px;max-width:95vw">
+    <div class="modal" style="width:700px;max-width:95vw;max-height:90vh;display:flex;flex-direction:column">
       <h3 id="t-dep-title" style="padding:16px 20px 0;margin:0"></h3>
-      <div style="padding:12px 20px 20px">
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-          <div class="field-group"><label id="t-dep-predecessor"></label><select id="dep-pred"></select></div>
-          <div class="field-group"><label id="t-dep-current-task"></label><select id="dep-succ" disabled></select></div>
+      <div style="padding:12px 20px 20px;overflow-y:auto;flex:1">
+        <!-- Current task -->
+        <div class="field-group">
+          <label id="t-dep-current-task"></label>
+          <div id="dep-succ-name" style="font-weight:600;font-size:0.95rem;padding:8px 0"></div>
+        </div>
+        <!-- Existing dependencies -->
+        <div id="dep-existing-list" style="margin-bottom:16px"></div>
+        <!-- Search predecessor -->
+        <div style="border-top:1px solid #e8e8e8;padding-top:14px">
+          <div class="field-group">
+            <label id="t-dep-predecessor"></label>
+            <input type="text" id="dep-search" placeholder="" style="font-size:0.9rem">
+          </div>
+          <!-- Task list grouped by phase -->
+          <div id="dep-task-list" style="max-height:280px;overflow-y:auto;border:1px solid #e8e8e8;border-radius:8px;margin-bottom:12px"></div>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
           <div class="field-group"><label id="t-dep-type"></label>
@@ -1866,31 +1887,71 @@
 
     let depTaskId = null;
 
+    let selectedPredId = null;
+
     function openDepModal(taskId) {
       depTaskId = taskId;
+      selectedPredId = null;
       const tk = tasksData.find(t => t.id === taskId);
+      const tkName = tk ? (tk['name_' + currentLang] || tk.name || tk.name_en || '?') : '?';
 
-      // Fill predecessor select (all tasks except this one)
-      const predSel = document.getElementById('dep-pred');
-      predSel.innerHTML = '<option value="">—</option>';
-      tasksData.forEach(t => {
-        if (t.id === taskId) return;
-        const label = t['name_' + currentLang] || t.name || t.name_en || '?';
-        predSel.innerHTML += `<option value="${t.id}">${label}</option>`;
-      });
-
-      // Fill successor (locked to current task)
-      const succSel = document.getElementById('dep-succ');
-      succSel.innerHTML = `<option value="${taskId}">${tk ? (tk['name_'+currentLang]||tk.name||'?') : '?'}</option>`;
-
+      document.getElementById('dep-succ-name').textContent = tkName;
+      document.getElementById('dep-search').value = '';
+      document.getElementById('dep-search').placeholder = t('ganttSearchContracts').replace(/контракт|contract/i, 'task');
       document.getElementById('dep-type').value = 'FS';
       document.getElementById('dep-lag').value = '0';
 
-      // Render existing dependencies for this task
+      renderDepTaskList('');
       renderExistingDeps(taskId);
-
       openModal('modal-dep');
     }
+
+    function renderDepTaskList(search) {
+      const list = document.getElementById('dep-task-list');
+      const q = (search || '').toLowerCase();
+      // Already linked predecessor IDs
+      const linkedIds = new Set(depsData.filter(d => d.successor_id === depTaskId).map(d => d.predecessor_id));
+
+      let html = '';
+      phasesData.forEach(phase => {
+        const phaseName = phase['name_' + currentLang] || phase.name || phase.name_en || '—';
+        const pTasks = tasksData.filter(t => {
+          if (t.id === depTaskId) return false;
+          if (t.phase_id !== phase.id) return false;
+          if (linkedIds.has(t.id)) return false;
+          if (!q) return true;
+          const name = (t['name_' + currentLang] || t.name || t.name_en || '').toLowerCase();
+          return name.includes(q);
+        });
+        if (!pTasks.length) return;
+        html += `<div class="dep-phase-group">${phaseName}</div>`;
+        pTasks.forEach(t => {
+          const name = t['name_' + currentLang] || t.name || t.name_en || '?';
+          const ps = t.planned_start ? fmtDateDMY(t.planned_start) : '';
+          const dur = t.duration_days ? t.duration_days + 'd' : '';
+          const sel = t.id === selectedPredId ? ' style="background:#dbeafe"' : '';
+          html += `<div class="dep-task-pick" data-pred-id="${t.id}"${sel}>
+            <span class="dt-name">${name}</span>
+            <span class="dt-dates">${ps}${ps && dur ? ' · ' : ''}${dur}</span>
+          </div>`;
+        });
+      });
+      if (!html) html = '<div style="padding:16px;color:#bbb;text-align:center">No tasks found</div>';
+      list.innerHTML = html;
+    }
+
+    // Search input
+    document.getElementById('dep-search').addEventListener('input', e => {
+      renderDepTaskList(e.target.value);
+    });
+
+    // Click task to select as predecessor
+    document.getElementById('dep-task-list').addEventListener('click', e => {
+      const row = e.target.closest('.dep-task-pick');
+      if (!row) return;
+      selectedPredId = row.dataset.predId;
+      renderDepTaskList(document.getElementById('dep-search').value);
+    });
 
     function renderExistingDeps(taskId) {
       const existing = depsData.filter(d => d.successor_id === taskId);
@@ -1912,21 +1973,21 @@
 
     document.getElementById('btn-dep-cancel').addEventListener('click', () => closeModal('modal-dep'));
     document.getElementById('btn-dep-save').addEventListener('click', async () => {
-      const pred = document.getElementById('dep-pred').value;
-      if (!pred) { showToast(t('ganttPredecessor'), 'error'); return; }
+      if (!selectedPredId) { showToast(t('ganttPredecessor'), 'error'); return; }
       try {
         await apiFetch('/task_dependencies', {
           method: 'POST',
           body: JSON.stringify({
-            predecessor_id: pred,
+            predecessor_id: selectedPredId,
             successor_id: depTaskId,
             type: document.getElementById('dep-type').value || 'FS',
             lag_days: parseInt(document.getElementById('dep-lag').value) || 0,
           }),
         });
         showToast(t('saved'), 'success');
-        // Reload deps and refresh
         depsData = await apiFetch(`/task_dependencies?folder_id=${filterFolder}`);
+        selectedPredId = null;
+        renderDepTaskList(document.getElementById('dep-search').value);
         renderExistingDeps(depTaskId);
       } catch(e) { showToast(e.message, 'error'); }
     });
