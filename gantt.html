@@ -1275,6 +1275,11 @@
             method: 'POST',
             body: JSON.stringify({ task_id: editTaskId, line_item_id: lineItemId, required_by_date: requiredBy, qty, unit, notes }),
           });
+          // Create empty delivery batch for this line item
+          await apiFetch('/delivery_schedule', {
+            method: 'POST',
+            body: JSON.stringify({ line_item_id: lineItemId, batch_number: 1, qty: qty || '0', unit: unit || '' }),
+          });
           showToast(t('saved'), 'success');
           await loadTaskMaterials(editTaskId);
         } catch(e) { showToast(e.message, 'error'); }
@@ -1283,13 +1288,17 @@
         if (!selectedContractIds.size) { showToast('Выберите хотя бы один контракт', 'error'); return; }
         closeModal('modal-mat-contract');
         try {
-          const promises = [...selectedContractIds].map(cId =>
-            apiFetch('/material_requirements', {
+          // Create material_requirements + empty delivery batch for each
+          for (const cId of selectedContractIds) {
+            await apiFetch('/material_requirements', {
               method: 'POST',
               body: JSON.stringify({ task_id: editTaskId, contract_id: cId, required_by_date: requiredBy, qty, unit, notes }),
-            })
-          );
-          await Promise.all(promises);
+            });
+            await apiFetch('/delivery_schedule', {
+              method: 'POST',
+              body: JSON.stringify({ contract_id: cId, batch_number: 1, qty: qty || '0', unit: unit || '' }),
+            });
+          }
           showToast(`${selectedContractIds.size} контрактов привязано`, 'success');
           await loadTaskMaterials(editTaskId);
         } catch(e) { showToast(e.message, 'error'); }
