@@ -1176,17 +1176,21 @@
       const endRaw = tk.planned_end || tk._computed_end;
 
       document.getElementById('sp-phase').textContent = phaseName;
-      document.getElementById('sp-title').innerHTML = taskName + (tk.is_critical ? '<span class="sp-critical">CRITICAL PATH</span>' : '');
+      document.getElementById('sp-title').innerHTML = '';
       document.getElementById('sp-meta').innerHTML = `
         <div><span class="label">Start:</span> ${ps ? fmtDateDMY(ps) : '—'}</div>
         <div><span class="label">End:</span> ${endRaw ? fmtDateDMY(endRaw) : '—'}</div>
         <div><span class="label">Duration:</span> ${dur}d</div>
+        ${tk.is_critical ? '<span class="sp-critical">CRITICAL PATH</span>' : ''}
       `;
 
       // Body
       let html = '';
 
-      // Notes (first, right under the header)
+      // Task name
+      html += `<div style="font-size:18px;font-weight:700;color:#222;margin-bottom:14px">${taskName}</div>`;
+
+      // Notes (right under the name)
       const noteText = tk['notes_' + currentLang] || tk.notes || tk.notes_en || '';
       if (noteText) {
         html += `<div style="font-size:13px;color:#444;line-height:1.6;white-space:pre-wrap;margin-bottom:16px;padding:10px 14px;background:#f8fafc;border-radius:6px;border-left:3px solid #3b82f6">${noteText}</div>`;
@@ -1302,9 +1306,8 @@
       });
       html += '</div>';
 
-      // Task name + Comments
+      // Comments
       html += `<div class="sp-section" style="margin-top:8px;padding-top:16px;border-top:1px solid #e2e8f0">
-        <div style="font-size:16px;font-weight:700;color:#222;margin-bottom:12px">${taskName}</div>
         <h3>Comments</h3>
         <div style="color:#bbb;font-size:12px;font-style:italic">Coming soon</div>
       </div>`;
