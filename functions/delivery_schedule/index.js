@@ -85,7 +85,7 @@ exports.delivery_schedule = async (req, res) => {
                    delivery_days, delivery_start, delivery_end,
                    lifecycle, notes)
                 VALUES
-                  (@id, NULLIF(@line_item_id,''), NULLIF(@contract_id,''), @batch_number, CAST(@qty AS NUMERIC), @unit,
+                  (@id, @line_item_id, NULLIF(@contract_id,''), @batch_number, CAST(@qty AS NUMERIC), @unit,
                    @production_days,
                    IF(@production_start = '', NULL, DATE(@production_start)),
                    IF(@production_end = '', NULL, DATE(@production_end)),
