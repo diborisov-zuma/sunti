@@ -437,6 +437,12 @@ const i18n = {
     reject: 'Отклонить',
     viewOriginal: 'Открыть оригинал',
 
+    // Помощь
+    navHelp: 'Помощь',
+    helpTitle: 'Справка',
+    helpGantt: 'Диаграмма Ганта',
+    helpDeliveryMarkers: 'Маркировки поставок',
+
     // Портал клиентов
     navPortal: 'Портал',
     portalSettings: 'Настройки портала',
@@ -971,6 +977,12 @@ const i18n = {
     reject: 'Reject',
     viewOriginal: 'View original',
 
+    // Help
+    navHelp: 'Help',
+    helpTitle: 'Help',
+    helpGantt: 'Gantt Chart',
+    helpDeliveryMarkers: 'Delivery Markers',
+
     // Client portal
     navPortal: 'Portal',
     portalSettings: 'Portal settings',
@@ -1504,6 +1516,12 @@ const i18n = {
     approve: 'อนุมัติ',
     reject: 'ไม่อนุมัติ',
     viewOriginal: 'ดูต้นฉบับ',
+
+    // ช่วยเหลือ
+    navHelp: 'ช่วยเหลือ',
+    helpTitle: 'คู่มือ',
+    helpGantt: 'แผนภูมิแกนต์',
+    helpDeliveryMarkers: 'เครื่องหมายการจัดส่ง',
 
     // พอร์ทัลลูกค้า
     navPortal: 'พอร์ทัล',

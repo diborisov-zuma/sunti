@@ -450,6 +450,13 @@
   </style>
 
   <script>
+    function fmtDateDMY(val) {
+      if (!val) return '—';
+      const d = new Date(val.value || val);
+      if (isNaN(d)) return '—';
+      return `${String(d.getUTCDate()).padStart(2,'0')}.${String(d.getUTCMonth()+1).padStart(2,'0')}.${d.getUTCFullYear()}`;
+    }
+
     let companiesCache = [];
     let foldersCache = [];
     let phasesData = [];
@@ -888,7 +895,7 @@
       // Today line
       const todayOff = dayOffset(today);
       if (todayOff >= 0 && todayOff <= totalDays) {
-        const todayLabel = today.toLocaleDateString('ru-RU', { day: '2-digit', month: 'short' });
+        const todayLabel = fmtDateDMY(today);
         rightHTML += `<div class="today-line" style="left:${todayOff * dayW}px"><div class="today-label">${todayLabel}</div></div>`;
       }
 
@@ -1183,7 +1190,7 @@
             batchesHTML = batches.map((b, idx) => {
               const lc = computeLifecycle(b);
               const eta = computeETA(b);
-              const etaStr = eta.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' });
+              const etaStr = fmtDateDMY(eta);
               const lcColor = (lc === 'on_site' || lc === 'installed') ? 'green' : ((lc === 'on_delivery' || lc === 'in_transit') ? 'yellow' : '');
               return `<div class="ds-batch-row">
                 <span>Batch ${b.batch_number || (idx+1)}: ${b.qty || '?'} ${b.unit || ''}</span>
@@ -1697,8 +1704,8 @@
         const name = m.line_item_id ? (m.contract_item_name || m.contract_item_description || '—') : `<span style="color:#8b5cf6">SLOT</span> ${m.category || '—'}`;
         const contract = m.contractor_name || '—';
         const lc = r.ds.length ? lifecycleLabels[computeLifecycle(r.ds[0])] || computeLifecycle(r.ds[0]) : '—';
-        const needByStr = r.needBy ? r.needBy.toLocaleDateString('ru-RU', { day:'2-digit', month:'2-digit', year:'2-digit' }) : '—';
-        const etaStr = r.worstETA ? r.worstETA.toLocaleDateString('ru-RU', { day:'2-digit', month:'2-digit', year:'2-digit' }) : '—';
+        const needByStr = r.needBy ? fmtDateDMY(r.needBy) : '—';
+        const etaStr = r.worstETA ? fmtDateDMY(r.worstETA) : '—';
         const marginStr = r.margin !== null ? (r.margin >= 0 ? `+${r.margin}d` : `${r.margin}d`) : '—';
         const marginColor = r.margin !== null ? (r.margin < 0 ? 'color:#ef4444' : (r.margin < 7 ? 'color:#f59e0b' : 'color:#10b981')) : '';
 

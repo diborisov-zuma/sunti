@@ -25,7 +25,7 @@ function renderHeader(activePage) {
       <a href="statements.html" class="nav-link ${activePage === 'statements' ? 'active' : ''}" id="t-nav-statements"></a>
       <a href="ai_chat.html" class="nav-link ${activePage === 'ai_chat' ? 'active' : ''}" id="t-nav-ai-chat" style="display:none"></a>
       <div class="nav-dropdown" id="nav-settings" style="display:none">
-        <a class="nav-link ${['folders','companies','users','categories','portal','buyers','templates'].includes(activePage) ? 'active' : ''}" id="t-nav-settings">⚙</a>
+        <a class="nav-link ${['folders','companies','users','categories','portal','buyers','templates','help'].includes(activePage) ? 'active' : ''}" id="t-nav-settings">⚙</a>
         <div class="nav-dropdown-menu">
           <a href="folders.html"      class="${activePage === 'folders'      ? 'active' : ''}" id="t-nav-folders"></a>
           <a href="companies.html"    class="${activePage === 'companies'    ? 'active' : ''}" id="t-nav-companies"></a>
@@ -34,6 +34,7 @@ function renderHeader(activePage) {
           <a href="categories.html"   class="${activePage === 'categories'   ? 'active' : ''}" id="t-nav-categories"></a>
           <a href="buyers.html"       class="${activePage === 'buyers'       ? 'active' : ''}" id="t-nav-buyers"></a>
           <a href="portal_settings.html" class="${activePage === 'portal' ? 'active' : ''}" id="t-nav-portal"></a>
+          <a href="help.html" class="${activePage === 'help' ? 'active' : ''}" id="t-nav-help"></a>
         </div>
       </div>
     </nav>
@@ -209,6 +210,8 @@ function updateHeaderTexts() {
   if (ncat) ncat.textContent = t('navCategories');
   const nportal = document.getElementById('t-nav-portal');
   if (nportal) nportal.textContent = t('navPortal');
+  const nhelp = document.getElementById('t-nav-help');
+  if (nhelp) nhelp.textContent = t('navHelp');
   if (nsett) nsett.textContent = '⚙';
   if (settWrap) settWrap.style.display = (typeof isAdmin !== 'undefined' && isAdmin) ? 'inline-flex' : 'none';
   if (lb) lb.textContent = t('logout');

@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sunti — Help</title>
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="stylesheet" href="style.css">
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="_i18n.js"></script>
+<script src="_config.js"></script>
+<script src="_auth.js"></script>
+<script src="_header.js"></script>
+<style>
+.help-content { max-width: 900px; margin: 32px auto; padding: 0 24px; }
+.help-section { background: #fff; border: 1px solid #e8e8e8; border-radius: 10px; margin-bottom: 16px; overflow: hidden; }
+.help-section-header {
+  padding: 14px 18px; cursor: pointer; display: flex; align-items: center; gap: 8px;
+  font-size: 0.95rem; font-weight: 600; color: #222; user-select: none;
+}
+.help-section-header:hover { background: #f8f8f8; }
+.help-section-header .arrow { transition: transform 0.2s; font-size: 0.7rem; color: #999; }
+.help-section-header.open .arrow { transform: rotate(90deg); }
+.help-section-body { display: none; padding: 0 18px 18px; font-size: 0.88rem; color: #444; line-height: 1.6; }
+.help-section-body.open { display: block; }
+.help-subsection { margin-top: 16px; }
+.help-subsection h4 { font-size: 0.85rem; color: #555; margin-bottom: 8px; }
+.help-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; margin: 12px 0; }
+.help-table th { background: #f8f8f8; padding: 8px 10px; text-align: left; font-size: 0.75rem; text-transform: uppercase; color: #888; border-bottom: 1px solid #e8e8e8; }
+.help-table td { padding: 8px 10px; border-bottom: 1px solid #f0f0f0; }
+.help-table tr:last-child td { border-bottom: none; }
+.help-note { background: #f8faff; border-left: 3px solid #3b82f6; padding: 10px 14px; border-radius: 4px; margin: 12px 0; font-size: 0.82rem; color: #555; }
+</style>
+</head>
+<body>
+
+<div id="header" class="header"></div>
+<div id="toast" class="toast"></div>
+
+<div class="help-content">
+  <h2 id="help-page-title"></h2>
+
+  <!-- Gantt section -->
+  <div class="help-section">
+    <div class="help-section-header" id="help-gantt-header">
+      <span class="arrow">&#9654;</span>
+      <span id="help-gantt-title"></span>
+    </div>
+    <div class="help-section-body">
+
+      <!-- Russian -->
+      <div data-lang="ru">
+        <div class="help-subsection">
+          <h4 id="help-dm-title-ru">Маркировки поставок</h4>
+          <table class="help-table">
+            <thead><tr>
+              <th>#</th><th>Сценарий</th><th>Статус</th><th>Условие</th><th>Цвет</th><th>Значение</th>
+            </tr></thead>
+            <tbody>
+              <tr><td>1</td><td>Время есть</td><td>Не заказан</td><td>запас на заказ &gt; 14д</td><td>&#9898; Серый</td><td>Спокойно</td></tr>
+              <tr><td>2</td><td>Скоро дедлайн заказа</td><td>Не заказан</td><td>запас на заказ &lt; 14д</td><td>&#128993; Жёлтый</td><td>Риск: пора заказывать</td></tr>
+              <tr><td>3</td><td>Дедлайн заказа прошёл</td><td>Не заказан</td><td>запас &lt; 0</td><td>&#128308; Красный</td><td>Срыв: не заказано вовремя</td></tr>
+              <tr><td>4</td><td>Заказано, времени много</td><td>В процессе</td><td>ETA &lt; начала работ, запас &gt; 14д</td><td>&#128309; Синий</td><td>Всё по плану</td></tr>
+              <tr><td>5</td><td>Заказано, впритык</td><td>В процессе</td><td>ETA &lt; начала работ, запас &lt; 14д</td><td>&#128993; Жёлтый</td><td>Риск: буфер тонкий</td></tr>
+              <tr><td>6</td><td>Заказано, не успевают</td><td>В процессе</td><td>ETA &gt; начала работ</td><td>&#128308; Красный</td><td>Срыв: материал опаздывает</td></tr>
+              <tr><td>7</td><td>На объекте</td><td>На объекте</td><td>—</td><td>&#128994; Зелёный</td><td>Готово</td></tr>
+              <tr><td>8</td><td>Смонтировано</td><td>Смонтировано</td><td>—</td><td>&#128994; Зелёный</td><td>Готово</td></tr>
+            </tbody>
+          </table>
+          <div class="help-note">Материал нужен к началу работ (задачи), а не к окончанию.</div>
+          <div class="help-note">Дедлайн заказа = начало работ − срок производства − срок доставки.</div>
+          <div class="help-note">ETA вычисляется автоматически из текущего этапа и оставшихся сроков.</div>
+        </div>
+      </div>
+
+      <!-- English -->
+      <div data-lang="en" style="display:none">
+        <div class="help-subsection">
+          <h4>Delivery Markers</h4>
+          <table class="help-table">
+            <thead><tr>
+              <th>#</th><th>Scenario</th><th>Status</th><th>Condition</th><th>Color</th><th>Meaning</th>
+            </tr></thead>
+            <tbody>
+              <tr><td>1</td><td>Plenty of time</td><td>Not ordered</td><td>order margin &gt; 14d</td><td>&#9898; Grey</td><td>All clear</td></tr>
+              <tr><td>2</td><td>Order deadline approaching</td><td>Not ordered</td><td>order margin &lt; 14d</td><td>&#128993; Yellow</td><td>Risk: time to order</td></tr>
+              <tr><td>3</td><td>Order deadline passed</td><td>Not ordered</td><td>margin &lt; 0</td><td>&#128308; Red</td><td>Overdue: not ordered on time</td></tr>
+              <tr><td>4</td><td>Ordered, plenty of time</td><td>In progress</td><td>ETA &lt; work start, margin &gt; 14d</td><td>&#128309; Blue</td><td>On track</td></tr>
+              <tr><td>5</td><td>Ordered, tight</td><td>In progress</td><td>ETA &lt; work start, margin &lt; 14d</td><td>&#128993; Yellow</td><td>Risk: thin buffer</td></tr>
+              <tr><td>6</td><td>Ordered, won't make it</td><td>In progress</td><td>ETA &gt; work start</td><td>&#128308; Red</td><td>Overdue: material is late</td></tr>
+              <tr><td>7</td><td>On site</td><td>On site</td><td>—</td><td>&#128994; Green</td><td>Ready</td></tr>
+              <tr><td>8</td><td>Installed</td><td>Installed</td><td>—</td><td>&#128994; Green</td><td>Ready</td></tr>
+            </tbody>
+          </table>
+          <div class="help-note">Material is needed by the task start date, not the end date.</div>
+          <div class="help-note">Order deadline = work start − production time − delivery time.</div>
+          <div class="help-note">ETA is calculated automatically from the current stage and remaining lead times.</div>
+        </div>
+      </div>
+
+      <!-- Thai -->
+      <div data-lang="th" style="display:none">
+        <div class="help-subsection">
+          <h4>เครื่องหมายการจัดส่ง</h4>
+          <table class="help-table">
+            <thead><tr>
+              <th>#</th><th>สถานการณ์</th><th>สถานะ</th><th>เงื่อนไข</th><th>สี</th><th>ความหมาย</th>
+            </tr></thead>
+            <tbody>
+              <tr><td>1</td><td>มีเวลาเหลือ</td><td>ยังไม่สั่ง</td><td>ระยะเวลาสั่งซื้อ &gt; 14 วัน</td><td>&#9898; เทา</td><td>สบายๆ</td></tr>
+              <tr><td>2</td><td>ใกล้ถึงกำหนดสั่ง</td><td>ยังไม่สั่ง</td><td>ระยะเวลาสั่งซื้อ &lt; 14 วัน</td><td>&#128993; เหลือง</td><td>เสี่ยง: ถึงเวลาสั่งซื้อ</td></tr>
+              <tr><td>3</td><td>เลยกำหนดสั่งแล้ว</td><td>ยังไม่สั่ง</td><td>ระยะเวลา &lt; 0</td><td>&#128308; แดง</td><td>ล่าช้า: ไม่ได้สั่งตามเวลา</td></tr>
+              <tr><td>4</td><td>สั่งแล้ว มีเวลาเหลือ</td><td>กำลังดำเนินการ</td><td>ETA &lt; เริ่มงาน, ระยะเวลา &gt; 14 วัน</td><td>&#128309; น้ำเงิน</td><td>ตามแผน</td></tr>
+              <tr><td>5</td><td>สั่งแล้ว เวลากระชั้น</td><td>กำลังดำเนินการ</td><td>ETA &lt; เริ่มงาน, ระยะเวลา &lt; 14 วัน</td><td>&#128993; เหลือง</td><td>เสี่ยง: บัฟเฟอร์น้อย</td></tr>
+              <tr><td>6</td><td>สั่งแล้ว ไม่ทัน</td><td>กำลังดำเนินการ</td><td>ETA &gt; เริ่มงาน</td><td>&#128308; แดง</td><td>ล่าช้า: วัสดุมาช้า</td></tr>
+              <tr><td>7</td><td>อยู่ที่ไซต์</td><td>อยู่ที่ไซต์</td><td>—</td><td>&#128994; เขียว</td><td>พร้อม</td></tr>
+              <tr><td>8</td><td>ติดตั้งแล้ว</td><td>ติดตั้งแล้ว</td><td>—</td><td>&#128994; เขียว</td><td>พร้อม</td></tr>
+            </tbody>
+          </table>
+          <div class="help-note">วัสดุต้องพร้อมก่อนวันเริ่มงาน ไม่ใช่วันสิ้นสุด</div>
+          <div class="help-note">กำหนดสั่งซื้อ = วันเริ่มงาน − ระยะเวลาผลิต − ระยะเวลาจัดส่ง</div>
+          <div class="help-note">ETA คำนวณอัตโนมัติจากขั้นตอนปัจจุบันและระยะเวลาที่เหลือ</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+<script>
+  function onAuthReady(me) {
+    onLangChange();
+  }
+
+  function onLogout() {
+    onLangChange();
+  }
+
+  function onLangChange() {
+    document.getElementById('help-page-title').textContent = t('helpTitle');
+    document.getElementById('help-gantt-title').textContent = t('helpGantt');
+
+    // Show/hide lang blocks
+    document.querySelectorAll('[data-lang]').forEach(el => {
+      el.style.display = el.getAttribute('data-lang') === currentLang ? '' : 'none';
+    });
+
+    // Update subsection titles from i18n
+    const dmRu = document.getElementById('help-dm-title-ru');
+    if (dmRu) dmRu.textContent = t('helpDeliveryMarkers');
+  }
+
+  // Collapsible sections
+  document.querySelectorAll('.help-section-header').forEach(h => {
+    h.addEventListener('click', () => {
+      h.classList.toggle('open');
+      h.nextElementSibling.classList.toggle('open');
+    });
+  });
+
+  function showToast(msg, type = '') {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.className = 'toast show' + (type ? ' ' + type : '');
+    clearTimeout(el._t);
+    el._t = setTimeout(() => el.className = 'toast', 3000);
+  }
+
+  renderHeader('help');
+  onLangChange();
+</script>
+
+</body>
+</html>
