@@ -634,7 +634,7 @@
 
       if (action === 'edit-task') {
         const tk = tasksData.find(t => t.id === btn.dataset.id);
-        if (!tk) return;
+        if (!tk) { console.log('edit-task: task not found', btn.dataset.id, tasksData.map(t=>t.id)); return; }
         editTaskId = tk.id;
         editTaskPhaseId = tk.phase_id;
         document.getElementById('g-tk-name').value = tk.name || '';
