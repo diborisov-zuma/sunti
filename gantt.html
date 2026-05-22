@@ -85,7 +85,7 @@
     gap: 8px;
     font-size: 13px;
   }
-  .task-row:hover { background: #f8fafc; }
+  .task-row:hover { background: #ebffee; }
   .task-row.active { background: #eff6ff; }
   .task-row .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .task-row .badge {
@@ -264,10 +264,44 @@
     </div>
   </div>
 
+  <!-- Modal: dependency -->
+  <div class="modal-overlay" id="modal-dep">
+    <div class="modal" style="width:560px;max-width:95vw">
+      <h3 style="padding:16px 20px 0;margin:0">Зависимость</h3>
+      <div style="padding:12px 20px 20px">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div class="field-group"><label>Предшественник</label><select id="dep-pred"></select></div>
+          <div class="field-group"><label>Текущая задача</label><select id="dep-succ" disabled></select></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div class="field-group"><label>Тип</label>
+            <select id="dep-type">
+              <option value="FS">FS (Finish → Start)</option>
+              <option value="SS">SS (Start → Start)</option>
+              <option value="FF">FF (Finish → Finish)</option>
+              <option value="SF">SF (Start → Finish)</option>
+            </select>
+          </div>
+          <div class="field-group"><label>Lag (дни)</label><input type="number" id="dep-lag" value="0"></div>
+        </div>
+        <div id="dep-existing-list" style="margin-bottom:12px"></div>
+        <div class="modal-actions">
+          <button class="btn btn-outline" id="btn-dep-cancel">Отмена</button>
+          <button class="btn btn-primary" id="btn-dep-save">Добавить</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div class="toast" id="toast"></div>
 
   <style>
     .field-group { margin-bottom:12px; }
+    .dep-btn {
+      background:none;border:none;cursor:pointer;font-size:11px;color:var(--gantt-primary);
+      font-weight:600;padding:2px 4px;opacity:0.5;
+    }
+    .dep-btn:hover { opacity:1; }
     .field-group label { display:block;font-size:0.82rem;color:#666;margin-bottom:4px; }
     .field-group input, .field-group select { width:100%;border:1px solid #ddd;border-radius:6px;padding:8px 12px;font-size:0.9rem;outline:none;box-sizing:border-box;background:#fff; }
     .field-group input:focus, .field-group select:focus { border-color:#1a73e8; }
@@ -438,8 +472,13 @@
           } else {
             const tk = row.data;
             const name = tk['name_' + currentLang] || tk.name || tk.name_en || '—';
+            const tkDeps = depsData.filter(d => d.successor_id === tk.id);
+            const tkDepLabel = tkDeps.map(d => { const p = tasksData.find(x => x.id === d.predecessor_id); return p ? (p['name_'+currentLang]||p.name||'?') : '?'; }).join(', ');
             listHTML += `<div class="task-row" data-action="edit-task" data-id="${tk.id}" data-phase-id="${tk.phase_id}">
-              <span class="name">${name}</span><span style="color:#bbb;font-size:0.78rem">${tk.duration_days || '—'}д</span></div>`;
+              <span class="name">${name}</span>
+              ${tkDepLabel ? `<span style="color:#1a73e8;font-size:0.72rem;margin-right:4px" title="Depends on: ${tkDepLabel}">⛓ ${tkDeps.length}</span>` : ''}
+              <button class="dep-btn" data-action="open-dep" data-task-id="${tk.id}" title="Зависимости">⛓</button>
+              <span style="color:#bbb;font-size:0.78rem">${tk.duration_days || '—'}д</span></div>`;
           }
         });
         listHTML += '</div></div>';
@@ -474,8 +513,11 @@
         } else {
           const tk = row.data;
           const name = tk['name_' + currentLang] || tk.name || tk.name_en || '—';
+          const tkDeps = depsData.filter(d => d.successor_id === tk.id);
           leftHTML += `<div class="task-row" data-task-id="${tk.id}" data-action="edit-task" data-id="${tk.id}" data-phase-id="${tk.phase_id}">
             <span class="name">${name}</span>
+            ${tkDeps.length ? `<span style="color:#1a73e8;font-size:0.72rem">⛓${tkDeps.length}</span>` : ''}
+            <button class="dep-btn" data-action="open-dep" data-task-id="${tk.id}" title="Зависимости">⛓</button>
           </div>`;
         }
       });
@@ -549,7 +591,7 @@
 
     // ─── Actions ───
 
-    document.addEventListener('click', e => {
+    document.addEventListener('click', async e => {
       const btn = e.target.closest('[data-action]');
       if (!btn) return;
       const action = btn.dataset.action;
@@ -570,6 +612,25 @@
         contractsCache = [];
         setText('t-modal-task-title', 'New Task');
         openModal('modal-task');
+      }
+
+      if (action === 'open-dep') {
+        e.stopPropagation();
+        openDepModal(btn.dataset.taskId);
+        return;
+      }
+
+      if (action === 'delete-dep') {
+        e.stopPropagation();
+        if (!confirm(t('confirmDelete'))) return;
+        btn.disabled = true;
+        try {
+          await apiFetch(`/task_dependencies/${btn.dataset.depId}`, { method: 'DELETE' });
+          depsData = await apiFetch(`/task_dependencies?folder_id=${filterFolder}`);
+          renderExistingDeps(depTaskId);
+          showToast(t('deleted'), 'success');
+        } catch(err) { showToast(err.message, 'error'); btn.disabled = false; }
+        return;
       }
 
       if (action === 'edit-task') {
@@ -817,9 +878,78 @@
       } catch(e) { showToast(e.message, 'error'); }
     });
 
+    // ─── Dependencies modal ───
+
+    let depTaskId = null;
+
+    function openDepModal(taskId) {
+      depTaskId = taskId;
+      const tk = tasksData.find(t => t.id === taskId);
+
+      // Fill predecessor select (all tasks except this one)
+      const predSel = document.getElementById('dep-pred');
+      predSel.innerHTML = '<option value="">— Выберите —</option>';
+      tasksData.forEach(t => {
+        if (t.id === taskId) return;
+        const label = t['name_' + currentLang] || t.name || t.name_en || '?';
+        predSel.innerHTML += `<option value="${t.id}">${label}</option>`;
+      });
+
+      // Fill successor (locked to current task)
+      const succSel = document.getElementById('dep-succ');
+      succSel.innerHTML = `<option value="${taskId}">${tk ? (tk['name_'+currentLang]||tk.name||'?') : '?'}</option>`;
+
+      document.getElementById('dep-type').value = 'FS';
+      document.getElementById('dep-lag').value = '0';
+
+      // Render existing dependencies for this task
+      renderExistingDeps(taskId);
+
+      openModal('modal-dep');
+    }
+
+    function renderExistingDeps(taskId) {
+      const existing = depsData.filter(d => d.successor_id === taskId);
+      const container = document.getElementById('dep-existing-list');
+      if (!existing.length) {
+        container.innerHTML = '<div style="color:#bbb;font-size:0.82rem;margin-bottom:8px">Нет зависимостей</div>';
+        return;
+      }
+      container.innerHTML = '<div style="font-size:0.78rem;color:#888;text-transform:uppercase;margin-bottom:6px;font-weight:600">Текущие зависимости</div>' +
+        existing.map(d => {
+          const pred = tasksData.find(t => t.id === d.predecessor_id);
+          const predName = pred ? (pred['name_'+currentLang] || pred.name || '?') : '?';
+          return `<div style="display:flex;align-items:center;gap:8px;padding:5px 8px;background:#f8f8f8;border-radius:6px;margin-bottom:4px;font-size:0.82rem">
+            <span style="flex:1"><strong>${predName}</strong> → ${d.type || 'FS'}${d.lag_days ? ' +' + d.lag_days + 'д' : ''}</span>
+            <button class="btn btn-outline" style="padding:1px 6px;font-size:0.7rem;color:#c5221f" data-action="delete-dep" data-dep-id="${d.id}">×</button>
+          </div>`;
+        }).join('');
+    }
+
+    document.getElementById('btn-dep-cancel').addEventListener('click', () => closeModal('modal-dep'));
+    document.getElementById('btn-dep-save').addEventListener('click', async () => {
+      const pred = document.getElementById('dep-pred').value;
+      if (!pred) { showToast('Выберите предшественника', 'error'); return; }
+      try {
+        await apiFetch('/task_dependencies', {
+          method: 'POST',
+          body: JSON.stringify({
+            predecessor_id: pred,
+            successor_id: depTaskId,
+            type: document.getElementById('dep-type').value || 'FS',
+            lag_days: parseInt(document.getElementById('dep-lag').value) || 0,
+          }),
+        });
+        showToast(t('saved'), 'success');
+        // Reload deps and refresh
+        depsData = await apiFetch(`/task_dependencies?folder_id=${filterFolder}`);
+        renderExistingDeps(depTaskId);
+      } catch(e) { showToast(e.message, 'error'); }
+    });
+
     // Escape
     document.addEventListener('keydown', e => {
-      if (e.key === 'Escape') { closeModal('modal-phase'); closeModal('modal-task'); closeModal('modal-mat-contract'); closeModal('modal-mat-slot'); }
+      if (e.key === 'Escape') { closeModal('modal-phase'); closeModal('modal-task'); closeModal('modal-mat-contract'); closeModal('modal-mat-slot'); closeModal('modal-dep'); }
     });
 
     // ─── Init ───
