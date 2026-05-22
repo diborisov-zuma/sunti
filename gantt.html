@@ -179,25 +179,88 @@
 
   <!-- Modal: task -->
   <div class="modal-overlay" id="modal-task">
-    <div class="modal" style="width:600px;max-width:95vw">
-      <h3 id="t-modal-task-title">Task</h3>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
-        <div class="field-group"><label>RU</label><input type="text" id="g-tk-name"></div>
-        <div class="field-group"><label>EN</label><input type="text" id="g-tk-name-en"></div>
-        <div class="field-group"><label>TH</label><input type="text" id="g-tk-name-th"></div>
+    <div class="modal" style="width:900px;max-width:95vw;max-height:90vh;display:flex;flex-direction:column">
+      <h3 id="t-modal-task-title" style="padding:16px 20px 0;margin:0">Task</h3>
+      <div style="padding:0 20px 20px;overflow-y:auto;flex:1">
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-top:12px">
+          <div class="field-group"><label>RU</label><input type="text" id="g-tk-name"></div>
+          <div class="field-group"><label>EN</label><input type="text" id="g-tk-name-en"></div>
+          <div class="field-group"><label>TH</label><input type="text" id="g-tk-name-th"></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px">
+          <div class="field-group"><label>Start</label><input type="date" id="g-tk-start"></div>
+          <div class="field-group"><label>End</label><input type="date" id="g-tk-end"></div>
+          <div class="field-group"><label>Duration (days)</label><input type="number" id="g-tk-dur" min="1" value="14"></div>
+          <div class="field-group"><label>Sort order</label><input type="number" id="g-tk-sort" min="0" value="0"></div>
+        </div>
+        <div class="field-group" style="margin-top:4px">
+          <label><input type="checkbox" id="g-tk-critical" style="width:auto;margin-right:6px">Critical path</label>
+        </div>
+
+        <!-- Materials section -->
+        <div style="margin-top:20px;padding-top:16px;border-top:1px solid #e8e8e8">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+            <h4 style="font-size:0.85rem;color:#555;margin:0;text-transform:uppercase;letter-spacing:0.5px">Материалы</h4>
+            <div style="display:flex;gap:6px">
+              <button class="btn btn-primary" style="font-size:0.78rem;padding:4px 10px" id="btn-add-mat-contract">+ Из контракта</button>
+              <button class="btn btn-outline" style="font-size:0.78rem;padding:4px 10px;color:#8b5cf6;border-color:#8b5cf6" id="btn-add-mat-slot">+ Слот</button>
+            </div>
+          </div>
+          <div id="task-materials-list"></div>
+        </div>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px">
-        <div class="field-group"><label>Start</label><input type="date" id="g-tk-start"></div>
-        <div class="field-group"><label>End</label><input type="date" id="g-tk-end"></div>
-        <div class="field-group"><label>Duration (days)</label><input type="number" id="g-tk-dur" min="1" value="14"></div>
-        <div class="field-group"><label>Sort order</label><input type="number" id="g-tk-sort" min="0" value="0"></div>
-      </div>
-      <div class="field-group" style="margin-top:4px">
-        <label><input type="checkbox" id="g-tk-critical" style="width:auto;margin-right:6px">Critical path</label>
-      </div>
-      <div class="modal-actions">
+      <div class="modal-actions" style="padding:12px 20px;border-top:1px solid #e8e8e8;margin:0">
         <button class="btn btn-outline" id="btn-gtk-cancel"></button>
         <button class="btn btn-primary" id="btn-gtk-save"></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: add material from contract -->
+  <div class="modal-overlay" id="modal-mat-contract">
+    <div class="modal" style="width:700px;max-width:95vw">
+      <h3 style="padding:16px 20px 0;margin:0">Привязать позицию контракта</h3>
+      <div style="padding:12px 20px 20px">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div class="field-group">
+            <label>Контракт</label>
+            <select id="mat-contract-select"><option value="">— Выберите контракт —</option></select>
+          </div>
+          <div class="field-group">
+            <label>Позиция</label>
+            <select id="mat-lineitem-select"><option value="">— Выберите позицию —</option></select>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
+          <div class="field-group"><label>Кол-во</label><input type="number" id="mat-qty" min="0" step="0.01"></div>
+          <div class="field-group"><label>Ед. изм.</label><input type="text" id="mat-unit" placeholder="м³, шт, м²"></div>
+          <div class="field-group"><label>Нужно к дате</label><input type="date" id="mat-required-by"></div>
+        </div>
+        <div class="field-group"><label>Примечание</label><input type="text" id="mat-notes"></div>
+        <div class="modal-actions">
+          <button class="btn btn-outline" id="btn-mat-contract-cancel">Отмена</button>
+          <button class="btn btn-primary" id="btn-mat-contract-save">Привязать</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: add slot -->
+  <div class="modal-overlay" id="modal-mat-slot">
+    <div class="modal" style="width:500px;max-width:95vw">
+      <h3 style="padding:16px 20px 0;margin:0">Создать слот (без контракта)</h3>
+      <div style="padding:12px 20px 20px">
+        <div class="field-group"><label>Категория / что нужно</label><input type="text" id="slot-category" placeholder="Bathroom suite, Kitchen appliances..."></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
+          <div class="field-group"><label>Кол-во</label><input type="number" id="slot-qty" min="0" step="0.01"></div>
+          <div class="field-group"><label>Ед. изм.</label><input type="text" id="slot-unit" placeholder="шт, м²"></div>
+          <div class="field-group"><label>Нужно к дате</label><input type="date" id="slot-required-by"></div>
+        </div>
+        <div class="field-group"><label>Примечание</label><input type="text" id="slot-notes"></div>
+        <div class="modal-actions">
+          <button class="btn btn-outline" id="btn-mat-slot-cancel">Отмена</button>
+          <button class="btn btn-primary" id="btn-mat-slot-save">Создать слот</button>
+        </div>
       </div>
     </div>
   </div>
@@ -227,6 +290,9 @@
     let editPhaseId = null;
     let editTaskId = null;
     let editTaskPhaseId = null;
+    let taskMaterials = [];
+    let contractsCache = [];
+    let contractItemsCache = {}; // contract_id → items[]
 
     function openModal(id) { document.getElementById(id).classList.add('open'); }
     function closeModal(id) { document.getElementById(id).classList.remove('open'); }
@@ -487,6 +553,8 @@
         document.getElementById('g-tk-dur').value = '14';
         document.getElementById('g-tk-sort').value = '0';
         document.getElementById('g-tk-critical').checked = false;
+        document.getElementById('task-materials-list').innerHTML = '<div style="color:#bbb;font-size:0.82rem">Сначала сохраните задачу</div>';
+        contractsCache = [];
         setText('t-modal-task-title', 'New Task');
         openModal('modal-task');
       }
@@ -506,8 +574,10 @@
         document.getElementById('g-tk-dur').value = tk.duration_days || 14;
         document.getElementById('g-tk-sort').value = tk.sort_order || 0;
         document.getElementById('g-tk-critical').checked = tk.is_critical === true;
+        contractsCache = [];
         setText('t-modal-task-title', 'Edit Task');
         openModal('modal-task');
+        loadTaskMaterials(tk.id);
       }
     });
 
@@ -575,9 +645,162 @@
       } catch(e) { showToast(e.message, 'error'); }
     });
 
+    // ─── Task materials ───
+
+    async function loadTaskMaterials(taskId) {
+      const list = document.getElementById('task-materials-list');
+      if (!taskId) { list.innerHTML = '<div style="color:#bbb;font-size:0.82rem">Сначала сохраните задачу</div>'; return; }
+      try {
+        taskMaterials = await apiFetch(`/material_requirements?task_id=${taskId}`);
+        renderTaskMaterials();
+      } catch(e) { list.innerHTML = `<div style="color:#c33;font-size:0.82rem">${e.message}</div>`; }
+    }
+
+    function renderTaskMaterials() {
+      const list = document.getElementById('task-materials-list');
+      if (!taskMaterials.length) {
+        list.innerHTML = '<div style="color:#bbb;font-size:0.82rem">Нет привязанных материалов</div>';
+        return;
+      }
+      list.innerHTML = taskMaterials.map(m => {
+        const isSlot = !m.line_item_id;
+        const name = isSlot
+          ? `<span style="color:#8b5cf6;font-weight:600">SLOT</span> ${m.category || '—'}`
+          : (m.contract_item_name || m.contract_item_description || '—');
+        const lifecycle = m.delivery_lifecycle
+          ? `<span style="background:#e2e8f0;padding:2px 6px;border-radius:8px;font-size:0.7rem;font-weight:600">${m.delivery_lifecycle}</span>`
+          : '';
+        const date = m.required_by_date ? (m.required_by_date.value || m.required_by_date).substring(0, 10) : '—';
+        const border = isSlot ? 'border-left:3px solid #8b5cf6' : 'border-left:3px solid #e2e8f0';
+        return `<div style="display:flex;align-items:center;gap:10px;padding:8px 12px;margin-bottom:6px;background:#fafafa;border-radius:6px;${border};font-size:0.85rem">
+          <div style="flex:1">
+            <div>${name}</div>
+            <div style="color:#999;font-size:0.78rem">${m.qty || '—'} ${m.unit || ''} · к ${date}</div>
+          </div>
+          ${lifecycle}
+          <button class="btn btn-outline" style="padding:2px 6px;font-size:0.7rem;color:#c5221f" data-action="delete-mat" data-mat-id="${m.id}">×</button>
+        </div>`;
+      }).join('');
+    }
+
+    // Delete material requirement
+    document.addEventListener('click', async e => {
+      const delBtn = e.target.closest('[data-action="delete-mat"]');
+      if (!delBtn) return;
+      if (!confirm(t('confirmDelete'))) return;
+      delBtn.disabled = true;
+      try {
+        await apiFetch(`/material_requirements/${delBtn.dataset.matId}`, { method: 'DELETE' });
+        await loadTaskMaterials(editTaskId);
+      } catch(err) { showToast(err.message, 'error'); delBtn.disabled = false; }
+    });
+
+    // ─── Add material from contract ───
+
+    document.getElementById('btn-add-mat-contract').addEventListener('click', async () => {
+      if (!editTaskId) { showToast('Сначала сохраните задачу', 'error'); return; }
+      // Load contracts for this folder
+      try {
+        if (!contractsCache.length) {
+          const companyId = companiesCache.find(c =>
+            foldersCache.find(f => f.id === filterFolder && f.company_id === c.id)
+          )?.id;
+          if (companyId) {
+            contractsCache = await apiFetch(`/contracts?company_id=${companyId}&folder_id=${filterFolder}`);
+          }
+        }
+      } catch(e) { contractsCache = []; }
+
+      const sel = document.getElementById('mat-contract-select');
+      sel.innerHTML = '<option value="">— Выберите контракт —</option>';
+      contractsCache.forEach(c => {
+        sel.innerHTML += `<option value="${c.id}">${c.name || c.external_ref || c.id.substring(0,8)}</option>`;
+      });
+      document.getElementById('mat-lineitem-select').innerHTML = '<option value="">— Сначала контракт —</option>';
+      document.getElementById('mat-qty').value = '';
+      document.getElementById('mat-unit').value = '';
+      document.getElementById('mat-required-by').value = '';
+      document.getElementById('mat-notes').value = '';
+      openModal('modal-mat-contract');
+    });
+
+    // When contract selected → load line items
+    document.getElementById('mat-contract-select').addEventListener('change', async e => {
+      const contractId = e.target.value;
+      const sel = document.getElementById('mat-lineitem-select');
+      if (!contractId) { sel.innerHTML = '<option value="">— Сначала контракт —</option>'; return; }
+      try {
+        if (!contractItemsCache[contractId]) {
+          contractItemsCache[contractId] = await apiFetch(`/contract_items?contract_id=${contractId}`);
+        }
+        const items = contractItemsCache[contractId];
+        sel.innerHTML = '<option value="">— Выберите позицию —</option>';
+        items.forEach(it => {
+          const label = it.description || `Line ${it.sort_order || '?'}`;
+          sel.innerHTML += `<option value="${it.id}" data-qty="${it.quantity || ''}" data-unit="${it.item_type || ''}">${label}</option>`;
+        });
+      } catch(err) { sel.innerHTML = '<option value="">Ошибка загрузки</option>'; }
+    });
+
+    document.getElementById('btn-mat-contract-cancel').addEventListener('click', () => closeModal('modal-mat-contract'));
+    document.getElementById('btn-mat-contract-save').addEventListener('click', async () => {
+      const lineItemId = document.getElementById('mat-lineitem-select').value;
+      if (!lineItemId) { showToast('Выберите позицию контракта', 'error'); return; }
+      closeModal('modal-mat-contract');
+      try {
+        await apiFetch('/material_requirements', {
+          method: 'POST',
+          body: JSON.stringify({
+            task_id: editTaskId,
+            line_item_id: lineItemId,
+            required_by_date: document.getElementById('mat-required-by').value || '',
+            qty: document.getElementById('mat-qty').value || '0',
+            unit: document.getElementById('mat-unit').value || '',
+            notes: document.getElementById('mat-notes').value || '',
+          }),
+        });
+        showToast(t('saved'), 'success');
+        await loadTaskMaterials(editTaskId);
+      } catch(e) { showToast(e.message, 'error'); }
+    });
+
+    // ─── Add slot ───
+
+    document.getElementById('btn-add-mat-slot').addEventListener('click', () => {
+      if (!editTaskId) { showToast('Сначала сохраните задачу', 'error'); return; }
+      document.getElementById('slot-category').value = '';
+      document.getElementById('slot-qty').value = '';
+      document.getElementById('slot-unit').value = '';
+      document.getElementById('slot-required-by').value = '';
+      document.getElementById('slot-notes').value = '';
+      openModal('modal-mat-slot');
+    });
+
+    document.getElementById('btn-mat-slot-cancel').addEventListener('click', () => closeModal('modal-mat-slot'));
+    document.getElementById('btn-mat-slot-save').addEventListener('click', async () => {
+      const category = document.getElementById('slot-category').value.trim();
+      if (!category) { showToast('Укажите категорию', 'error'); return; }
+      closeModal('modal-mat-slot');
+      try {
+        await apiFetch('/material_requirements', {
+          method: 'POST',
+          body: JSON.stringify({
+            task_id: editTaskId,
+            category,
+            required_by_date: document.getElementById('slot-required-by').value || '',
+            qty: document.getElementById('slot-qty').value || '0',
+            unit: document.getElementById('slot-unit').value || '',
+            notes: document.getElementById('slot-notes').value || '',
+          }),
+        });
+        showToast(t('saved'), 'success');
+        await loadTaskMaterials(editTaskId);
+      } catch(e) { showToast(e.message, 'error'); }
+    });
+
     // Escape
     document.addEventListener('keydown', e => {
-      if (e.key === 'Escape') { closeModal('modal-phase'); closeModal('modal-task'); }
+      if (e.key === 'Escape') { closeModal('modal-phase'); closeModal('modal-task'); closeModal('modal-mat-contract'); closeModal('modal-mat-slot'); }
     });
 
     // ─── Init ───
