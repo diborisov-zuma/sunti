@@ -1290,7 +1290,7 @@
         if (!startDate) return null;
         const startOff = Math.round((ps - startDate) / 86400000) * dayW;
         const endOff = Math.round((pe - startDate) / 86400000) * dayW + dayW;
-        const y = (ri + 1) * rowH; // +1 for header row offset
+        const y = ri * rowH; // header is in sticky block, not in gantt-right-inner
         return { left: startOff, right: endOff, midY: y + rowH / 2 };
       }
 
