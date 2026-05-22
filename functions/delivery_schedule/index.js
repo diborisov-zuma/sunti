@@ -41,20 +41,29 @@ exports.delivery_schedule = async (req, res) => {
   const path  = (req.url || '').split('?')[0];
 
   try {
-    // GET /delivery_schedule?line_item_id=X
+    // GET /delivery_schedule?line_item_id=X or ?contract_id=X
     if (req.method === 'GET') {
-      const { line_item_id } = req.query;
-      if (!line_item_id) { res.status(400).json({ error: 'line_item_id is required' }); return; }
+      const { line_item_id, contract_id } = req.query;
+      if (!line_item_id && !contract_id) { res.status(400).json({ error: 'line_item_id or contract_id is required' }); return; }
+
+      let where, params;
+      if (line_item_id) {
+        where = 'line_item_id = @line_item_id';
+        params = { line_item_id };
+      } else {
+        where = 'contract_id = @contract_id';
+        params = { contract_id };
+      }
 
       const [rows] = await bigquery.query({
-        query: `SELECT id, line_item_id, batch_number, qty, unit,
+        query: `SELECT id, line_item_id, contract_id, batch_number, qty, unit,
                        production_days, production_start, production_end,
                        delivery_days, delivery_start, delivery_end,
                        lifecycle, notes
                 FROM ${table}
-                WHERE line_item_id = @line_item_id
+                WHERE ${where}
                 ORDER BY batch_number`,
-        params: { line_item_id },
+        params,
       });
       res.json(rows);
       return;
@@ -64,19 +73,19 @@ exports.delivery_schedule = async (req, res) => {
     if (req.method === 'POST') {
       if (!(await isAdmin(email))) { res.status(403).json({ error: 'Forbidden' }); return; }
       const b = req.body || {};
-      if (!b.line_item_id) {
-        res.status(400).json({ error: 'line_item_id is required' });
+      if (!b.line_item_id && !b.contract_id) {
+        res.status(400).json({ error: 'line_item_id or contract_id is required' });
         return;
       }
       const id = crypto.randomUUID();
       await bigquery.query({
         query: `INSERT INTO ${table}
-                  (id, line_item_id, batch_number, qty, unit,
+                  (id, line_item_id, contract_id, batch_number, qty, unit,
                    production_days, production_start, production_end,
                    delivery_days, delivery_start, delivery_end,
                    lifecycle, notes)
                 VALUES
-                  (@id, @line_item_id, @batch_number, CAST(@qty AS NUMERIC), @unit,
+                  (@id, NULLIF(@line_item_id,''), NULLIF(@contract_id,''), @batch_number, CAST(@qty AS NUMERIC), @unit,
                    @production_days,
                    IF(@production_start = '', NULL, DATE(@production_start)),
                    IF(@production_end = '', NULL, DATE(@production_end)),
@@ -86,7 +95,8 @@ exports.delivery_schedule = async (req, res) => {
                    NULLIF(@lifecycle,''), NULLIF(@notes,''))`,
         params: {
           id,
-          line_item_id:    b.line_item_id,
+          line_item_id:    b.line_item_id || '',
+          contract_id:     b.contract_id || '',
           batch_number:    b.batch_number != null ? b.batch_number : 1,
           qty:             b.qty != null ? String(b.qty) : '0',
           unit:            b.unit || '',

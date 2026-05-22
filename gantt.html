@@ -456,6 +456,7 @@
     let contractsCache = [];
     let contractItemsCache = {}; // contract_id → items[]
     let editDSLineItemId = null;
+    let editDSContractId = null;
     let editDSBatchId = null;
     let procFilterColor = 'all';
 
@@ -557,12 +558,17 @@
         depsData = deps;
         allMaterialReqs = matReqs;
 
-        // Load delivery schedules for all line items
+        // Load delivery schedules for all line items and whole contracts
         const lineItemIds = [...new Set(matReqs.filter(m => m.line_item_id).map(m => m.line_item_id))];
-        const dsPromises = lineItemIds.map(id => apiFetch(`/delivery_schedule?line_item_id=${id}`).catch(() => []));
+        const wholeContractIds = [...new Set(matReqs.filter(m => !m.line_item_id && m.contract_id).map(m => m.contract_id))];
+        const dsPromises = [
+          ...lineItemIds.map(id => apiFetch(`/delivery_schedule?line_item_id=${id}`).catch(() => [])),
+          ...wholeContractIds.map(id => apiFetch(`/delivery_schedule?contract_id=${id}`).catch(() => [])),
+        ];
         const dsResults = await Promise.all(dsPromises);
         allDeliverySchedules = {};
         lineItemIds.forEach((id, i) => { allDeliverySchedules[id] = dsResults[i]; });
+        wholeContractIds.forEach((id, i) => { allDeliverySchedules['c_' + id] = dsResults[lineItemIds.length + i]; });
 
         renderGantt();
         updateDashboard();
@@ -664,7 +670,7 @@
       let worst = null;
       const priority = { red: 3, purple: 2, yellow: 1, green: 0, grey: -1 };
       mats.forEach(m => {
-        const ds = m.line_item_id ? (allDeliverySchedules[m.line_item_id] || []) : [];
+        const ds = m.line_item_id ? (allDeliverySchedules[m.line_item_id] || []) : (m.contract_id ? (allDeliverySchedules['c_' + m.contract_id] || []) : []);
         const risk = computeRisk(m, ds);
         if (!worst || (priority[risk.color] || 0) > (priority[worst.color] || 0)) worst = risk;
       });
@@ -838,7 +844,7 @@
         const taskMatsForBar = allMaterialReqs.filter(m => m.task_id === tk.id);
         taskMatsForBar.forEach(m => {
           if (!m.line_item_id) return;
-          const dsArr = allDeliverySchedules[m.line_item_id] || [];
+          const dsArr = m.line_item_id ? (allDeliverySchedules[m.line_item_id] || []) : (m.contract_id ? (allDeliverySchedules['c_' + m.contract_id] || []) : []);
           dsArr.forEach(d => {
             const eta = computeETA(d);
             const lc = computeLifecycle(d);
@@ -1025,12 +1031,17 @@
       if (!taskId) { list.innerHTML = '<div style="color:#bbb;font-size:0.82rem">Сначала сохраните задачу</div>'; return; }
       try {
         taskMaterials = await apiFetch(`/material_requirements?task_id=${taskId}`);
-        // Load delivery schedules for materials in this task
+        // Load delivery schedules for materials in this task (by line_item_id and contract_id)
         const lineIds = [...new Set(taskMaterials.filter(m => m.line_item_id).map(m => m.line_item_id))];
-        const dsProms = lineIds.map(id => apiFetch(`/delivery_schedule?line_item_id=${id}`).catch(() => []));
+        const contractIds = [...new Set(taskMaterials.filter(m => !m.line_item_id && m.contract_id).map(m => m.contract_id))];
+        const dsProms = [
+          ...lineIds.map(id => apiFetch(`/delivery_schedule?line_item_id=${id}`).catch(() => [])),
+          ...contractIds.map(id => apiFetch(`/delivery_schedule?contract_id=${id}`).catch(() => [])),
+        ];
         const dsRes = await Promise.all(dsProms);
         taskMaterialDS = {};
         lineIds.forEach((id, i) => { taskMaterialDS[id] = dsRes[i]; });
+        contractIds.forEach((id, i) => { taskMaterialDS['c_' + id] = dsRes[lineIds.length + i]; });
         renderTaskMaterials();
       } catch(e) { list.innerHTML = `<div style="color:#c33;font-size:0.82rem">${e.message}</div>`; }
     }
@@ -1062,10 +1073,11 @@
         const date = m.required_by_date ? (m.required_by_date.value || m.required_by_date).substring(0, 10) : '—';
         const border = isSlot ? 'border-left:3px solid #8b5cf6' : (isWhole ? 'border-left:3px solid #1a73e8' : 'border-left:3px solid #e2e8f0');
 
-        // Delivery batches
+        // Delivery batches — for line_item or contract
         let batchesHTML = '';
-        if (m.line_item_id) {
-          const batches = taskMaterialDS[m.line_item_id] || [];
+        const dsKey = m.line_item_id || (m.contract_id ? 'c_' + m.contract_id : null);
+        if (dsKey) {
+          const batches = taskMaterialDS[dsKey] || [];
           if (batches.length) {
             batchesHTML = batches.map((b, idx) => {
               const lc = computeLifecycle(b);
@@ -1074,15 +1086,16 @@
               const lcColor = (lc === 'on_site' || lc === 'installed') ? 'green' : ((lc === 'on_delivery' || lc === 'in_transit') ? 'yellow' : '');
               return `<div class="ds-batch-row">
                 <span>Batch ${b.batch_number || (idx+1)}: ${b.qty || '?'} ${b.unit || ''}</span>
-                <span>prod ${b.production_days || 0}д</span>
+                <span>prod ${b.production_days || 0}д · del ${b.delivery_days || 0}д</span>
                 <span class="ds-lc ${lcColor}">${lifecycleLabels[lc] || lc}</span>
                 <span>ETA ${etaStr}</span>
-                <button class="btn btn-outline" style="padding:1px 5px;font-size:0.68rem" data-action="edit-ds" data-ds-id="${b.id}" data-line-item-id="${m.line_item_id}">✎</button>
+                <button class="btn btn-outline" style="padding:1px 5px;font-size:0.68rem" data-action="edit-ds" data-ds-id="${b.id}" data-line-item-id="${m.line_item_id || ''}" data-contract-id="${m.contract_id || ''}">✎</button>
                 <button class="btn btn-outline" style="padding:1px 5px;font-size:0.68rem;color:#c5221f" data-action="delete-ds" data-ds-id="${b.id}">×</button>
               </div>`;
             }).join('');
           }
-          batchesHTML += `<div style="padding:2px 12px 2px 24px"><button class="btn btn-outline" style="font-size:0.72rem;padding:2px 8px;color:var(--gantt-primary)" data-action="add-ds" data-line-item-id="${m.line_item_id}">+ Добавить партию</button></div>`;
+          const addAttrs = m.line_item_id ? `data-line-item-id="${m.line_item_id}"` : `data-contract-id="${m.contract_id}"`;
+          batchesHTML += `<div style="padding:2px 12px 2px 24px"><button class="btn btn-outline" style="font-size:0.72rem;padding:2px 8px;color:var(--gantt-primary)" data-action="add-ds" ${addAttrs}>+ Добавить партию</button></div>`;
         }
 
         return `<div style="margin-bottom:6px;background:#fafafa;border-radius:6px;${border};font-size:0.85rem">
@@ -1363,7 +1376,8 @@
     document.addEventListener('click', async e => {
       const addDs = e.target.closest('[data-action="add-ds"]');
       if (addDs) {
-        editDSLineItemId = addDs.dataset.lineItemId;
+        editDSLineItemId = addDs.dataset.lineItemId || '';
+        editDSContractId = addDs.dataset.contractId || '';
         editDSBatchId = null;
         document.getElementById('ds-qty').value = '';
         document.getElementById('ds-unit').value = '';
@@ -1381,10 +1395,12 @@
 
       const editDs = e.target.closest('[data-action="edit-ds"]');
       if (editDs) {
-        editDSLineItemId = editDs.dataset.lineItemId;
+        editDSLineItemId = editDs.dataset.lineItemId || '';
+        editDSContractId = editDs.dataset.contractId || '';
         editDSBatchId = editDs.dataset.dsId;
         // Find the batch data
-        const batches = taskMaterialDS[editDSLineItemId] || [];
+        const dsKey = editDSLineItemId || ('c_' + editDSContractId);
+        const batches = taskMaterialDS[dsKey] || [];
         const b = batches.find(x => x.id === editDSBatchId);
         if (b) {
           document.getElementById('ds-qty').value = b.qty || '';
@@ -1420,7 +1436,8 @@
       closeModal('modal-delivery');
       try {
         const body = {
-          line_item_id: editDSLineItemId,
+          line_item_id: editDSLineItemId || '',
+          contract_id: editDSContractId || '',
           qty: document.getElementById('ds-qty').value || '0',
           unit: document.getElementById('ds-unit').value || '',
           batch_number: parseInt(document.getElementById('ds-batch').value) || 1,
@@ -1467,12 +1484,12 @@
       tabs.style.display = 'flex';
 
       const reds = allMaterialReqs.filter(m => {
-        const ds = m.line_item_id ? (allDeliverySchedules[m.line_item_id] || []) : [];
+        const ds = m.line_item_id ? (allDeliverySchedules[m.line_item_id] || []) : (m.contract_id ? (allDeliverySchedules['c_' + m.contract_id] || []) : []);
         return computeRisk(m, ds).color === 'red';
       });
       const slots = allMaterialReqs.filter(m => !m.line_item_id);
       const yellows = allMaterialReqs.filter(m => {
-        const ds = m.line_item_id ? (allDeliverySchedules[m.line_item_id] || []) : [];
+        const ds = m.line_item_id ? (allDeliverySchedules[m.line_item_id] || []) : (m.contract_id ? (allDeliverySchedules['c_' + m.contract_id] || []) : []);
         return computeRisk(m, ds).color === 'yellow';
       });
       const total = reds.length + slots.length + yellows.length;
@@ -1500,7 +1517,7 @@
       // Filter pills
       const counts = { all: 0, red: 0, yellow: 0, purple: 0 };
       allMaterialReqs.forEach(m => {
-        const ds = m.line_item_id ? (allDeliverySchedules[m.line_item_id] || []) : [];
+        const ds = m.line_item_id ? (allDeliverySchedules[m.line_item_id] || []) : (m.contract_id ? (allDeliverySchedules['c_' + m.contract_id] || []) : []);
         const risk = computeRisk(m, ds);
         counts.all++;
         if (risk.color === 'red') counts.red++;
@@ -1524,7 +1541,7 @@
 
       // Table
       let rows = allMaterialReqs.map(m => {
-        const ds = m.line_item_id ? (allDeliverySchedules[m.line_item_id] || []) : [];
+        const ds = m.line_item_id ? (allDeliverySchedules[m.line_item_id] || []) : (m.contract_id ? (allDeliverySchedules['c_' + m.contract_id] || []) : []);
         const risk = computeRisk(m, ds);
         const needBy = m.required_by_date ? new Date(m.required_by_date.value || m.required_by_date) : null;
         let worstETA = null;
