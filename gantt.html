@@ -146,17 +146,20 @@
 
   /* Risk badges */
   .task-row .badge.green { background: #d1fae5; color: #065f46; }
+  .task-row .badge.blue { background: #dbeafe; color: #1e40af; }
   .task-row .badge.purple { background: #ede9fe; color: #6d28d9; }
 
   /* Delivery markers */
   .delivery-marker {
-    position: absolute; width: 8px; height: 8px; transform: rotate(45deg);
-    bottom: 2px; border: 1px solid white; z-index: 5;
+    position: absolute; width: 14px; height: 14px; transform: rotate(45deg);
+    bottom: 2px; border: 1.5px solid white; z-index: 5;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.15);
   }
   .delivery-marker.green { background: var(--gantt-green); }
   .delivery-marker.yellow { background: var(--gantt-yellow); }
   .delivery-marker.red { background: var(--gantt-red); }
   .delivery-marker.grey { background: var(--gantt-grey); }
+  .delivery-marker.blue { background: #3b82f6; }
   .delivery-marker.purple { background: var(--gantt-purple); }
 
   /* Tabs */
@@ -668,11 +671,14 @@
       return d;
     }
 
-    function computeRisk(mr, deliveries) {
-      if (!mr.line_item_id) return { level: 'no_contract', color: 'purple', label: 'No contract' };
+    // taskStart = task's planned_start date (material needed before work begins)
+    function computeRisk(mr, deliveries, taskStart) {
+      if (!mr.line_item_id && !mr.contract_id) return { level: 'no_contract', color: 'purple', label: 'No contract' };
 
       const today = new Date(); today.setHours(0,0,0,0);
-      const needBy = mr.required_by_date ? new Date(mr.required_by_date.value || mr.required_by_date) : null;
+      // needBy = required_by_date if set, otherwise task start
+      const needByRaw = mr.required_by_date ? (mr.required_by_date.value || mr.required_by_date) : null;
+      const needBy = needByRaw ? new Date(needByRaw) : (taskStart ? new Date(taskStart) : null);
       if (!needBy) return { level: 'unknown', color: 'grey', label: '—' };
 
       if (!deliveries || !deliveries.length) {
@@ -681,7 +687,8 @@
 
       let worstETA = null;
       let allDelivered = true;
-      let lifecycle = 'planned';
+      let worstLC = 'installed';
+      const lcOrder = ['planned','quoted','in_production','produced','on_delivery','in_transit','on_site','installed'];
       deliveries.forEach(ds => {
         const lc = computeLifecycle(ds);
         if (lc !== 'on_site' && lc !== 'installed') {
@@ -689,13 +696,13 @@
           const eta = computeETA(ds);
           if (!worstETA || eta > worstETA) worstETA = eta;
         }
-        const lcOrder = ['planned','quoted','in_production','produced','on_delivery','in_transit','on_site','installed'];
-        if (lcOrder.indexOf(lc) < lcOrder.indexOf(lifecycle) || lifecycle === 'planned') lifecycle = lc;
+        if (lcOrder.indexOf(lc) < lcOrder.indexOf(worstLC)) worstLC = lc;
       });
 
-      if (allDelivered) return { level: 'on_track', color: 'green', label: 'Delivered' };
+      if (allDelivered) return { level: 'delivered', color: 'green', label: 'Delivered' };
 
-      if (lifecycle === 'planned' || lifecycle === 'quoted') {
+      if (worstLC === 'planned' || worstLC === 'quoted') {
+        // Not ordered — check order deadline
         const prodDays = Math.max(...deliveries.map(d => parseInt(d.production_days) || 0));
         const delDays = Math.max(...deliveries.map(d => parseInt(d.delivery_days) || 0));
         const orderDeadline = new Date(needBy);
@@ -703,12 +710,13 @@
         const margin = Math.round((orderDeadline - today) / 86400000);
         if (margin < 0) return { level: 'too_late', color: 'red', label: 'Too late' };
         if (margin < 14) return { level: 'order_now', color: 'yellow', label: 'Order now' };
-        return { level: 'ok_to_wait', color: 'green', label: 'OK to wait' };
+        return { level: 'ok_to_wait', color: 'grey', label: 'OK' };
       } else {
+        // Ordered — check ETA vs task start
         const margin = worstETA ? Math.round((needBy - worstETA) / 86400000) : 999;
         if (margin < 0) return { level: 'late', color: 'red', label: 'Late' };
-        if (margin < 7) return { level: 'at_risk', color: 'yellow', label: 'At risk' };
-        return { level: 'on_track', color: 'green', label: 'On track' };
+        if (margin < 14) return { level: 'at_risk', color: 'yellow', label: 'At risk' };
+        return { level: 'on_track', color: 'blue', label: 'On track' };
       }
     }
 
@@ -719,14 +727,21 @@
     };
     const lifecycleLabels = new Proxy({}, { get(_, key) { return (lifecycleLabelsI18n[currentLang] || lifecycleLabelsI18n.en)[key] || key; } });
 
+    function getTaskStartForMat(mr) {
+      const tk = tasksData.find(t => t.id === mr.task_id);
+      return tk?.planned_start ? (tk.planned_start.value || tk.planned_start) : null;
+    }
+
     function getTaskRisk(taskId) {
       const mats = allMaterialReqs.filter(m => m.task_id === taskId);
       if (!mats.length) return null;
+      const tk = tasksData.find(t => t.id === taskId);
+      const taskStart = tk?.planned_start ? (tk.planned_start.value || tk.planned_start) : null;
       let worst = null;
-      const priority = { red: 3, purple: 2, yellow: 1, green: 0, grey: -1 };
+      const priority = { red: 3, purple: 2, yellow: 1, blue: 0, green: 0, grey: -1 };
       mats.forEach(m => {
         const ds = m.line_item_id ? (allDeliverySchedules[m.line_item_id] || []) : (m.contract_id ? (allDeliverySchedules['c_' + m.contract_id] || []) : []);
-        const risk = computeRisk(m, ds);
+        const risk = computeRisk(m, ds, taskStart);
         if (!worst || (priority[risk.color] || 0) > (priority[worst.color] || 0)) worst = risk;
       });
       return worst;
@@ -909,27 +924,28 @@
             const lc = computeLifecycle(d);
             const off = dayOffset(eta);
             if (off >= 0 && off <= totalDays) {
-              // Determine marker color based on lifecycle + risk
+              // needBy = task start (material needed before work begins)
+              const needBy = s || barEnd;
               let markerColor;
-              const needBy = m.required_by_date ? new Date(m.required_by_date.value || m.required_by_date) : barEnd;
-              const isLate = needBy && eta > needBy;
               if (lc === 'on_site' || lc === 'installed') {
+                // Delivered
                 markerColor = 'green';
-              } else if (lc === 'on_delivery' || lc === 'in_transit') {
-                markerColor = isLate ? 'red' : 'yellow';
-              } else {
-                // Not ordered yet — check if order deadline passed
+              } else if (lc === 'planned' || lc === 'quoted') {
+                // Not ordered — check order deadline = taskStart - prod - del
                 const prodDays = parseInt(d.production_days) || 0;
                 const delDays = parseInt(d.delivery_days) || 0;
-                const orderDeadline = needBy ? new Date(needBy) : null;
-                if (orderDeadline) orderDeadline.setDate(orderDeadline.getDate() - prodDays - delDays);
-                if (!orderDeadline) { markerColor = 'grey'; }
-                else {
-                  const marginDays = Math.round((orderDeadline - today) / 86400000);
-                  if (marginDays < 0) markerColor = 'red';
-                  else if (marginDays < 14) markerColor = 'yellow';
-                  else markerColor = 'grey';
-                }
+                const orderDeadline = new Date(needBy);
+                orderDeadline.setDate(orderDeadline.getDate() - prodDays - delDays);
+                const marginDays = Math.round((orderDeadline - today) / 86400000);
+                if (marginDays < 0) markerColor = 'red';       // Срыв: дедлайн прошёл
+                else if (marginDays < 14) markerColor = 'yellow'; // Риск: пора заказывать
+                else markerColor = 'grey';                       // Спокойно
+              } else {
+                // Ordered & in process — check ETA vs task start
+                const marginDays = Math.round((needBy - eta) / 86400000);
+                if (marginDays < 0) markerColor = 'red';        // Срыв: не успевают
+                else if (marginDays < 14) markerColor = 'yellow'; // Риск: впритык
+                else markerColor = 'blue';                       // По плану
               }
               rightHTML += `<div class="delivery-marker ${markerColor}" style="left:${off * dayW}px" title="${m.contract_item_name || m.contract_name || m.category || '?'}: ${lifecycleLabels[lc] || lc}"></div>`;
             }
@@ -1591,12 +1607,12 @@
 
       const reds = allMaterialReqs.filter(m => {
         const ds = m.line_item_id ? (allDeliverySchedules[m.line_item_id] || []) : (m.contract_id ? (allDeliverySchedules['c_' + m.contract_id] || []) : []);
-        return computeRisk(m, ds).color === 'red';
+        return computeRisk(m, ds, getTaskStartForMat(m)).color === 'red';
       });
       const slots = allMaterialReqs.filter(m => !m.line_item_id);
       const yellows = allMaterialReqs.filter(m => {
         const ds = m.line_item_id ? (allDeliverySchedules[m.line_item_id] || []) : (m.contract_id ? (allDeliverySchedules['c_' + m.contract_id] || []) : []);
-        return computeRisk(m, ds).color === 'yellow';
+        return computeRisk(m, ds, getTaskStartForMat(m)).color === 'yellow';
       });
       const total = reds.length + slots.length + yellows.length;
       if (!total) { widget.style.display = 'none'; return; }
@@ -1624,7 +1640,7 @@
       const counts = { all: 0, red: 0, yellow: 0, purple: 0 };
       allMaterialReqs.forEach(m => {
         const ds = m.line_item_id ? (allDeliverySchedules[m.line_item_id] || []) : (m.contract_id ? (allDeliverySchedules['c_' + m.contract_id] || []) : []);
-        const risk = computeRisk(m, ds);
+        const risk = computeRisk(m, ds, getTaskStartForMat(m));
         counts.all++;
         if (risk.color === 'red') counts.red++;
         if (risk.color === 'yellow') counts.yellow++;
@@ -1648,7 +1664,7 @@
       // Table
       let rows = allMaterialReqs.map(m => {
         const ds = m.line_item_id ? (allDeliverySchedules[m.line_item_id] || []) : (m.contract_id ? (allDeliverySchedules['c_' + m.contract_id] || []) : []);
-        const risk = computeRisk(m, ds);
+        const risk = computeRisk(m, ds, getTaskStartForMat(m));
         const needBy = m.required_by_date ? new Date(m.required_by_date.value || m.required_by_date) : null;
         let worstETA = null;
         ds.forEach(d => {
