@@ -63,6 +63,8 @@ exports.material_requirements = async (req, res) => {
                          ds.delivery_start, ds.delivery_end,
                          COALESCE(con2.name, con.name) AS contract_name,
                          COALESCE(con2.total_amount, con.total_amount) AS contract_total,
+                         COALESCE(con2.paid_amount, con.paid_amount) AS contract_paid,
+                         COALESCE(con2.status, con.status) AS contract_status,
                          COALESCE(ct2.name_en, ct.name_en) AS contractor_name_en,
                          COALESCE(ct2.name_th, ct.name_th) AS contractor_name_th
                   FROM ${table} m
@@ -94,6 +96,8 @@ exports.material_requirements = async (req, res) => {
                          ci.amount AS contract_item_amount,
                          COALESCE(con2.name, con.name) AS contract_name,
                          COALESCE(con2.total_amount, con.total_amount) AS contract_total,
+                         COALESCE(con2.paid_amount, con.paid_amount) AS contract_paid,
+                         COALESCE(con2.status, con.status) AS contract_status,
                          COALESCE(ct2.name_en, ct.name_en) AS contractor_name_en,
                          COALESCE(ct2.name_th, ct.name_th) AS contractor_name_th
                   FROM ${table} m

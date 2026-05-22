@@ -793,6 +793,28 @@
     function computeRisk(mr, deliveries, taskStart) {
       if (!mr.line_item_id && !mr.contract_id) return { level: 'no_contract', color: 'purple', label: 'No contract' };
 
+      // Contract status overrides delivery_schedule
+      const cs = mr.contract_status;
+      if (cs === 'delivered' || cs === 'completed') return { level: 'delivered', color: 'green', label: 'Delivered' };
+      if (cs === 'cancelled') return { level: 'cancelled', color: 'grey', label: 'Cancelled' };
+      if (cs === 'in_stock') {
+        // In stock — only delivery_days matter, no production
+        const today2 = new Date(); today2.setHours(0,0,0,0);
+        const needByRaw2 = mr.required_by_date ? (mr.required_by_date.value || mr.required_by_date) : null;
+        const needBy2 = needByRaw2 ? new Date(needByRaw2) : (taskStart ? new Date(taskStart) : null);
+        if (needBy2) {
+          const delDays = deliveries.length ? Math.max(...deliveries.map(d => parseInt(d.delivery_days) || 0)) : 0;
+          const deliveryDeadline = new Date(needBy2);
+          deliveryDeadline.setDate(deliveryDeadline.getDate() - delDays);
+          const margin = Math.round((deliveryDeadline - today2) / 86400000);
+          if (margin < 0) return { level: 'late', color: 'red', label: 'In stock, late' };
+          if (margin < 14) return { level: 'at_risk', color: 'yellow', label: 'In stock, order delivery' };
+          return { level: 'in_stock', color: 'blue', label: 'In stock' };
+        }
+        return { level: 'in_stock', color: 'blue', label: 'In stock' };
+      }
+      if (cs === 'estimate') return { level: 'estimate', color: 'grey', label: 'Estimate' };
+
       const today = new Date(); today.setHours(0,0,0,0);
       // needBy = required_by_date if set, otherwise task start
       const needByRaw = mr.required_by_date ? (mr.required_by_date.value || mr.required_by_date) : null;
@@ -1221,30 +1243,44 @@
       // Materials
       const taskMats = allMaterialReqs.filter(m => m.task_id === taskId);
 
-      // Calculate totals
+      // Calculate totals: total, paid, remaining
       const fmtAmt0 = v => { const n = parseFloat(v?.value ?? v ?? 0); return isNaN(n) ? 0 : n; };
-      let totalContracts = 0, totalPositions = 0, slotsCount = 0;
+      const fmtN = n => n ? n.toLocaleString('en-US',{minimumFractionDigits:2}) : '—';
+      let grandTotal = 0, grandPaid = 0, slotsCount = 0;
+      const seenContracts = new Set();
       taskMats.forEach(m => {
         if (!m.line_item_id && !m.contract_id) { slotsCount++; return; }
-        if (!m.line_item_id && m.contract_id) totalContracts += fmtAmt0(m.contract_total);
-        else totalPositions += fmtAmt0(m.contract_item_amount);
+        // Avoid double-counting same contract
+        const cKey = m.contract_id || (m.line_item_id + '_li');
+        if (m.contract_id && seenContracts.has(m.contract_id)) return;
+        if (m.contract_id) seenContracts.add(m.contract_id);
+        const total = m.contract_id ? fmtAmt0(m.contract_total) : fmtAmt0(m.contract_item_amount);
+        const paid = m.contract_id ? fmtAmt0(m.contract_paid) : 0;
+        grandTotal += total;
+        grandPaid += paid;
       });
-      const grandTotal = totalContracts + totalPositions;
+      const grandRemaining = grandTotal - grandPaid;
 
       html += '<div class="sp-section"><h3>' + t('ganttMaterials') + ' (' + taskMats.length + ')</h3>';
 
       // Summary block
       if (taskMats.length) {
-        html += `<div style="background:#f0f4ff;border:1px solid #d0d8f0;border-radius:8px;padding:12px 14px;margin-bottom:14px">
-          <div style="display:flex;justify-content:space-between;align-items:baseline">
-            <span style="font-size:12px;color:#555;font-weight:600">Total:</span>
-            <span style="font-size:20px;font-weight:700;color:#0f4c81">${grandTotal ? grandTotal.toLocaleString('en-US',{minimumFractionDigits:2}) : '—'}</span>
+        html += `<div style="background:#f0f4ff;border:1px solid #d0d8f0;border-radius:8px;padding:14px;margin-bottom:14px">
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;text-align:center">
+            <div>
+              <div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:0.5px">Total</div>
+              <div style="font-size:14px;font-weight:600;color:#555;margin-top:2px">${fmtN(grandTotal)}</div>
+            </div>
+            <div>
+              <div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:0.5px">Paid</div>
+              <div style="font-size:14px;font-weight:600;color:#1e8e3e;margin-top:2px">${fmtN(grandPaid)}</div>
+            </div>
+            <div>
+              <div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:0.5px">Remaining</div>
+              <div style="font-size:20px;font-weight:700;color:#c5221f;margin-top:2px">${fmtN(grandRemaining)}</div>
+            </div>
           </div>
-          <div style="display:flex;gap:12px;margin-top:6px;font-size:11px;color:#666">
-            ${totalContracts ? `<span>Contracts: <strong>${totalContracts.toLocaleString('en-US',{minimumFractionDigits:2})}</strong></span>` : ''}
-            ${totalPositions ? `<span>Positions: <strong>${totalPositions.toLocaleString('en-US',{minimumFractionDigits:2})}</strong></span>` : ''}
-            ${slotsCount ? `<span style="color:#8b5cf6">Slots: <strong>${slotsCount}</strong> (no price)</span>` : ''}
-          </div>
+          ${slotsCount ? `<div style="text-align:center;margin-top:6px;font-size:11px;color:#8b5cf6">+ ${slotsCount} slot(s) without price</div>` : ''}
         </div>`;
       }
 
@@ -1272,6 +1308,11 @@
         const contractor = m.contractor_name_en || m.contractor_name_th || '';
         const fmtAmt = v => { const n = parseFloat(v?.value ?? v ?? 0); return isNaN(n)||n===0 ? '' : n.toLocaleString('en-US',{minimumFractionDigits:2}); };
         const amount = isWhole ? fmtAmt(m.contract_total) : fmtAmt(m.contract_item_amount);
+        const paid = fmtAmt(m.contract_paid);
+        const totalNum = fmtAmt0(isWhole ? m.contract_total : m.contract_item_amount);
+        const paidNum = fmtAmt0(m.contract_paid);
+        const remainingNum = totalNum - paidNum;
+        const contractStatus = m.contract_status || '';
 
         // Worst lifecycle and ETA
         let worstLC = 'installed', worstETA = null;
@@ -1319,7 +1360,11 @@
               <div class="sp-mat-name">${matName}</div>
               ${amount ? `<div style="font-size:15px;font-weight:700;color:#0f4c81;white-space:nowrap">${amount}</div>` : ''}
             </div>
-            <div class="sp-mat-sub">${contractor ? contractor + ' · ' : ''}${m.qty || ''} ${m.unit || ''}</div>
+            <div class="sp-mat-sub">${contractor ? contractor + ' · ' : ''}${m.qty || ''} ${m.unit || ''}${contractStatus ? ' · <span style="text-transform:uppercase;font-weight:600;font-size:10px">' + contractStatus + '</span>' : ''}</div>
+            ${totalNum ? `<div style="display:flex;gap:10px;margin-top:4px;font-size:11px">
+              <span style="color:#888">Paid: <strong style="color:#1e8e3e">${fmtN(paidNum)}</strong></span>
+              <span style="color:#888">Remaining: <strong style="color:#c5221f">${fmtN(remainingNum)}</strong></span>
+            </div>` : ''}
             <div class="sp-mat-indicators">
               <span class="sp-ind sp-ind-lc">${lifecycleLabels[worstLC] || worstLC}</span>
               <span class="sp-ind sp-ind-risk ${risk.color}">● ${risk.label}</span>
