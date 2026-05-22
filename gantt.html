@@ -1220,7 +1220,34 @@
 
       // Materials
       const taskMats = allMaterialReqs.filter(m => m.task_id === taskId);
+
+      // Calculate totals
+      const fmtAmt0 = v => { const n = parseFloat(v?.value ?? v ?? 0); return isNaN(n) ? 0 : n; };
+      let totalContracts = 0, totalPositions = 0, slotsCount = 0;
+      taskMats.forEach(m => {
+        if (!m.line_item_id && !m.contract_id) { slotsCount++; return; }
+        if (!m.line_item_id && m.contract_id) totalContracts += fmtAmt0(m.contract_total);
+        else totalPositions += fmtAmt0(m.contract_item_amount);
+      });
+      const grandTotal = totalContracts + totalPositions;
+
       html += '<div class="sp-section"><h3>' + t('ganttMaterials') + ' (' + taskMats.length + ')</h3>';
+
+      // Summary block
+      if (taskMats.length) {
+        html += `<div style="background:#f0f4ff;border:1px solid #d0d8f0;border-radius:8px;padding:12px 14px;margin-bottom:14px">
+          <div style="display:flex;justify-content:space-between;align-items:baseline">
+            <span style="font-size:12px;color:#555;font-weight:600">Total:</span>
+            <span style="font-size:20px;font-weight:700;color:#0f4c81">${grandTotal ? grandTotal.toLocaleString('en-US',{minimumFractionDigits:2}) : '—'}</span>
+          </div>
+          <div style="display:flex;gap:12px;margin-top:6px;font-size:11px;color:#666">
+            ${totalContracts ? `<span>Contracts: <strong>${totalContracts.toLocaleString('en-US',{minimumFractionDigits:2})}</strong></span>` : ''}
+            ${totalPositions ? `<span>Positions: <strong>${totalPositions.toLocaleString('en-US',{minimumFractionDigits:2})}</strong></span>` : ''}
+            ${slotsCount ? `<span style="color:#8b5cf6">Slots: <strong>${slotsCount}</strong> (no price)</span>` : ''}
+          </div>
+        </div>`;
+      }
+
       if (!taskMats.length) {
         html += '<div style="color:#bbb;font-size:12px;font-style:italic">' + t('ganttNoMaterials') + '</div>';
       }
@@ -1288,8 +1315,11 @@
         html += `<div class="sp-mat-card risk-${risk.color}">
           ${sourceLabel ? `<div class="sp-mat-source"><span>📄</span><span class="ref">${sourceLabel}</span></div>` : ''}
           <div class="sp-mat-body">
-            <div class="sp-mat-name">${matName}</div>
-            <div class="sp-mat-sub">${contractor ? contractor + ' · ' : ''}${m.qty || ''} ${m.unit || ''}${amount ? ' · ' + amount : ''}</div>
+            <div style="display:flex;justify-content:space-between;align-items:baseline">
+              <div class="sp-mat-name">${matName}</div>
+              ${amount ? `<div style="font-size:15px;font-weight:700;color:#0f4c81;white-space:nowrap">${amount}</div>` : ''}
+            </div>
+            <div class="sp-mat-sub">${contractor ? contractor + ' · ' : ''}${m.qty || ''} ${m.unit || ''}</div>
             <div class="sp-mat-indicators">
               <span class="sp-ind sp-ind-lc">${lifecycleLabels[worstLC] || worstLC}</span>
               <span class="sp-ind sp-ind-risk ${risk.color}">● ${risk.label}</span>
