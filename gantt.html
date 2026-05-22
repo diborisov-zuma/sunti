@@ -128,6 +128,60 @@
 
   .empty-state { text-align: center; padding: 64px 24px; color: #bbb; }
   .loading { text-align: center; padding: 48px; color: #bbb; }
+
+  /* Risk badges */
+  .task-row .badge.green { background: #d1fae5; color: #065f46; }
+  .task-row .badge.purple { background: #ede9fe; color: #6d28d9; }
+
+  /* Delivery markers */
+  .delivery-marker {
+    position: absolute; width: 8px; height: 8px; transform: rotate(45deg);
+    bottom: 2px; border: 1px solid white; z-index: 5;
+  }
+  .delivery-marker.green { background: var(--gantt-green); }
+  .delivery-marker.yellow { background: var(--gantt-yellow); }
+  .delivery-marker.red { background: var(--gantt-red); }
+  .delivery-marker.grey { background: var(--gantt-grey); }
+  .delivery-marker.purple { background: var(--gantt-purple); }
+
+  /* Tabs */
+  .gantt-tab {
+    padding: 8px 16px; background: white; border: 1px solid var(--gantt-border);
+    border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: 500; color: var(--gantt-muted);
+  }
+  .gantt-tab.active { color: var(--gantt-primary); border-color: var(--gantt-primary); font-weight: 600; }
+  .gantt-tab .pill { background: var(--gantt-red); color: white; font-size: 10px; padding: 1px 6px; border-radius: 8px; font-weight: 700; }
+
+  /* Dashboard widget */
+  .dash-widget {
+    background: white; border: 1px solid var(--gantt-border); border-left: 4px solid var(--gantt-yellow);
+    border-radius: 6px; padding: 12px 16px; display: flex; gap: 14px; align-items: center; margin-bottom: 16px;
+  }
+  .dw-icon { font-size: 20px; }
+  .dw-text { flex: 1; }
+  .dw-title { font-weight: 700; font-size: 13px; }
+  .dw-sub { font-size: 12px; color: var(--gantt-muted); margin-top: 2px; }
+
+  /* Procurement table */
+  .proc-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .proc-table th { background: #fafbfc; text-align: left; padding: 8px 12px; border-bottom: 2px solid var(--gantt-border); font-size: 11px; text-transform: uppercase; color: var(--gantt-muted); letter-spacing: 0.5px; }
+  .proc-table td { padding: 8px 12px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
+  .proc-table tr:hover td { background: #f8fafc; }
+  .proc-pill { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+  .proc-pill.green { background: #d1fae5; color: #065f46; }
+  .proc-pill.yellow { background: #fef3c7; color: #92400e; }
+  .proc-pill.red { background: #fee2e2; color: #991b1b; }
+  .proc-pill.purple { background: #ede9fe; color: #6d28d9; }
+  .proc-pill.grey { background: #e2e8f0; color: var(--gantt-muted); }
+  .proc-filter-pill { padding: 6px 14px; border-radius: 16px; border: 1px solid var(--gantt-border); background: white; cursor: pointer; font-size: 12px; font-weight: 500; }
+  .proc-filter-pill.active { background: var(--gantt-primary); color: white; border-color: var(--gantt-primary); }
+
+  /* Delivery batches in task materials */
+  .ds-batch-row { display: flex; align-items: center; gap: 8px; padding: 4px 12px 4px 24px; font-size: 0.78rem; color: #666; }
+  .ds-batch-row .ds-lc { padding: 1px 6px; border-radius: 8px; font-size: 0.7rem; font-weight: 600; background: #e2e8f0; }
+  .ds-batch-row .ds-lc.green { background: #d1fae5; color: #065f46; }
+  .ds-batch-row .ds-lc.yellow { background: #fef3c7; color: #92400e; }
+  .ds-batch-row .ds-lc.red { background: #fee2e2; color: #991b1b; }
 </style>
 </head>
 <body>
@@ -154,8 +208,28 @@
         </div>
       </div>
 
-      <div id="gantt-container">
-        <div class="empty-state" id="gantt-empty">Выберите компанию и проект</div>
+      <div class="dash-widget" id="dash-widget" style="display:none">
+        <div class="dw-icon">⚠️</div>
+        <div class="dw-text">
+          <div class="dw-title" id="dw-title"></div>
+          <div class="dw-sub" id="dw-sub"></div>
+        </div>
+      </div>
+
+      <div class="gantt-tabs" id="gantt-tabs" style="display:none;gap:4px;margin-bottom:12px">
+        <button class="gantt-tab active" data-tab="gantt">Schedule (Gantt)</button>
+        <button class="gantt-tab" data-tab="proc">Procurement <span class="pill" id="proc-pill"></span></button>
+      </div>
+
+      <div id="view-gantt">
+        <div id="gantt-container">
+          <div class="empty-state" id="gantt-empty">Выберите компанию и проект</div>
+        </div>
+      </div>
+
+      <div id="view-proc" style="display:none">
+        <div id="proc-filters" style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap"></div>
+        <div id="proc-table-wrap"></div>
       </div>
     </div>
   </div>
@@ -293,6 +367,37 @@
     </div>
   </div>
 
+  <!-- Modal: delivery batch -->
+  <div class="modal-overlay" id="modal-delivery">
+    <div class="modal" style="width:600px;max-width:95vw">
+      <h3 style="padding:16px 20px 0;margin:0">Партия поставки</h3>
+      <div style="padding:12px 20px 20px">
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
+          <div class="field-group"><label>Кол-во</label><input type="number" id="ds-qty" min="0" step="0.01"></div>
+          <div class="field-group"><label>Ед. изм.</label><input type="text" id="ds-unit"></div>
+          <div class="field-group"><label>Batch #</label><input type="number" id="ds-batch" min="1" value="1"></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div class="field-group"><label>Срок производства (дни)</label><input type="number" id="ds-prod-days" min="0" value="0"></div>
+          <div class="field-group"><label>Срок доставки (дни)</label><input type="number" id="ds-del-days" min="0" value="0"></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div class="field-group"><label>Начало производства</label><input type="date" id="ds-prod-start"></div>
+          <div class="field-group"><label>Окончание производства</label><input type="date" id="ds-prod-end"></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div class="field-group"><label>Начало доставки</label><input type="date" id="ds-del-start"></div>
+          <div class="field-group"><label>Получено (факт)</label><input type="date" id="ds-del-end"></div>
+        </div>
+        <div class="field-group"><label>Примечание</label><input type="text" id="ds-notes"></div>
+        <div class="modal-actions">
+          <button class="btn btn-outline" id="btn-ds-cancel">Отмена</button>
+          <button class="btn btn-primary" id="btn-ds-save">Сохранить</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div class="toast" id="toast"></div>
 
   <style>
@@ -318,14 +423,20 @@
     let phasesData = [];
     let tasksData = [];
     let depsData = [];
+    let allMaterialReqs = [];
+    let allDeliverySchedules = {}; // line_item_id → [batches]
     let filterCompany = '';
     let filterFolder = '';
     let editPhaseId = null;
     let editTaskId = null;
     let editTaskPhaseId = null;
     let taskMaterials = [];
+    let taskMaterialDS = {}; // line_item_id → [batches] for task modal
     let contractsCache = [];
     let contractItemsCache = {}; // contract_id → items[]
+    let editDSLineItemId = null;
+    let editDSBatchId = null;
+    let procFilterColor = 'all';
 
     function openModal(id) { document.getElementById(id).classList.add('open'); }
     function closeModal(id) { document.getElementById(id).classList.remove('open'); }
@@ -388,13 +499,24 @@
       filterFolder = '';
       fillFolderFilter();
       document.getElementById('gantt-container').innerHTML = '<div class="empty-state">Выберите проект</div>';
+      document.getElementById('dash-widget').style.display = 'none';
+      document.getElementById('gantt-tabs').style.display = 'none';
+      document.getElementById('view-gantt').style.display = '';
+      document.getElementById('view-proc').style.display = 'none';
     });
 
     document.getElementById('filter-folder').addEventListener('change', e => {
       filterFolder = e.target.value;
       document.getElementById('btn-add-phase').style.display = filterFolder ? '' : 'none';
-      if (filterFolder) loadGanttData();
-      else document.getElementById('gantt-container').innerHTML = '<div class="empty-state">Выберите проект</div>';
+      if (filterFolder) {
+        loadGanttData();
+      } else {
+        document.getElementById('gantt-container').innerHTML = '<div class="empty-state">Выберите проект</div>';
+        document.getElementById('dash-widget').style.display = 'none';
+        document.getElementById('gantt-tabs').style.display = 'none';
+        document.getElementById('view-gantt').style.display = '';
+        document.getElementById('view-proc').style.display = 'none';
+      }
     });
 
     // ─── Load data ───
@@ -403,18 +525,129 @@
       const container = document.getElementById('gantt-container');
       container.innerHTML = '<div class="loading">Загрузка…</div>';
       try {
-        const [phases, tasks, deps] = await Promise.all([
+        const [phases, tasks, deps, matReqs] = await Promise.all([
           apiFetch(`/phases?folder_id=${filterFolder}`),
           apiFetch(`/gantt_tasks?folder_id=${filterFolder}`),
           apiFetch(`/task_dependencies?folder_id=${filterFolder}`),
+          apiFetch(`/material_requirements?folder_id=${filterFolder}`).catch(() => []),
         ]);
         phasesData = phases;
         tasksData = tasks;
         depsData = deps;
+        allMaterialReqs = matReqs;
+
+        // Load delivery schedules for all line items
+        const lineItemIds = [...new Set(matReqs.filter(m => m.line_item_id).map(m => m.line_item_id))];
+        const dsPromises = lineItemIds.map(id => apiFetch(`/delivery_schedule?line_item_id=${id}`).catch(() => []));
+        const dsResults = await Promise.all(dsPromises);
+        allDeliverySchedules = {};
+        lineItemIds.forEach((id, i) => { allDeliverySchedules[id] = dsResults[i]; });
+
         renderGantt();
+        updateDashboard();
       } catch(e) {
         container.innerHTML = `<div class="empty-state" style="color:#c33">${e.message}</div>`;
       }
+    }
+
+    // ─── Compute functions ───
+
+    function computeLifecycle(ds) {
+      if (ds.lifecycle === 'in_transit' || ds.lifecycle === 'installed') return ds.lifecycle;
+      if (ds.delivery_end) return 'on_site';
+      if (ds.delivery_start) return 'on_delivery';
+      if (ds.production_end) return 'produced';
+      if (ds.production_start) return 'in_production';
+      return ds.lifecycle || 'planned';
+    }
+
+    function computeETA(ds) {
+      const prodDays = parseInt(ds.production_days) || 0;
+      const delDays = parseInt(ds.delivery_days) || 0;
+      const today = new Date(); today.setHours(0,0,0,0);
+
+      if (ds.delivery_end) return new Date(ds.delivery_end.value || ds.delivery_end);
+      if (ds.delivery_start) {
+        const d = new Date(ds.delivery_start.value || ds.delivery_start);
+        d.setDate(d.getDate() + delDays);
+        return d;
+      }
+      if (ds.production_end) {
+        const d = new Date(ds.production_end.value || ds.production_end);
+        d.setDate(d.getDate() + delDays);
+        return d;
+      }
+      if (ds.production_start) {
+        const d = new Date(ds.production_start.value || ds.production_start);
+        d.setDate(d.getDate() + prodDays + delDays);
+        return d;
+      }
+      const d = new Date(today);
+      d.setDate(d.getDate() + prodDays + delDays);
+      return d;
+    }
+
+    function computeRisk(mr, deliveries) {
+      if (!mr.line_item_id) return { level: 'no_contract', color: 'purple', label: 'No contract' };
+
+      const today = new Date(); today.setHours(0,0,0,0);
+      const needBy = mr.required_by_date ? new Date(mr.required_by_date.value || mr.required_by_date) : null;
+      if (!needBy) return { level: 'unknown', color: 'grey', label: '—' };
+
+      if (!deliveries || !deliveries.length) {
+        return { level: 'no_delivery', color: 'yellow', label: 'No delivery' };
+      }
+
+      let worstETA = null;
+      let allDelivered = true;
+      let lifecycle = 'planned';
+      deliveries.forEach(ds => {
+        const lc = computeLifecycle(ds);
+        if (lc !== 'on_site' && lc !== 'installed') {
+          allDelivered = false;
+          const eta = computeETA(ds);
+          if (!worstETA || eta > worstETA) worstETA = eta;
+        }
+        const lcOrder = ['planned','quoted','in_production','produced','on_delivery','in_transit','on_site','installed'];
+        if (lcOrder.indexOf(lc) < lcOrder.indexOf(lifecycle) || lifecycle === 'planned') lifecycle = lc;
+      });
+
+      if (allDelivered) return { level: 'on_track', color: 'green', label: 'Delivered' };
+
+      if (lifecycle === 'planned' || lifecycle === 'quoted') {
+        const prodDays = Math.max(...deliveries.map(d => parseInt(d.production_days) || 0));
+        const delDays = Math.max(...deliveries.map(d => parseInt(d.delivery_days) || 0));
+        const orderDeadline = new Date(needBy);
+        orderDeadline.setDate(orderDeadline.getDate() - prodDays - delDays);
+        const margin = Math.round((orderDeadline - today) / 86400000);
+        if (margin < 0) return { level: 'too_late', color: 'red', label: 'Too late' };
+        if (margin < 14) return { level: 'order_now', color: 'yellow', label: 'Order now' };
+        return { level: 'ok_to_wait', color: 'green', label: 'OK to wait' };
+      } else {
+        const margin = worstETA ? Math.round((needBy - worstETA) / 86400000) : 999;
+        if (margin < 0) return { level: 'late', color: 'red', label: 'Late' };
+        if (margin < 7) return { level: 'at_risk', color: 'yellow', label: 'At risk' };
+        return { level: 'on_track', color: 'green', label: 'On track' };
+      }
+    }
+
+    const lifecycleLabels = {
+      planned: 'Не заказан', quoted: 'КП получено', in_production: 'В производстве',
+      produced: 'Произведено', on_delivery: 'В доставке', in_transit: 'На складе',
+      on_site: 'На объекте', installed: 'Смонтировано'
+    };
+
+    function getTaskRisk(taskId) {
+      const mats = allMaterialReqs.filter(m => m.task_id === taskId);
+      if (!mats.length) return null;
+      let worst = null;
+      const priority = { red: 3, purple: 2, yellow: 1, green: 0, grey: -1 };
+      mats.forEach(m => {
+        const ds = m.line_item_id ? (allDeliverySchedules[m.line_item_id] || []) : [];
+        const risk = computeRisk(m, ds);
+        if (!worst || (priority[risk.color] || 0) > (priority[worst.color] || 0)) worst = risk;
+      });
+      return worst;
     }
 
     // ─── Render Gantt ───
@@ -474,8 +707,11 @@
             const name = tk['name_' + currentLang] || tk.name || tk.name_en || '—';
             const tkDeps = depsData.filter(d => d.successor_id === tk.id);
             const tkDepLabel = tkDeps.map(d => { const p = tasksData.find(x => x.id === d.predecessor_id); return p ? (p['name_'+currentLang]||p.name||'?') : '?'; }).join(', ');
+            const listRisk = getTaskRisk(tk.id);
+            const listRiskBadge = listRisk ? `<span class="badge ${listRisk.color}" title="${listRisk.label}">●</span>` : '';
             listHTML += `<div class="task-row" data-action="edit-task" data-id="${tk.id}" data-phase-id="${tk.phase_id}">
               <span class="name">${name}</span>
+              ${listRiskBadge}
               ${tkDepLabel ? `<span style="color:#1a73e8;font-size:0.72rem;margin-right:4px" title="Depends on: ${tkDepLabel}">⛓ ${tkDeps.length}</span>` : ''}
               <button class="dep-btn" data-action="open-dep" data-task-id="${tk.id}" title="Зависимости">⛓</button>
               <span style="color:#bbb;font-size:0.78rem">${tk.duration_days || '—'}д</span></div>`;
@@ -514,8 +750,11 @@
           const tk = row.data;
           const name = tk['name_' + currentLang] || tk.name || tk.name_en || '—';
           const tkDeps = depsData.filter(d => d.successor_id === tk.id);
+          const ganttRisk = getTaskRisk(tk.id);
+          const ganttRiskBadge = ganttRisk ? `<span class="badge ${ganttRisk.color}" title="${ganttRisk.label}">●</span>` : '';
           leftHTML += `<div class="task-row" data-task-id="${tk.id}" data-action="edit-task" data-id="${tk.id}" data-phase-id="${tk.phase_id}">
             <span class="name">${name}</span>
+            ${ganttRiskBadge}
             ${tkDeps.length ? `<span style="color:#1a73e8;font-size:0.72rem">⛓${tkDeps.length}</span>` : ''}
             <button class="dep-btn" data-action="open-dep" data-task-id="${tk.id}" title="Зависимости">⛓</button>
           </div>`;
@@ -574,6 +813,21 @@
             <div class="bar-label">${name}</div>
           </div>`;
         }
+        // Delivery markers (diamonds) on bar row
+        const taskMatsForBar = allMaterialReqs.filter(m => m.task_id === tk.id);
+        taskMatsForBar.forEach(m => {
+          if (!m.line_item_id) return;
+          const dsArr = allDeliverySchedules[m.line_item_id] || [];
+          dsArr.forEach(d => {
+            const eta = computeETA(d);
+            const lc = computeLifecycle(d);
+            const off = dayOffset(eta);
+            if (off >= 0 && off <= totalDays) {
+              const markerColor = (lc === 'on_site' || lc === 'installed') ? 'green' : ((lc === 'on_delivery' || lc === 'in_transit') ? 'yellow' : 'grey');
+              rightHTML += `<div class="delivery-marker ${markerColor}" style="left:${off * dayW}px" title="${m.contract_item_name || m.category || '?'}: ${lifecycleLabels[lc] || lc}"></div>`;
+            }
+          });
+        });
         rightHTML += '</div>';
       });
 
@@ -731,6 +985,12 @@
       if (!taskId) { list.innerHTML = '<div style="color:#bbb;font-size:0.82rem">Сначала сохраните задачу</div>'; return; }
       try {
         taskMaterials = await apiFetch(`/material_requirements?task_id=${taskId}`);
+        // Load delivery schedules for materials in this task
+        const lineIds = [...new Set(taskMaterials.filter(m => m.line_item_id).map(m => m.line_item_id))];
+        const dsProms = lineIds.map(id => apiFetch(`/delivery_schedule?line_item_id=${id}`).catch(() => []));
+        const dsRes = await Promise.all(dsProms);
+        taskMaterialDS = {};
+        lineIds.forEach((id, i) => { taskMaterialDS[id] = dsRes[i]; });
         renderTaskMaterials();
       } catch(e) { list.innerHTML = `<div style="color:#c33;font-size:0.82rem">${e.message}</div>`; }
     }
@@ -751,13 +1011,40 @@
           : '';
         const date = m.required_by_date ? (m.required_by_date.value || m.required_by_date).substring(0, 10) : '—';
         const border = isSlot ? 'border-left:3px solid #8b5cf6' : 'border-left:3px solid #e2e8f0';
-        return `<div style="display:flex;align-items:center;gap:10px;padding:8px 12px;margin-bottom:6px;background:#fafafa;border-radius:6px;${border};font-size:0.85rem">
-          <div style="flex:1">
-            <div>${name}</div>
-            <div style="color:#999;font-size:0.78rem">${m.qty || '—'} ${m.unit || ''} · к ${date}</div>
+
+        // Delivery batches
+        let batchesHTML = '';
+        if (m.line_item_id) {
+          const batches = taskMaterialDS[m.line_item_id] || [];
+          if (batches.length) {
+            batchesHTML = batches.map((b, idx) => {
+              const lc = computeLifecycle(b);
+              const eta = computeETA(b);
+              const etaStr = eta.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' });
+              const lcColor = (lc === 'on_site' || lc === 'installed') ? 'green' : ((lc === 'on_delivery' || lc === 'in_transit') ? 'yellow' : '');
+              return `<div class="ds-batch-row">
+                <span>Batch ${b.batch_number || (idx+1)}: ${b.qty || '?'} ${b.unit || ''}</span>
+                <span>prod ${b.production_days || 0}д</span>
+                <span class="ds-lc ${lcColor}">${lifecycleLabels[lc] || lc}</span>
+                <span>ETA ${etaStr}</span>
+                <button class="btn btn-outline" style="padding:1px 5px;font-size:0.68rem" data-action="edit-ds" data-ds-id="${b.id}" data-line-item-id="${m.line_item_id}">✎</button>
+                <button class="btn btn-outline" style="padding:1px 5px;font-size:0.68rem;color:#c5221f" data-action="delete-ds" data-ds-id="${b.id}">×</button>
+              </div>`;
+            }).join('');
+          }
+          batchesHTML += `<div style="padding:2px 12px 2px 24px"><button class="btn btn-outline" style="font-size:0.72rem;padding:2px 8px;color:var(--gantt-primary)" data-action="add-ds" data-line-item-id="${m.line_item_id}">+ Добавить партию</button></div>`;
+        }
+
+        return `<div style="margin-bottom:6px;background:#fafafa;border-radius:6px;${border};font-size:0.85rem">
+          <div style="display:flex;align-items:center;gap:10px;padding:8px 12px;">
+            <div style="flex:1">
+              <div>${name}</div>
+              <div style="color:#999;font-size:0.78rem">${m.qty || '—'} ${m.unit || ''} · к ${date}</div>
+            </div>
+            ${lifecycle}
+            <button class="btn btn-outline" style="padding:2px 6px;font-size:0.7rem;color:#c5221f" data-action="delete-mat" data-mat-id="${m.id}">×</button>
           </div>
-          ${lifecycle}
-          <button class="btn btn-outline" style="padding:2px 6px;font-size:0.7rem;color:#c5221f" data-action="delete-mat" data-mat-id="${m.id}">×</button>
+          ${batchesHTML}
         </div>`;
       }).join('');
     }
@@ -946,9 +1233,229 @@
       } catch(e) { showToast(e.message, 'error'); }
     });
 
+    // ─── Delivery schedule CRUD ───
+
+    document.addEventListener('click', async e => {
+      const addDs = e.target.closest('[data-action="add-ds"]');
+      if (addDs) {
+        editDSLineItemId = addDs.dataset.lineItemId;
+        editDSBatchId = null;
+        document.getElementById('ds-qty').value = '';
+        document.getElementById('ds-unit').value = '';
+        document.getElementById('ds-batch').value = '1';
+        document.getElementById('ds-prod-days').value = '0';
+        document.getElementById('ds-del-days').value = '0';
+        document.getElementById('ds-prod-start').value = '';
+        document.getElementById('ds-prod-end').value = '';
+        document.getElementById('ds-del-start').value = '';
+        document.getElementById('ds-del-end').value = '';
+        document.getElementById('ds-notes').value = '';
+        openModal('modal-delivery');
+        return;
+      }
+
+      const editDs = e.target.closest('[data-action="edit-ds"]');
+      if (editDs) {
+        editDSLineItemId = editDs.dataset.lineItemId;
+        editDSBatchId = editDs.dataset.dsId;
+        // Find the batch data
+        const batches = taskMaterialDS[editDSLineItemId] || [];
+        const b = batches.find(x => x.id === editDSBatchId);
+        if (b) {
+          document.getElementById('ds-qty').value = b.qty || '';
+          document.getElementById('ds-unit').value = b.unit || '';
+          document.getElementById('ds-batch').value = b.batch_number || 1;
+          document.getElementById('ds-prod-days').value = b.production_days || 0;
+          document.getElementById('ds-del-days').value = b.delivery_days || 0;
+          document.getElementById('ds-prod-start').value = b.production_start ? (b.production_start.value || b.production_start).substring(0,10) : '';
+          document.getElementById('ds-prod-end').value = b.production_end ? (b.production_end.value || b.production_end).substring(0,10) : '';
+          document.getElementById('ds-del-start').value = b.delivery_start ? (b.delivery_start.value || b.delivery_start).substring(0,10) : '';
+          document.getElementById('ds-del-end').value = b.delivery_end ? (b.delivery_end.value || b.delivery_end).substring(0,10) : '';
+          document.getElementById('ds-notes').value = b.notes || '';
+        }
+        openModal('modal-delivery');
+        return;
+      }
+
+      const delDs = e.target.closest('[data-action="delete-ds"]');
+      if (delDs) {
+        if (!confirm('Удалить партию?')) return;
+        delDs.disabled = true;
+        try {
+          await apiFetch(`/delivery_schedule/${delDs.dataset.dsId}`, { method: 'DELETE' });
+          showToast('Удалено', 'success');
+          await loadTaskMaterials(editTaskId);
+        } catch(err) { showToast(err.message, 'error'); delDs.disabled = false; }
+        return;
+      }
+    });
+
+    document.getElementById('btn-ds-cancel').addEventListener('click', () => closeModal('modal-delivery'));
+    document.getElementById('btn-ds-save').addEventListener('click', async () => {
+      closeModal('modal-delivery');
+      try {
+        const body = {
+          line_item_id: editDSLineItemId,
+          qty: document.getElementById('ds-qty').value || '0',
+          unit: document.getElementById('ds-unit').value || '',
+          batch_number: parseInt(document.getElementById('ds-batch').value) || 1,
+          production_days: parseInt(document.getElementById('ds-prod-days').value) || 0,
+          delivery_days: parseInt(document.getElementById('ds-del-days').value) || 0,
+          production_start: document.getElementById('ds-prod-start').value || '',
+          production_end: document.getElementById('ds-prod-end').value || '',
+          delivery_start: document.getElementById('ds-del-start').value || '',
+          delivery_end: document.getElementById('ds-del-end').value || '',
+          notes: document.getElementById('ds-notes').value || '',
+        };
+        if (editDSBatchId) {
+          await apiFetch(`/delivery_schedule/${editDSBatchId}`, { method: 'PUT', body: JSON.stringify(body) });
+        } else {
+          await apiFetch('/delivery_schedule', { method: 'POST', body: JSON.stringify(body) });
+        }
+        showToast(t('saved'), 'success');
+        await loadTaskMaterials(editTaskId);
+      } catch(e) { showToast(e.message, 'error'); }
+    });
+
+    // ─── Tab switching ───
+
+    document.querySelectorAll('.gantt-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('.gantt-tab').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        document.getElementById('view-gantt').style.display = tab.dataset.tab === 'gantt' ? '' : 'none';
+        document.getElementById('view-proc').style.display = tab.dataset.tab === 'proc' ? '' : 'none';
+        if (tab.dataset.tab === 'proc') renderProcurement();
+      });
+    });
+
+    // ─── Dashboard widget ───
+
+    function updateDashboard() {
+      const widget = document.getElementById('dash-widget');
+      const tabs = document.getElementById('gantt-tabs');
+      if (!filterFolder || !allMaterialReqs.length) {
+        widget.style.display = 'none';
+        tabs.style.display = 'none';
+        return;
+      }
+      tabs.style.display = 'flex';
+
+      const reds = allMaterialReqs.filter(m => {
+        const ds = m.line_item_id ? (allDeliverySchedules[m.line_item_id] || []) : [];
+        return computeRisk(m, ds).color === 'red';
+      });
+      const slots = allMaterialReqs.filter(m => !m.line_item_id);
+      const yellows = allMaterialReqs.filter(m => {
+        const ds = m.line_item_id ? (allDeliverySchedules[m.line_item_id] || []) : [];
+        return computeRisk(m, ds).color === 'yellow';
+      });
+      const total = reds.length + slots.length + yellows.length;
+      if (!total) { widget.style.display = 'none'; return; }
+      widget.style.display = 'flex';
+      document.getElementById('dw-title').textContent = `Требует внимания: ${total}`;
+      const parts = [];
+      if (reds.length) parts.push(`🔴 ${reds.length} late/too late`);
+      if (yellows.length) parts.push(`🟡 ${yellows.length} at risk`);
+      if (slots.length) parts.push(`🟣 ${slots.length} no contract`);
+      document.getElementById('dw-sub').textContent = parts.join(' · ');
+
+      // Update procurement pill
+      const pill = document.getElementById('proc-pill');
+      if (reds.length) { pill.textContent = reds.length; pill.style.display = ''; }
+      else { pill.style.display = 'none'; }
+    }
+
+    // ─── Procurement view ───
+
+    function renderProcurement() {
+      const filtersEl = document.getElementById('proc-filters');
+      const tableWrap = document.getElementById('proc-table-wrap');
+
+      // Filter pills
+      const counts = { all: 0, red: 0, yellow: 0, purple: 0 };
+      allMaterialReqs.forEach(m => {
+        const ds = m.line_item_id ? (allDeliverySchedules[m.line_item_id] || []) : [];
+        const risk = computeRisk(m, ds);
+        counts.all++;
+        if (risk.color === 'red') counts.red++;
+        if (risk.color === 'yellow') counts.yellow++;
+        if (risk.color === 'purple') counts.purple++;
+      });
+
+      filtersEl.innerHTML = [
+        { key: 'all', label: `All (${counts.all})` },
+        { key: 'red', label: `🔴 Late (${counts.red})` },
+        { key: 'yellow', label: `🟡 Order now (${counts.yellow})` },
+        { key: 'purple', label: `🟣 No contract (${counts.purple})` },
+      ].map(f => `<button class="proc-filter-pill ${procFilterColor === f.key ? 'active' : ''}" data-proc-filter="${f.key}">${f.label}</button>`).join('');
+
+      filtersEl.querySelectorAll('.proc-filter-pill').forEach(btn => {
+        btn.addEventListener('click', () => {
+          procFilterColor = btn.dataset.procFilter;
+          renderProcurement();
+        });
+      });
+
+      // Table
+      let rows = allMaterialReqs.map(m => {
+        const ds = m.line_item_id ? (allDeliverySchedules[m.line_item_id] || []) : [];
+        const risk = computeRisk(m, ds);
+        const needBy = m.required_by_date ? new Date(m.required_by_date.value || m.required_by_date) : null;
+        let worstETA = null;
+        ds.forEach(d => {
+          const lc = computeLifecycle(d);
+          if (lc !== 'on_site' && lc !== 'installed') {
+            const eta = computeETA(d);
+            if (!worstETA || eta > worstETA) worstETA = eta;
+          }
+        });
+        const margin = (needBy && worstETA) ? Math.round((needBy - worstETA) / 86400000) : null;
+        const lcAgg = ds.length ? computeLifecycle(ds[0]) : '—';
+        return { m, risk, needBy, worstETA, margin, lcAgg, ds };
+      });
+
+      if (procFilterColor !== 'all') {
+        rows = rows.filter(r => r.risk.color === procFilterColor);
+      }
+
+      if (!rows.length) {
+        tableWrap.innerHTML = '<div style="text-align:center;padding:32px;color:#bbb">Нет материалов</div>';
+        return;
+      }
+
+      let html = `<table class="proc-table"><thead><tr>
+        <th>Материал / Слот</th><th>Контракт</th><th>Lifecycle</th><th>Need by</th><th>ETA</th><th>Margin</th><th>Risk</th>
+      </tr></thead><tbody>`;
+
+      rows.forEach(r => {
+        const m = r.m;
+        const name = m.line_item_id ? (m.contract_item_name || m.contract_item_description || '—') : `<span style="color:#8b5cf6">SLOT</span> ${m.category || '—'}`;
+        const contract = m.contractor_name || '—';
+        const lc = r.ds.length ? lifecycleLabels[computeLifecycle(r.ds[0])] || computeLifecycle(r.ds[0]) : '—';
+        const needByStr = r.needBy ? r.needBy.toLocaleDateString('ru-RU', { day:'2-digit', month:'2-digit', year:'2-digit' }) : '—';
+        const etaStr = r.worstETA ? r.worstETA.toLocaleDateString('ru-RU', { day:'2-digit', month:'2-digit', year:'2-digit' }) : '—';
+        const marginStr = r.margin !== null ? (r.margin >= 0 ? `+${r.margin}д` : `${r.margin}д`) : '—';
+        const marginColor = r.margin !== null ? (r.margin < 0 ? 'color:#ef4444' : (r.margin < 7 ? 'color:#f59e0b' : 'color:#10b981')) : '';
+
+        html += `<tr>
+          <td>${name}<div style="color:#999;font-size:11px">${m.task_name || ''}</div></td>
+          <td>${contract}</td>
+          <td>${lc}</td>
+          <td>${needByStr}</td>
+          <td>${etaStr}</td>
+          <td style="${marginColor};font-weight:600">${marginStr}</td>
+          <td><span class="proc-pill ${r.risk.color}">${r.risk.label}</span></td>
+        </tr>`;
+      });
+
+      html += '</tbody></table>';
+      tableWrap.innerHTML = html;
+    }
+
     // Escape
     document.addEventListener('keydown', e => {
-      if (e.key === 'Escape') { closeModal('modal-phase'); closeModal('modal-task'); closeModal('modal-mat-contract'); closeModal('modal-mat-slot'); closeModal('modal-dep'); }
+      if (e.key === 'Escape') { closeModal('modal-phase'); closeModal('modal-task'); closeModal('modal-mat-contract'); closeModal('modal-mat-slot'); closeModal('modal-dep'); closeModal('modal-delivery'); }
     });
 
     // ─── Init ───
