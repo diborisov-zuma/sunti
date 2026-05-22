@@ -53,15 +53,24 @@ exports.material_requirements = async (req, res) => {
 
       if (task_id) {
         // List for a specific task, join to contract_items and delivery_schedule
+        // Also join to contracts for whole-contract mode (contract_id set, line_item_id null)
         const [rows] = await bigquery.query({
-          query: `SELECT m.id, m.task_id, m.line_item_id, m.category,
+          query: `SELECT m.id, m.task_id, m.line_item_id, m.contract_id, m.category,
                          m.required_by_date, m.qty, m.unit, m.notes,
-                         ci.name AS contract_item_name,
-                         ci.description AS contract_item_description,
+                         ci.description AS contract_item_name,
+                         ci.amount AS contract_item_amount,
                          ds.lifecycle AS delivery_lifecycle,
-                         ds.delivery_start, ds.delivery_end
+                         ds.delivery_start, ds.delivery_end,
+                         COALESCE(con2.name, con.name) AS contract_name,
+                         COALESCE(con2.total_amount, con.total_amount) AS contract_total,
+                         COALESCE(ct2.name_en, ct.name_en) AS contractor_name_en,
+                         COALESCE(ct2.name_th, ct.name_th) AS contractor_name_th
                   FROM ${table} m
                   LEFT JOIN ${ciTbl} ci ON m.line_item_id = ci.id
+                  LEFT JOIN ${conTbl} con ON ci.contract_id = con.id
+                  LEFT JOIN ${ctrTbl} ct ON con.contractor_id = ct.id
+                  LEFT JOIN ${conTbl} con2 ON m.contract_id = con2.id
+                  LEFT JOIN ${ctrTbl} ct2 ON con2.contractor_id = ct2.id
                   LEFT JOIN (
                     SELECT line_item_id, lifecycle, delivery_start, delivery_end
                     FROM ${dsTbl}
@@ -78,17 +87,23 @@ exports.material_requirements = async (req, res) => {
       if (folder_id) {
         // List ALL for a folder, join through tasks -> phases -> folder_id
         const [rows] = await bigquery.query({
-          query: `SELECT m.id, m.task_id, m.line_item_id, m.category,
+          query: `SELECT m.id, m.task_id, m.line_item_id, m.contract_id, m.category,
                          m.required_by_date, m.qty, m.unit, m.notes,
                          t.name AS task_name, t.name_en AS task_name_en,
-                         ci.name AS contract_item_name,
-                         ct.name_en AS contractor_name_en, ct.name_th AS contractor_name_th
+                         ci.description AS contract_item_name,
+                         ci.amount AS contract_item_amount,
+                         COALESCE(con2.name, con.name) AS contract_name,
+                         COALESCE(con2.total_amount, con.total_amount) AS contract_total,
+                         COALESCE(ct2.name_en, ct.name_en) AS contractor_name_en,
+                         COALESCE(ct2.name_th, ct.name_th) AS contractor_name_th
                   FROM ${table} m
                   JOIN ${tasksTbl} t ON m.task_id = t.id
                   JOIN ${phasesTbl} p ON t.phase_id = p.id
                   LEFT JOIN ${ciTbl} ci ON m.line_item_id = ci.id
                   LEFT JOIN ${conTbl} con ON ci.contract_id = con.id
                   LEFT JOIN ${ctrTbl} ct ON con.contractor_id = ct.id
+                  LEFT JOIN ${conTbl} con2 ON m.contract_id = con2.id
+                  LEFT JOIN ${ctrTbl} ct2 ON con2.contractor_id = ct2.id
                   WHERE p.folder_id = @folder_id
                   ORDER BY p.sort_order, t.sort_order, m.required_by_date`,
           params: { folder_id },
@@ -112,15 +127,16 @@ exports.material_requirements = async (req, res) => {
       const id = crypto.randomUUID();
       await bigquery.query({
         query: `INSERT INTO ${table}
-                  (id, task_id, line_item_id, category, required_by_date, qty, unit, notes)
+                  (id, task_id, line_item_id, contract_id, category, required_by_date, qty, unit, notes)
                 VALUES
-                  (@id, @task_id, NULLIF(@line_item_id,''), NULLIF(@category,''),
+                  (@id, @task_id, NULLIF(@line_item_id,''), NULLIF(@contract_id,''), NULLIF(@category,''),
                    IF(@required_by_date = '', NULL, DATE(@required_by_date)),
                    CAST(@qty AS NUMERIC), @unit, NULLIF(@notes,''))`,
         params: {
           id,
           task_id:          b.task_id,
           line_item_id:     b.line_item_id || '',
+          contract_id:      b.contract_id || '',
           category:         b.category || '',
           required_by_date: b.required_by_date || '',
           qty:              b.qty != null ? String(b.qty) : '0',

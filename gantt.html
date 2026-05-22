@@ -282,7 +282,8 @@
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
             <h4 style="font-size:0.85rem;color:#555;margin:0;text-transform:uppercase;letter-spacing:0.5px">Материалы</h4>
             <div style="display:flex;gap:6px">
-              <button class="btn btn-primary" style="font-size:0.78rem;padding:4px 10px" id="btn-add-mat-contract">+ Из контракта</button>
+              <button class="btn btn-primary" style="font-size:0.78rem;padding:4px 10px" id="btn-add-mat-contract">+ Позиция</button>
+              <button class="btn btn-outline" style="font-size:0.78rem;padding:4px 10px" id="btn-add-mat-whole">+ Весь контракт</button>
               <button class="btn btn-outline" style="font-size:0.78rem;padding:4px 10px;color:#8b5cf6;border-color:#8b5cf6" id="btn-add-mat-slot">+ Слот</button>
             </div>
           </div>
@@ -296,21 +297,24 @@
     </div>
   </div>
 
-  <!-- Modal: add material from contract -->
+  <!-- Modal: add material from contract (position or whole) -->
   <div class="modal-overlay" id="modal-mat-contract">
-    <div class="modal" style="width:700px;max-width:95vw">
-      <h3 style="padding:16px 20px 0;margin:0">Привязать позицию контракта</h3>
-      <div style="padding:12px 20px 20px">
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-          <div class="field-group">
-            <label>Контракт</label>
-            <select id="mat-contract-select"><option value="">— Выберите контракт —</option></select>
-          </div>
-          <div class="field-group">
-            <label>Позиция</label>
-            <select id="mat-lineitem-select"><option value="">— Выберите позицию —</option></select>
+    <div class="modal" style="width:1000px;max-width:95vw;max-height:90vh;display:flex;flex-direction:column">
+      <h3 style="padding:16px 20px 0;margin:0" id="mat-modal-title">Привязать контракт</h3>
+      <div style="padding:12px 20px 20px;overflow-y:auto;flex:1">
+        <!-- Search -->
+        <div class="field-group">
+          <input type="text" id="mat-contract-search" placeholder="Поиск по названию контракта или поставщику..." style="font-size:0.9rem">
+        </div>
+        <!-- Contract list -->
+        <div id="mat-contract-list" style="max-height:250px;overflow-y:auto;border:1px solid #e8e8e8;border-radius:8px;margin-bottom:12px"></div>
+        <!-- Line items (only for position mode) -->
+        <div id="mat-lineitem-section" style="display:none">
+          <div class="field-group"><label>Позиция контракта</label>
+            <select id="mat-lineitem-select" style="font-size:0.9rem"><option value="">— Выберите позицию —</option></select>
           </div>
         </div>
+        <!-- Common fields -->
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
           <div class="field-group"><label>Кол-во</label><input type="number" id="mat-qty" min="0" step="0.01"></div>
           <div class="field-group"><label>Ед. изм.</label><input type="text" id="mat-unit" placeholder="м³, шт, м²"></div>
@@ -422,6 +426,16 @@
       font-weight:600;padding:2px 8px;margin-left:auto;opacity:0.7;
     }
     .phase-add-btn:hover { opacity:1; }
+    .contract-pick-row {
+      display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid #f0f0f0;
+      cursor:pointer;font-size:0.85rem;transition:background 0.1s;
+    }
+    .contract-pick-row:hover { background:#f8fafc; }
+    .contract-pick-row.selected { background:#eff6ff;border-left:3px solid #1a73e8; }
+    .contract-pick-row:last-child { border-bottom:none; }
+    .contract-pick-row .c-name { font-weight:600;color:#222;flex:1; }
+    .contract-pick-row .c-contractor { color:#888;font-size:0.78rem; }
+    .contract-pick-row .c-amount { font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap; }
   </style>
 
   <script>
@@ -1027,16 +1041,26 @@
         list.innerHTML = '<div style="color:#bbb;font-size:0.82rem">Нет привязанных материалов</div>';
         return;
       }
+      const fmtAmt = v => { const n = parseFloat(v?.value ?? v ?? 0); return isNaN(n)||n===0 ? '' : n.toLocaleString('en-US',{minimumFractionDigits:2}); };
       list.innerHTML = taskMaterials.map(m => {
-        const isSlot = !m.line_item_id;
-        const name = isSlot
-          ? `<span style="color:#8b5cf6;font-weight:600">SLOT</span> ${m.category || '—'}`
-          : (m.contract_item_name || m.contract_item_description || '—');
+        const isSlot = !m.line_item_id && !m.contract_id;
+        const isWhole = !m.line_item_id && m.contract_id;
+        let name, amount = '';
+        if (isSlot) {
+          name = `<span style="color:#8b5cf6;font-weight:600">SLOT</span> ${m.category || '—'}`;
+        } else if (isWhole) {
+          name = `<span style="color:#1a73e8;font-weight:600">CONTRACT</span> ${m.contract_name || '—'}`;
+          amount = fmtAmt(m.contract_total);
+        } else {
+          name = m.contract_item_name || '—';
+          amount = fmtAmt(m.contract_item_amount);
+        }
+        const contractor = m.contractor_name_en || m.contractor_name_th || '';
         const lifecycle = m.delivery_lifecycle
-          ? `<span style="background:#e2e8f0;padding:2px 6px;border-radius:8px;font-size:0.7rem;font-weight:600">${m.delivery_lifecycle}</span>`
+          ? `<span style="background:#e2e8f0;padding:2px 6px;border-radius:8px;font-size:0.7rem;font-weight:600">${lifecycleLabels[m.delivery_lifecycle] || m.delivery_lifecycle}</span>`
           : '';
         const date = m.required_by_date ? (m.required_by_date.value || m.required_by_date).substring(0, 10) : '—';
-        const border = isSlot ? 'border-left:3px solid #8b5cf6' : 'border-left:3px solid #e2e8f0';
+        const border = isSlot ? 'border-left:3px solid #8b5cf6' : (isWhole ? 'border-left:3px solid #1a73e8' : 'border-left:3px solid #e2e8f0');
 
         // Delivery batches
         let batchesHTML = '';
@@ -1065,7 +1089,7 @@
           <div style="display:flex;align-items:center;gap:10px;padding:8px 12px;">
             <div style="flex:1">
               <div>${name}</div>
-              <div style="color:#999;font-size:0.78rem">${m.qty || '—'} ${m.unit || ''} · к ${date}</div>
+              <div style="color:#999;font-size:0.78rem">${contractor ? contractor + ' · ' : ''}${m.qty || '—'} ${m.unit || ''} · к ${date}${amount ? ' · <strong style="color:#333">'+amount+'</strong>' : ''}</div>
             </div>
             ${lifecycle}
             <button class="btn btn-outline" style="padding:2px 6px;font-size:0.7rem;color:#c5221f" data-action="delete-mat" data-mat-id="${m.id}">×</button>
@@ -1089,71 +1113,146 @@
 
     // ─── Add material from contract ───
 
-    document.getElementById('btn-add-mat-contract').addEventListener('click', async () => {
-      if (!editTaskId) { showToast('Сначала сохраните задачу', 'error'); return; }
-      // Load contracts for this folder
-      try {
-        if (!contractsCache.length) {
+    let matMode = 'position'; // 'position' or 'whole'
+    let selectedContractId = null;
+
+    async function loadContractsForPicker() {
+      if (!contractsCache.length) {
+        try {
           const companyId = companiesCache.find(c =>
             foldersCache.find(f => f.id === filterFolder && f.company_id === c.id)
           )?.id;
           if (companyId) {
             contractsCache = await apiFetch(`/contracts?company_id=${companyId}&folder_id=${filterFolder}`);
           }
-        }
-      } catch(e) { contractsCache = []; }
+        } catch(e) { contractsCache = []; }
+      }
+    }
 
-      const sel = document.getElementById('mat-contract-select');
-      sel.innerHTML = '<option value="">— Выберите контракт —</option>';
-      contractsCache.forEach(c => {
-        sel.innerHTML += `<option value="${c.id}">${c.name || c.external_ref || c.id.substring(0,8)}</option>`;
+    function renderContractList(search) {
+      const list = document.getElementById('mat-contract-list');
+      const q = (search || '').toLowerCase();
+      const filtered = contractsCache.filter(c => {
+        if (!q) return true;
+        const name = (c.name || '').toLowerCase();
+        const contractor = (c.contractor_name_en || c.contractor_name_th || '').toLowerCase();
+        const ref = (c.external_ref || '').toLowerCase();
+        return name.includes(q) || contractor.includes(q) || ref.includes(q);
       });
-      document.getElementById('mat-lineitem-select').innerHTML = '<option value="">— Сначала контракт —</option>';
+      if (!filtered.length) {
+        list.innerHTML = '<div style="padding:16px;color:#bbb;text-align:center">Контракты не найдены</div>';
+        return;
+      }
+      const fmt = v => { const n = parseFloat(v?.value ?? v ?? 0); return isNaN(n) ? '—' : n.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2}); };
+      list.innerHTML = filtered.map(c => {
+        const sel = c.id === selectedContractId ? ' selected' : '';
+        const contractor = c.contractor_name_en || c.contractor_name_th || '—';
+        return `<div class="contract-pick-row${sel}" data-contract-id="${c.id}">
+          <div class="c-name">${c.name || c.external_ref || c.id.substring(0,8)}</div>
+          <div class="c-contractor">${contractor}</div>
+          <div class="c-amount">${fmt(c.total_amount)}</div>
+          <span class="badge" style="font-size:0.68rem">${c.status || '—'}</span>
+        </div>`;
+      }).join('');
+    }
+
+    function openContractPicker(mode) {
+      if (!editTaskId) { showToast('Сначала сохраните задачу', 'error'); return; }
+      matMode = mode;
+      selectedContractId = null;
+      document.getElementById('mat-modal-title').textContent = mode === 'whole' ? 'Привязать весь контракт' : 'Привязать позицию контракта';
+      document.getElementById('mat-lineitem-section').style.display = mode === 'position' ? '' : 'none';
+      document.getElementById('mat-lineitem-select').innerHTML = '<option value="">— Сначала выберите контракт —</option>';
+      document.getElementById('mat-contract-search').value = '';
       document.getElementById('mat-qty').value = '';
       document.getElementById('mat-unit').value = '';
       document.getElementById('mat-required-by').value = '';
       document.getElementById('mat-notes').value = '';
+      renderContractList('');
       openModal('modal-mat-contract');
+    }
+
+    document.getElementById('btn-add-mat-contract').addEventListener('click', async () => {
+      await loadContractsForPicker();
+      openContractPicker('position');
     });
 
-    // When contract selected → load line items
-    document.getElementById('mat-contract-select').addEventListener('change', async e => {
-      const contractId = e.target.value;
-      const sel = document.getElementById('mat-lineitem-select');
-      if (!contractId) { sel.innerHTML = '<option value="">— Сначала контракт —</option>'; return; }
-      try {
-        if (!contractItemsCache[contractId]) {
-          contractItemsCache[contractId] = await apiFetch(`/contract_items?contract_id=${contractId}`);
-        }
-        const items = contractItemsCache[contractId];
-        sel.innerHTML = '<option value="">— Выберите позицию —</option>';
-        items.forEach(it => {
-          const label = it.description || `Line ${it.sort_order || '?'}`;
-          sel.innerHTML += `<option value="${it.id}" data-qty="${it.quantity || ''}" data-unit="${it.item_type || ''}">${label}</option>`;
-        });
-      } catch(err) { sel.innerHTML = '<option value="">Ошибка загрузки</option>'; }
+    document.getElementById('btn-add-mat-whole').addEventListener('click', async () => {
+      await loadContractsForPicker();
+      openContractPicker('whole');
+    });
+
+    // Search filter
+    document.getElementById('mat-contract-search').addEventListener('input', e => {
+      renderContractList(e.target.value);
+    });
+
+    // Click contract row → select + load line items
+    document.getElementById('mat-contract-list').addEventListener('click', async e => {
+      const row = e.target.closest('.contract-pick-row');
+      if (!row) return;
+      selectedContractId = row.dataset.contractId;
+      renderContractList(document.getElementById('mat-contract-search').value);
+
+      if (matMode === 'position') {
+        const sel = document.getElementById('mat-lineitem-select');
+        sel.innerHTML = '<option value="">Загрузка...</option>';
+        try {
+          if (!contractItemsCache[selectedContractId]) {
+            contractItemsCache[selectedContractId] = await apiFetch(`/contract_items?contract_id=${selectedContractId}`);
+          }
+          const items = contractItemsCache[selectedContractId];
+          sel.innerHTML = '<option value="">— Выберите позицию —</option>';
+          items.forEach(it => {
+            const label = it.description || `Line ${it.sort_order || '?'}`;
+            const amt = it.amount ? ` (${parseFloat(it.amount?.value ?? it.amount ?? 0).toLocaleString('en-US',{minimumFractionDigits:2})})` : '';
+            sel.innerHTML += `<option value="${it.id}">${label}${amt}</option>`;
+          });
+        } catch(err) { sel.innerHTML = '<option value="">Ошибка загрузки</option>'; }
+      }
     });
 
     document.getElementById('btn-mat-contract-cancel').addEventListener('click', () => closeModal('modal-mat-contract'));
     document.getElementById('btn-mat-contract-save').addEventListener('click', async () => {
-      const lineItemId = document.getElementById('mat-lineitem-select').value;
-      if (!lineItemId) { showToast('Выберите позицию контракта', 'error'); return; }
-      closeModal('modal-mat-contract');
-      try {
-        await apiFetch('/material_requirements', {
-          method: 'POST',
-          body: JSON.stringify({
-            task_id: editTaskId,
-            line_item_id: lineItemId,
-            required_by_date: document.getElementById('mat-required-by').value || '',
-            qty: document.getElementById('mat-qty').value || '0',
-            unit: document.getElementById('mat-unit').value || '',
-            notes: document.getElementById('mat-notes').value || '',
-          }),
-        });
-        showToast(t('saved'), 'success');
-        await loadTaskMaterials(editTaskId);
-      } catch(e) { showToast(e.message, 'error'); }
+      if (!selectedContractId) { showToast('Выберите контракт', 'error'); return; }
+      if (matMode === 'position') {
+        const lineItemId = document.getElementById('mat-lineitem-select').value;
+        if (!lineItemId) { showToast('Выберите позицию контракта', 'error'); return; }
+        closeModal('modal-mat-contract');
+        try {
+          await apiFetch('/material_requirements', {
+            method: 'POST',
+            body: JSON.stringify({
+              task_id: editTaskId,
+              line_item_id: lineItemId,
+              required_by_date: document.getElementById('mat-required-by').value || '',
+              qty: document.getElementById('mat-qty').value || '0',
+              unit: document.getElementById('mat-unit').value || '',
+              notes: document.getElementById('mat-notes').value || '',
+            }),
+          });
+          showToast(t('saved'), 'success');
+          await loadTaskMaterials(editTaskId);
+        } catch(e) { showToast(e.message, 'error'); }
+      } else {
+        // Whole contract mode
+        closeModal('modal-mat-contract');
+        try {
+          await apiFetch('/material_requirements', {
+            method: 'POST',
+            body: JSON.stringify({
+              task_id: editTaskId,
+              contract_id: selectedContractId,
+              required_by_date: document.getElementById('mat-required-by').value || '',
+              qty: document.getElementById('mat-qty').value || '0',
+              unit: document.getElementById('mat-unit').value || '',
+              notes: document.getElementById('mat-notes').value || '',
+            }),
+          });
+          showToast(t('saved'), 'success');
+          await loadTaskMaterials(editTaskId);
+        } catch(e) { showToast(e.message, 'error'); }
+      }
     });
 
     // ─── Add slot ───

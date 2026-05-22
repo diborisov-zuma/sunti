@@ -58,6 +58,10 @@ CREATE TABLE IF NOT EXISTS `project-9718e7d4-4cd7-4f52-8d6.sunti.delivery_schedu
   notes STRING
 );
 
+-- 6a. Add contract_id to material_requirements (whole-contract linking)
+ALTER TABLE `project-9718e7d4-4cd7-4f52-8d6.sunti.material_requirements`
+ADD COLUMN IF NOT EXISTS contract_id STRING;
+
 -- 6. Material requirements
 CREATE TABLE IF NOT EXISTS `project-9718e7d4-4cd7-4f52-8d6.sunti.material_requirements` (
   id STRING NOT NULL,
