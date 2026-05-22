@@ -1144,6 +1144,7 @@
 
     let matMode = 'position'; // 'position' or 'whole'
     let selectedContractId = null;
+    let selectedContractIds = new Set(); // for multi-select in whole mode
 
     async function loadContractsForPicker() {
       if (!contractsCache.length) {
@@ -1174,21 +1175,27 @@
       }
       const fmt = v => { const n = parseFloat(v?.value ?? v ?? 0); return isNaN(n) ? '—' : n.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2}); };
       list.innerHTML = filtered.map(c => {
-        const sel = c.id === selectedContractId ? ' selected' : '';
+        const isSel = matMode === 'whole' ? selectedContractIds.has(c.id) : c.id === selectedContractId;
         const contractor = c.contractor_name_en || c.contractor_name_th || '—';
-        return `<div class="contract-pick-row${sel}" data-contract-id="${c.id}">
+        return `<div class="contract-pick-row${isSel ? ' selected' : ''}" data-contract-id="${c.id}">
+          ${matMode === 'whole' ? `<span style="font-size:1rem;width:20px;text-align:center">${isSel ? '☑' : '☐'}</span>` : ''}
           <div class="c-name">${c.name || c.external_ref || c.id.substring(0,8)}</div>
           <div class="c-contractor">${contractor}</div>
           <div class="c-amount">${fmt(c.total_amount)}</div>
           <span class="badge" style="font-size:0.68rem">${c.status || '—'}</span>
         </div>`;
       }).join('');
+      // Show selected count for whole mode
+      if (matMode === 'whole' && selectedContractIds.size > 0) {
+        list.insertAdjacentHTML('beforeend', `<div style="padding:8px 14px;font-size:0.78rem;color:#1a73e8;font-weight:600;border-top:1px solid #e8e8e8">Выбрано: ${selectedContractIds.size}</div>`);
+      }
     }
 
     function openContractPicker(mode) {
       if (!editTaskId) { showToast('Сначала сохраните задачу', 'error'); return; }
       matMode = mode;
       selectedContractId = null;
+      selectedContractIds = new Set();
       document.getElementById('mat-modal-title').textContent = mode === 'whole' ? 'Привязать весь контракт' : 'Привязать позицию контракта';
       document.getElementById('mat-lineitem-section').style.display = mode === 'position' ? '' : 'none';
       document.getElementById('mat-lineitem-select').innerHTML = '<option value="">— Сначала выберите контракт —</option>';
@@ -1216,11 +1223,21 @@
       renderContractList(e.target.value);
     });
 
-    // Click contract row → select + load line items
+    // Click contract row → select (multi for whole, single for position)
     document.getElementById('mat-contract-list').addEventListener('click', async e => {
       const row = e.target.closest('.contract-pick-row');
       if (!row) return;
-      selectedContractId = row.dataset.contractId;
+      const cId = row.dataset.contractId;
+
+      if (matMode === 'whole') {
+        if (selectedContractIds.has(cId)) selectedContractIds.delete(cId);
+        else selectedContractIds.add(cId);
+        renderContractList(document.getElementById('mat-contract-search').value);
+        return;
+      }
+
+      // Position mode — single select
+      selectedContractId = cId;
       renderContractList(document.getElementById('mat-contract-search').value);
 
       if (matMode === 'position') {
@@ -1243,42 +1260,37 @@
 
     document.getElementById('btn-mat-contract-cancel').addEventListener('click', () => closeModal('modal-mat-contract'));
     document.getElementById('btn-mat-contract-save').addEventListener('click', async () => {
-      if (!selectedContractId) { showToast('Выберите контракт', 'error'); return; }
+      const requiredBy = document.getElementById('mat-required-by').value || '';
+      const qty = document.getElementById('mat-qty').value || '0';
+      const unit = document.getElementById('mat-unit').value || '';
+      const notes = document.getElementById('mat-notes').value || '';
+
       if (matMode === 'position') {
+        if (!selectedContractId) { showToast('Выберите контракт', 'error'); return; }
         const lineItemId = document.getElementById('mat-lineitem-select').value;
         if (!lineItemId) { showToast('Выберите позицию контракта', 'error'); return; }
         closeModal('modal-mat-contract');
         try {
           await apiFetch('/material_requirements', {
             method: 'POST',
-            body: JSON.stringify({
-              task_id: editTaskId,
-              line_item_id: lineItemId,
-              required_by_date: document.getElementById('mat-required-by').value || '',
-              qty: document.getElementById('mat-qty').value || '0',
-              unit: document.getElementById('mat-unit').value || '',
-              notes: document.getElementById('mat-notes').value || '',
-            }),
+            body: JSON.stringify({ task_id: editTaskId, line_item_id: lineItemId, required_by_date: requiredBy, qty, unit, notes }),
           });
           showToast(t('saved'), 'success');
           await loadTaskMaterials(editTaskId);
         } catch(e) { showToast(e.message, 'error'); }
       } else {
-        // Whole contract mode
+        // Whole contract mode — multi-select
+        if (!selectedContractIds.size) { showToast('Выберите хотя бы один контракт', 'error'); return; }
         closeModal('modal-mat-contract');
         try {
-          await apiFetch('/material_requirements', {
-            method: 'POST',
-            body: JSON.stringify({
-              task_id: editTaskId,
-              contract_id: selectedContractId,
-              required_by_date: document.getElementById('mat-required-by').value || '',
-              qty: document.getElementById('mat-qty').value || '0',
-              unit: document.getElementById('mat-unit').value || '',
-              notes: document.getElementById('mat-notes').value || '',
-            }),
-          });
-          showToast(t('saved'), 'success');
+          const promises = [...selectedContractIds].map(cId =>
+            apiFetch('/material_requirements', {
+              method: 'POST',
+              body: JSON.stringify({ task_id: editTaskId, contract_id: cId, required_by_date: requiredBy, qty, unit, notes }),
+            })
+          );
+          await Promise.all(promises);
+          showToast(`${selectedContractIds.size} контрактов привязано`, 'success');
           await loadTaskMaterials(editTaskId);
         } catch(e) { showToast(e.message, 'error'); }
       }
