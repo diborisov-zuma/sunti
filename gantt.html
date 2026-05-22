@@ -187,9 +187,8 @@
           <div class="field-group"><label>EN</label><input type="text" id="g-tk-name-en"></div>
           <div class="field-group"><label>TH</label><input type="text" id="g-tk-name-th"></div>
         </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px">
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
           <div class="field-group"><label>Start</label><input type="date" id="g-tk-start"></div>
-          <div class="field-group"><label>End</label><input type="date" id="g-tk-end"></div>
           <div class="field-group"><label>Duration (days)</label><input type="number" id="g-tk-dur" min="1" value="14"></div>
           <div class="field-group"><label>Sort order</label><input type="number" id="g-tk-sort" min="0" value="0"></div>
         </div>
@@ -568,9 +567,7 @@
         document.getElementById('g-tk-name-en').value = tk.name_en || '';
         document.getElementById('g-tk-name-th').value = tk.name_th || '';
         const ps = tk.planned_start ? (tk.planned_start.value || tk.planned_start) : '';
-        const pe = tk.planned_end ? (tk.planned_end.value || tk.planned_end) : '';
         document.getElementById('g-tk-start').value = ps ? ps.substring(0,10) : '';
-        document.getElementById('g-tk-end').value = pe ? pe.substring(0,10) : '';
         document.getElementById('g-tk-dur').value = tk.duration_days || 14;
         document.getElementById('g-tk-sort').value = tk.sort_order || 0;
         document.getElementById('g-tk-critical').checked = tk.is_critical === true;
@@ -624,14 +621,22 @@
       if (!name) { showToast(t('fillAllFields'), 'error'); return; }
       closeModal('modal-task');
       try {
+        const startVal = document.getElementById('g-tk-start').value || '';
+        const durDays = parseInt(document.getElementById('g-tk-dur').value) || 14;
+        let endVal = '';
+        if (startVal) {
+          const endDate = new Date(startVal);
+          endDate.setDate(endDate.getDate() + durDays);
+          endVal = endDate.toISOString().substring(0, 10);
+        }
         const body = {
           phase_id: editTaskPhaseId,
           name,
           name_en: document.getElementById('g-tk-name-en').value.trim(),
           name_th: document.getElementById('g-tk-name-th').value.trim(),
-          planned_start: document.getElementById('g-tk-start').value || '',
-          planned_end: document.getElementById('g-tk-end').value || '',
-          duration_days: parseInt(document.getElementById('g-tk-dur').value) || 14,
+          planned_start: startVal,
+          planned_end: endVal,
+          duration_days: durDays,
           sort_order: parseInt(document.getElementById('g-tk-sort').value) || 0,
           is_critical: document.getElementById('g-tk-critical').checked,
         };
