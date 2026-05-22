@@ -923,7 +923,13 @@
                 const delDays = parseInt(d.delivery_days) || 0;
                 const orderDeadline = needBy ? new Date(needBy) : null;
                 if (orderDeadline) orderDeadline.setDate(orderDeadline.getDate() - prodDays - delDays);
-                markerColor = (orderDeadline && today > orderDeadline) ? 'red' : 'grey';
+                if (!orderDeadline) { markerColor = 'grey'; }
+                else {
+                  const marginDays = Math.round((orderDeadline - today) / 86400000);
+                  if (marginDays < 0) markerColor = 'red';
+                  else if (marginDays < 14) markerColor = 'yellow';
+                  else markerColor = 'grey';
+                }
               }
               rightHTML += `<div class="delivery-marker ${markerColor}" style="left:${off * dayW}px" title="${m.contract_item_name || m.contract_name || m.category || '?'}: ${lifecycleLabels[lc] || lc}"></div>`;
             }
