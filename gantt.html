@@ -847,15 +847,22 @@
       const needBy = needByRaw ? new Date(needByRaw) : (taskStart ? new Date(taskStart) : null);
       if (!needBy) return { level: 'unknown', color: 'grey', label: '—' };
 
-      if (!deliveries || !deliveries.length) {
-        return { level: 'no_delivery', color: 'yellow', label: 'No delivery' };
+      // Filter out "empty" batches (no prod/del days, no dates started) — just work contracts
+      const realDeliveries = (deliveries || []).filter(d => {
+        const pd = parseInt(d.production_days) || 0;
+        const dd = parseInt(d.delivery_days) || 0;
+        return pd > 0 || dd > 0 || d.production_start || d.delivery_start;
+      });
+
+      if (!realDeliveries.length) {
+        return { level: 'work_only', color: 'grey', label: 'Work' };
       }
 
       let worstETA = null;
       let allDelivered = true;
       let worstLC = 'installed';
       const lcOrder = ['planned','quoted','in_production','produced','on_delivery','in_transit','on_site','installed'];
-      deliveries.forEach(ds => {
+      realDeliveries.forEach(ds => {
         const lc = computeLifecycle(ds);
         if (lc !== 'on_site' && lc !== 'installed') {
           allDelivered = false;
@@ -869,8 +876,8 @@
 
       if (worstLC === 'planned' || worstLC === 'quoted') {
         // Not ordered — check order deadline
-        const prodDays = Math.max(...deliveries.map(d => parseInt(d.production_days) || 0));
-        const delDays = Math.max(...deliveries.map(d => parseInt(d.delivery_days) || 0));
+        const prodDays = Math.max(...realDeliveries.map(d => parseInt(d.production_days) || 0));
+        const delDays = Math.max(...realDeliveries.map(d => parseInt(d.delivery_days) || 0));
         const orderDeadline = new Date(needBy);
         orderDeadline.setDate(orderDeadline.getDate() - prodDays - delDays);
         const margin = Math.round((orderDeadline - today) / 86400000);
@@ -1108,6 +1115,10 @@
           if (!m.line_item_id && !m.contract_id) return;
           const dsArr = m.line_item_id ? (allDeliverySchedules[m.line_item_id] || []) : (m.contract_id ? (allDeliverySchedules['c_' + m.contract_id] || []) : []);
           dsArr.forEach(d => {
+            // Skip marker if no production and no delivery time (just work, not material)
+            const prodD = parseInt(d.production_days) || 0;
+            const delD = parseInt(d.delivery_days) || 0;
+            if (prodD === 0 && delD === 0 && !d.production_start && !d.delivery_start) return;
             const eta = computeETA(d);
             const lc = computeLifecycle(d);
             const off = dayOffset(eta);
