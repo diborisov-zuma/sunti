@@ -404,13 +404,25 @@
       const orphanTasks = tasksData.filter(t => !phasesData.some(p => p.id === t.phase_id));
       orphanTasks.forEach(task => rows.push({ type: 'task', data: task }));
 
+      // Compute planned_end from start + duration if missing
+      tasksData.forEach(t => {
+        const s = t.planned_start ? (t.planned_start.value || t.planned_start) : null;
+        if (s && !t.planned_end) {
+          const d = new Date(s);
+          d.setDate(d.getDate() + (parseInt(t.duration_days) || 14));
+          t._computed_end = d.toISOString().substring(0, 10);
+        }
+      });
+
       // Calculate date range
       let minDate = null, maxDate = null;
       tasksData.forEach(t => {
         const s = t.planned_start ? new Date(t.planned_start.value || t.planned_start) : null;
-        const e = t.planned_end ? new Date(t.planned_end.value || t.planned_end) : null;
+        const endRaw = t.planned_end || t._computed_end;
+        const e = endRaw ? new Date(endRaw.value || endRaw) : null;
         if (s && (!minDate || s < minDate)) minDate = s;
         if (e && (!maxDate || e > maxDate)) maxDate = e;
+        if (s && !e && (!maxDate || s > maxDate)) maxDate = s;
       });
 
       if (!minDate || !maxDate) {
@@ -506,12 +518,14 @@
         }
         const tk = row.data;
         const s = tk.planned_start ? new Date(tk.planned_start.value || tk.planned_start) : null;
-        const e = tk.planned_end ? new Date(tk.planned_end.value || tk.planned_end) : null;
+        const endRaw = tk.planned_end || tk._computed_end;
+        const e = endRaw ? new Date(endRaw.value || endRaw) : null;
 
         rightHTML += '<div class="bar-row">';
-        if (s && e) {
+        if (s) {
+          const barEnd = e || s;
           const left = dayOffset(s) * dayW;
-          const width = Math.max((dayOffset(e) - dayOffset(s) + 1) * dayW, 4);
+          const width = Math.max((dayOffset(barEnd) - dayOffset(s) + 1) * dayW, 4);
           const critical = tk.is_critical ? ' critical' : '';
           const name = tk['name_' + currentLang] || tk.name || tk.name_en || '';
           rightHTML += `<div class="bar${critical}" style="left:${left}px;width:${width}px">
