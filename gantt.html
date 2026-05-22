@@ -284,6 +284,11 @@
   .sp-comment .author { font-weight: 600; color: #333; }
   .sp-comment .date { color: #999; font-size: 11px; margin-left: 6px; }
   .sp-comment .text { margin-top: 3px; color: #555; }
+  .dep-arrows-svg {
+    position: absolute; top: 0; left: 0; pointer-events: none; z-index: 8;
+  }
+  .dep-arrows-svg line { stroke-width: 1.5; }
+  .dep-arrows-svg polygon { }
   .dep-phase-group { font-size:10px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:0.5px;padding:8px 12px;background:#f8f8f8;border-bottom:1px solid #e8e8e8; }
   .dep-task-pick {
     display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid #f0f0f0;
@@ -908,6 +913,28 @@
       return worst;
     }
 
+    // Dependency icon color: grey=no deps, black=has deps ok, red=predecessor delays this task
+    function getDepIconColor(taskId) {
+      const deps = depsData.filter(d => d.successor_id === taskId);
+      if (!deps.length) return 'grey';
+      const tk = tasksData.find(t => t.id === taskId);
+      const tkStart = tk?.planned_start ? new Date(tk.planned_start.value || tk.planned_start) : null;
+      if (!tkStart) return '#333';
+      const today2 = new Date(); today2.setHours(0,0,0,0);
+      for (const d of deps) {
+        const pred = tasksData.find(t => t.id === d.predecessor_id);
+        if (!pred) continue;
+        const predEndRaw = pred.planned_end || pred._computed_end;
+        const predEnd = predEndRaw ? new Date(predEndRaw.value || predEndRaw) : null;
+        if (!predEnd) continue;
+        // predecessor not finished and its end >= task start → risk
+        const lag = parseInt(d.lag_days) || 0;
+        const predEndWithLag = new Date(predEnd); predEndWithLag.setDate(predEndWithLag.getDate() + lag);
+        if (!pred.actual_end && predEndWithLag > tkStart) return '#c5221f'; // red
+      }
+      return '#333'; // black - has deps, all ok
+    }
+
     // ─── Render Gantt ───
 
     function renderGantt() {
@@ -970,8 +997,7 @@
             listHTML += `<div class="task-row" data-action="edit-task" data-id="${tk.id}" data-phase-id="${tk.phase_id}">
               <span class="name">${name}</span>
               ${listRiskBadge}
-              ${tkDepLabel ? `<span style="color:#1a73e8;font-size:0.72rem;margin-right:4px" title="Depends on: ${tkDepLabel}">⛓ ${tkDeps.length}</span>` : ''}
-              <button class="dep-btn" data-action="open-dep" data-task-id="${tk.id}" title="${t('ganttDependency')}">⛓</button>
+              <button class="dep-btn" data-action="open-dep" data-task-id="${tk.id}" title="${tkDepLabel ? 'Depends on: '+tkDepLabel : t('ganttDependency')}" style="color:${getDepIconColor(tk.id)};opacity:${tkDeps.length ? '1' : '0.4'}">${tkDeps.length ? '⛓' + tkDeps.length : '⛓'}</button>
               <span style="color:#bbb;font-size:0.78rem">${tk.duration_days || '—'}d</span></div>`;
           }
         });
@@ -982,6 +1008,7 @@
 
       // Add padding: 1 month before, 1 month after
       const startDate = new Date(minDate.getFullYear(), minDate.getMonth() - 1, 1);
+      window._ganttStartDate = startDate;
       const endDate = new Date(maxDate.getFullYear(), maxDate.getMonth() + 2, 0);
       const totalDays = Math.ceil((endDate - startDate) / 86400000);
       const dayW = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--day-w'));
@@ -1037,8 +1064,7 @@
           leftHTML += `<div class="task-row" data-row-idx="${ri}" data-task-id="${tk.id}" data-action="edit-task" data-id="${tk.id}" data-phase-id="${tk.phase_id}">
             <span class="name">${name}</span>
             ${ganttRiskBadge}
-            ${tkDeps.length ? `<span style="color:#1a73e8;font-size:0.72rem">⛓${tkDeps.length}</span>` : ''}
-            <button class="dep-btn" data-action="open-dep" data-task-id="${tk.id}" title="${t('ganttDependency')}">⛓</button>
+            <button class="dep-btn" data-action="open-dep" data-task-id="${tk.id}" title="${t('ganttDependency')}" style="color:${getDepIconColor(tk.id)};opacity:${tkDeps.length ? '1' : '0.4'}">${tkDeps.length ? '⛓' + tkDeps.length : '⛓'}</button>
           </div>`;
         }
       });
@@ -1209,6 +1235,95 @@
     function closeSidePanel() {
       document.getElementById('side-panel').classList.remove('open');
       document.getElementById('sp-overlay').style.display = 'none';
+      clearDepArrows();
+    }
+
+    function clearDepArrows() {
+      const old = document.querySelector('.dep-arrows-svg');
+      if (old) old.remove();
+    }
+
+    function drawDepArrows(taskId) {
+      clearDepArrows();
+      const rightInner = document.querySelector('.gantt-right-inner');
+      if (!rightInner) return;
+      const rowH = 40; // --row-h
+      const dayW = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--day-w'));
+
+      // Build row index map: taskId → row index (matching data-row-idx)
+      const rowMap = {};
+      document.querySelectorAll('.bar-row[data-row-idx]').forEach(el => {
+        const tid = el.querySelector('.bar[data-task-id]');
+        if (tid) rowMap[tid.dataset.taskId] = parseInt(el.dataset.rowIdx);
+      });
+      // Also map from task-row in left panel
+      document.querySelectorAll('.task-row[data-task-id]').forEach(el => {
+        rowMap[el.dataset.taskId] = parseInt(el.dataset.rowIdx);
+      });
+
+      const predsOf = depsData.filter(d => d.successor_id === taskId);
+      const succsOf = depsData.filter(d => d.predecessor_id === taskId);
+      const allDeps = [...predsOf.map(d => ({ from: d.predecessor_id, to: d.successor_id, type: 'pred' })),
+                        ...succsOf.map(d => ({ from: d.predecessor_id, to: d.successor_id, type: 'succ' }))];
+
+      if (!allDeps.length) return;
+
+      const svgNS = 'http://www.w3.org/2000/svg';
+      const svg = document.createElementNS(svgNS, 'svg');
+      svg.classList.add('dep-arrows-svg');
+      svg.setAttribute('width', rightInner.scrollWidth);
+      svg.setAttribute('height', rightInner.scrollHeight);
+
+      // Helper: get bar position for a task
+      function getBarPos(tid) {
+        const tk = tasksData.find(t => t.id === tid);
+        if (!tk) return null;
+        const ri = rowMap[tid];
+        if (ri === undefined) return null;
+        const ps = tk.planned_start ? new Date(tk.planned_start.value || tk.planned_start) : null;
+        const endRaw = tk.planned_end || tk._computed_end;
+        const pe = endRaw ? new Date(endRaw.value || endRaw) : ps;
+        if (!ps) return null;
+        // startDate is not accessible here — we need to compute from first month
+        // Use the gantt's startDate stored globally
+        const startDate = window._ganttStartDate;
+        if (!startDate) return null;
+        const startOff = Math.round((ps - startDate) / 86400000) * dayW;
+        const endOff = Math.round((pe - startDate) / 86400000) * dayW + dayW;
+        const y = (ri + 1) * rowH; // +1 for header row offset
+        return { left: startOff, right: endOff, midY: y + rowH / 2 };
+      }
+
+      allDeps.forEach(dep => {
+        const fromPos = getBarPos(dep.from);
+        const toPos = getBarPos(dep.to);
+        if (!fromPos || !toPos) return;
+
+        const color = dep.type === 'pred' ? '#f59e0b' : '#3b82f6'; // orange for predecessors, blue for successors
+        const x1 = fromPos.right;
+        const y1 = fromPos.midY;
+        const x2 = toPos.left;
+        const y2 = toPos.midY;
+
+        // Draw path: horizontal from end, down/up, horizontal to start
+        const midX = x1 + 12;
+        const path = document.createElementNS(svgNS, 'path');
+        path.setAttribute('d', `M${x1},${y1} H${midX} V${y2} H${x2}`);
+        path.setAttribute('fill', 'none');
+        path.setAttribute('stroke', color);
+        path.setAttribute('stroke-width', '2');
+        path.setAttribute('stroke-dasharray', dep.type === 'pred' ? '' : '4,3');
+        svg.appendChild(path);
+
+        // Arrow head at x2,y2
+        const arrow = document.createElementNS(svgNS, 'polygon');
+        const ax = x2, ay = y2;
+        arrow.setAttribute('points', `${ax},${ay} ${ax-6},${ay-4} ${ax-6},${ay+4}`);
+        arrow.setAttribute('fill', color);
+        svg.appendChild(arrow);
+      });
+
+      rightInner.appendChild(svg);
     }
 
     function openSidePanel(taskId) {
@@ -1415,6 +1530,7 @@
       document.getElementById('sp-body').innerHTML = html;
       document.getElementById('side-panel').classList.add('open');
       document.getElementById('sp-overlay').style.display = 'block';
+      drawDepArrows(taskId);
     }
 
     // ─── Actions ───
