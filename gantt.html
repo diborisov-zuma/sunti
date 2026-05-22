@@ -200,6 +200,87 @@
   .ds-batch-row .ds-lc.green { background: #d1fae5; color: #065f46; }
   .ds-batch-row .ds-lc.yellow { background: #fef3c7; color: #92400e; }
   .ds-batch-row .ds-lc.red { background: #fee2e2; color: #991b1b; }
+
+  /* Side panel */
+  .side-panel {
+    position: fixed; top: 0; right: -520px; width: 500px; height: 100vh;
+    background: white; border-left: 1px solid var(--gantt-border);
+    box-shadow: -8px 0 24px rgba(0,0,0,0.1); transition: right 0.3s ease;
+    overflow-y: auto; z-index: 90; display: flex; flex-direction: column;
+  }
+  .side-panel.open { right: 0; }
+  .sp-head {
+    padding: 18px 20px; border-bottom: 1px solid var(--gantt-border);
+    position: relative; flex-shrink: 0;
+  }
+  .sp-head .sp-close {
+    position: absolute; top: 14px; right: 14px; background: none; border: none;
+    font-size: 22px; color: var(--gantt-muted); cursor: pointer; line-height: 1;
+  }
+  .sp-head .sp-phase { font-size: 10px; color: var(--gantt-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+  .sp-head h2 { font-size: 16px; margin: 4px 0 10px; color: var(--gantt-text); }
+  .sp-head .sp-meta { display: flex; gap: 16px; font-size: 12px; color: var(--gantt-muted); flex-wrap: wrap; }
+  .sp-head .sp-meta .label { font-weight: 600; color: var(--gantt-text); margin-right: 3px; }
+  .sp-head .sp-critical { display: inline-block; background: var(--gantt-red); color: white; font-size: 10px; padding: 2px 6px; border-radius: 4px; font-weight: 700; margin-left: 8px; }
+  .sp-body { padding: 16px 20px; flex: 1; overflow-y: auto; }
+  .sp-section { margin-bottom: 20px; }
+  .sp-section h3 {
+    font-size: 10px; text-transform: uppercase; color: var(--gantt-muted);
+    letter-spacing: 0.7px; margin-bottom: 10px; font-weight: 700;
+  }
+  .sp-dep-item { font-size: 12px; padding: 3px 0; color: #444; }
+  .sp-dep-item .dep-arrow { color: var(--gantt-muted); margin: 0 4px; }
+  .sp-mat-card {
+    border: 1px solid var(--gantt-border); border-radius: 8px;
+    margin-bottom: 10px; overflow: hidden;
+  }
+  .sp-mat-card.risk-red { border-left: 4px solid var(--gantt-red); }
+  .sp-mat-card.risk-yellow { border-left: 4px solid var(--gantt-yellow); }
+  .sp-mat-card.risk-blue { border-left: 4px solid #3b82f6; }
+  .sp-mat-card.risk-green { border-left: 4px solid var(--gantt-green); }
+  .sp-mat-card.risk-grey { border-left: 4px solid var(--gantt-grey); }
+  .sp-mat-card.risk-purple { border-left: 4px solid var(--gantt-purple); }
+  .sp-mat-source {
+    background: linear-gradient(to right, #eff6ff, #f8fafc); border-bottom: 1px solid var(--gantt-border);
+    padding: 8px 12px; display: flex; align-items: center; gap: 8px; font-size: 11px;
+  }
+  .sp-mat-source .ref { font-weight: 700; color: var(--gantt-primary); }
+  .sp-mat-body { padding: 10px 12px; }
+  .sp-mat-name { font-weight: 600; font-size: 13px; }
+  .sp-mat-sub { font-size: 11px; color: var(--gantt-muted); margin-top: 2px; }
+  .sp-mat-indicators { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+  .sp-ind {
+    font-size: 10px; padding: 3px 8px; border-radius: 10px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.3px;
+  }
+  .sp-ind-lc { background: #e2e8f0; color: var(--gantt-text); }
+  .sp-ind-risk { color: white; }
+  .sp-ind-risk.red { background: var(--gantt-red); }
+  .sp-ind-risk.yellow { background: var(--gantt-yellow); }
+  .sp-ind-risk.blue { background: #3b82f6; }
+  .sp-ind-risk.green { background: var(--gantt-green); }
+  .sp-ind-risk.grey { background: var(--gantt-grey); }
+  .sp-ind-risk.purple { background: var(--gantt-purple); }
+  .sp-mat-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 3px 14px;
+    margin-top: 8px; font-size: 11px; color: var(--gantt-muted);
+  }
+  .sp-mat-grid .row { display: flex; justify-content: space-between; }
+  .sp-mat-grid .row .v { font-weight: 600; color: var(--gantt-text); }
+  .sp-mat-grid .row .v.late { color: var(--gantt-red); }
+  .sp-mat-margin {
+    margin-top: 8px; font-size: 11px; padding: 6px 8px; border-radius: 4px;
+  }
+  .sp-mat-margin.red { background: #fee2e2; color: #991b1b; }
+  .sp-mat-margin.yellow { background: #fef3c7; color: #92400e; }
+  .sp-mat-margin.blue { background: #dbeafe; color: #1e40af; }
+  .sp-mat-margin.grey { background: #f1f5f9; color: #64748b; }
+  .sp-mat-margin.green { background: #d1fae5; color: #065f46; }
+  .sp-comment { padding: 8px 0; border-bottom: 1px solid #f0f0f0; font-size: 12px; }
+  .sp-comment:last-child { border-bottom: none; }
+  .sp-comment .author { font-weight: 600; color: #333; }
+  .sp-comment .date { color: #999; font-size: 11px; margin-left: 6px; }
+  .sp-comment .text { margin-top: 3px; color: #555; }
 </style>
 </head>
 <body>
@@ -418,6 +499,17 @@
         </div>
       </div>
     </div>
+  </div>
+
+  <!-- Side panel (task info) -->
+  <div class="side-panel" id="side-panel">
+    <div class="sp-head">
+      <button class="sp-close" id="sp-close">×</button>
+      <div class="sp-phase" id="sp-phase"></div>
+      <h2 id="sp-title"></h2>
+      <div class="sp-meta" id="sp-meta"></div>
+    </div>
+    <div class="sp-body" id="sp-body"></div>
   </div>
 
   <div class="toast" id="toast"></div>
@@ -917,7 +1009,7 @@
           const width = Math.max((dayOffset(barEnd) - dayOffset(s) + 1) * dayW, 4);
           const critical = tk.is_critical ? ' critical' : '';
           const name = tk['name_' + currentLang] || tk.name || tk.name_en || '';
-          rightHTML += `<div class="bar${critical}" style="left:${left}px;width:${width}px">
+          rightHTML += `<div class="bar${critical}" style="left:${left}px;width:${width}px" data-action="open-panel" data-task-id="${tk.id}">
             <div class="bar-label">${name}</div>
           </div>`;
         }
@@ -997,12 +1089,164 @@
       });
     }
 
+    // ─── Side panel ───
+
+    document.getElementById('sp-close').addEventListener('click', closeSidePanel);
+
+    function closeSidePanel() {
+      document.getElementById('side-panel').classList.remove('open');
+    }
+
+    function openSidePanel(taskId) {
+      const tk = tasksData.find(t => t.id === taskId);
+      if (!tk) return;
+
+      const phase = phasesData.find(p => p.id === tk.phase_id);
+      const phaseName = phase ? (phase['name_' + currentLang] || phase.name || phase.name_en || '') : '';
+      const taskName = tk['name_' + currentLang] || tk.name || tk.name_en || '—';
+      const ps = tk.planned_start ? (tk.planned_start.value || tk.planned_start) : null;
+      const dur = tk.duration_days || 0;
+      const endRaw = tk.planned_end || tk._computed_end;
+
+      document.getElementById('sp-phase').textContent = phaseName;
+      document.getElementById('sp-title').innerHTML = taskName + (tk.is_critical ? '<span class="sp-critical">CRITICAL PATH</span>' : '');
+      document.getElementById('sp-meta').innerHTML = `
+        <div><span class="label">Start:</span> ${ps ? fmtDateDMY(ps) : '—'}</div>
+        <div><span class="label">End:</span> ${endRaw ? fmtDateDMY(endRaw) : '—'}</div>
+        <div><span class="label">Duration:</span> ${dur}d</div>
+      `;
+
+      // Body
+      let html = '';
+
+      // Dependencies
+      const predsOf = depsData.filter(d => d.successor_id === taskId);
+      const succsOf = depsData.filter(d => d.predecessor_id === taskId);
+      if (predsOf.length || succsOf.length) {
+        html += '<div class="sp-section"><h3>' + t('ganttDependency') + '</h3>';
+        predsOf.forEach(d => {
+          const pred = tasksData.find(t => t.id === d.predecessor_id);
+          const predName = pred ? (pred['name_' + currentLang] || pred.name || '?') : '?';
+          html += `<div class="sp-dep-item">← ${predName} <span class="dep-arrow">${d.type || 'FS'}${d.lag_days ? ' +' + d.lag_days + 'd' : ''}</span></div>`;
+        });
+        succsOf.forEach(d => {
+          const succ = tasksData.find(t => t.id === d.successor_id);
+          const succName = succ ? (succ['name_' + currentLang] || succ.name || '?') : '?';
+          html += `<div class="sp-dep-item">→ ${succName} <span class="dep-arrow">${d.type || 'FS'}${d.lag_days ? ' +' + d.lag_days + 'd' : ''}</span></div>`;
+        });
+        html += '</div>';
+      }
+
+      // Materials
+      const taskMats = allMaterialReqs.filter(m => m.task_id === taskId);
+      html += '<div class="sp-section"><h3>' + t('ganttMaterials') + ' (' + taskMats.length + ')</h3>';
+      if (!taskMats.length) {
+        html += '<div style="color:#bbb;font-size:12px;font-style:italic">' + t('ganttNoMaterials') + '</div>';
+      }
+      taskMats.forEach(m => {
+        const isSlot = !m.line_item_id && !m.contract_id;
+        const isWhole = !m.line_item_id && m.contract_id;
+        const ds = m.line_item_id ? (allDeliverySchedules[m.line_item_id] || []) : (m.contract_id ? (allDeliverySchedules['c_' + m.contract_id] || []) : []);
+        const risk = computeRisk(m, ds, ps);
+
+        if (isSlot) {
+          html += `<div class="sp-mat-card risk-purple">
+            <div class="sp-mat-body">
+              <div class="sp-mat-name">🟣 SLOT — ${m.category || '—'}</div>
+              <div class="sp-mat-grid"><div class="row"><span>Need by:</span><span class="v">${m.required_by_date ? fmtDateDMY(m.required_by_date) : '—'}</span></div></div>
+              <div class="sp-mat-margin purple" style="background:#ede9fe;color:#6d28d9;margin-top:8px">No contract</div>
+            </div>
+          </div>`;
+          return;
+        }
+
+        const matName = isWhole ? (m.contract_name || '—') : (m.contract_item_name || '—');
+        const contractor = m.contractor_name_en || m.contractor_name_th || '';
+        const fmtAmt = v => { const n = parseFloat(v?.value ?? v ?? 0); return isNaN(n)||n===0 ? '' : n.toLocaleString('en-US',{minimumFractionDigits:2}); };
+        const amount = isWhole ? fmtAmt(m.contract_total) : fmtAmt(m.contract_item_amount);
+
+        // Worst lifecycle and ETA
+        let worstLC = 'installed', worstETA = null;
+        const lcOrder = ['planned','quoted','in_production','produced','on_delivery','in_transit','on_site','installed'];
+        ds.forEach(d => {
+          const lc = computeLifecycle(d);
+          if (lcOrder.indexOf(lc) < lcOrder.indexOf(worstLC)) worstLC = lc;
+          const eta = computeETA(d);
+          if (lc !== 'on_site' && lc !== 'installed' && (!worstETA || eta > worstETA)) worstETA = eta;
+        });
+        if (!ds.length) worstLC = 'planned';
+
+        // Margin text
+        let marginText, marginCls;
+        if (worstLC === 'planned' || worstLC === 'quoted') {
+          const prodDays = ds.length ? Math.max(...ds.map(d => parseInt(d.production_days) || 0)) : 0;
+          const delDays = ds.length ? Math.max(...ds.map(d => parseInt(d.delivery_days) || 0)) : 0;
+          const needBy = ps ? new Date(ps) : null;
+          if (needBy) {
+            const orderDeadline = new Date(needBy);
+            orderDeadline.setDate(orderDeadline.getDate() - prodDays - delDays);
+            const margin = Math.round((orderDeadline - new Date()) / 86400000);
+            if (margin < 0) { marginText = '⚠ Order deadline passed ' + Math.abs(margin) + 'd ago'; marginCls = 'red'; }
+            else if (margin < 14) { marginText = '⏰ Order within ' + margin + 'd'; marginCls = 'yellow'; }
+            else { marginText = 'Order margin: ' + margin + 'd'; marginCls = 'grey'; }
+          } else { marginText = '—'; marginCls = 'grey'; }
+        } else if (worstLC === 'on_site' || worstLC === 'installed') {
+          marginText = '✓ Delivered'; marginCls = 'green';
+        } else {
+          const needBy = ps ? new Date(ps) : null;
+          if (needBy && worstETA) {
+            const margin = Math.round((needBy - worstETA) / 86400000);
+            if (margin < 0) { marginText = '⚠ Late by ' + Math.abs(margin) + 'd'; marginCls = 'red'; }
+            else if (margin < 14) { marginText = 'Buffer: ' + margin + 'd (tight)'; marginCls = 'yellow'; }
+            else { marginText = 'On track, buffer: ' + margin + 'd'; marginCls = 'blue'; }
+          } else { marginText = '—'; marginCls = 'grey'; }
+        }
+
+        const sourceLabel = isWhole ? 'CONTRACT' : (m.contract_name || '');
+
+        html += `<div class="sp-mat-card risk-${risk.color}">
+          ${sourceLabel ? `<div class="sp-mat-source"><span>📄</span><span class="ref">${sourceLabel}</span></div>` : ''}
+          <div class="sp-mat-body">
+            <div class="sp-mat-name">${matName}</div>
+            <div class="sp-mat-sub">${contractor ? contractor + ' · ' : ''}${m.qty || ''} ${m.unit || ''}${amount ? ' · ' + amount : ''}</div>
+            <div class="sp-mat-indicators">
+              <span class="sp-ind sp-ind-lc">${lifecycleLabels[worstLC] || worstLC}</span>
+              <span class="sp-ind sp-ind-risk ${risk.color}">● ${risk.label}</span>
+            </div>
+            <div class="sp-mat-grid">
+              <div class="row"><span>Need by:</span><span class="v">${ps ? fmtDateDMY(ps) : '—'}</span></div>
+              <div class="row"><span>ETA:</span><span class="v${worstETA && ps && worstETA > new Date(ps) ? ' late' : ''}">${worstETA ? fmtDateDMY(worstETA) : '—'}</span></div>
+            </div>
+            <div class="sp-mat-margin ${marginCls}">${marginText}</div>
+            ${ds.length ? '<div style="margin-top:6px;font-size:10px;color:#999">' + ds.map((d,i) => {
+              const lc = computeLifecycle(d);
+              return 'Batch ' + (d.batch_number || i+1) + ': ' + (d.qty||'?') + ' ' + (d.unit||'') + ' · ' + (lifecycleLabels[lc]||lc) + ' · ETA ' + fmtDateDMY(computeETA(d));
+            }).join('<br>') + '</div>' : ''}
+          </div>
+        </div>`;
+      });
+      html += '</div>';
+
+      // Comments placeholder
+      html += '<div class="sp-section"><h3>Comments</h3>';
+      html += '<div style="color:#bbb;font-size:12px;font-style:italic">Coming soon</div>';
+      html += '</div>';
+
+      document.getElementById('sp-body').innerHTML = html;
+      document.getElementById('side-panel').classList.add('open');
+    }
+
     // ─── Actions ───
 
     document.addEventListener('click', async e => {
       const btn = e.target.closest('[data-action]');
       if (!btn) return;
       const action = btn.dataset.action;
+
+      if (action === 'open-panel') {
+        openSidePanel(btn.dataset.taskId);
+        return;
+      }
 
       if (action === 'add-task') {
         e.stopPropagation();
@@ -1726,7 +1970,7 @@
 
     // Escape
     document.addEventListener('keydown', e => {
-      if (e.key === 'Escape') { closeModal('modal-phase'); closeModal('modal-task'); closeModal('modal-mat-contract'); closeModal('modal-mat-slot'); closeModal('modal-dep'); closeModal('modal-delivery'); }
+      if (e.key === 'Escape') { closeSidePanel(); closeModal('modal-phase'); closeModal('modal-task'); closeModal('modal-mat-contract'); closeModal('modal-mat-slot'); closeModal('modal-dep'); closeModal('modal-delivery'); }
     });
 
     // ─── Init ───
