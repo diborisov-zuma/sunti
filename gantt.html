@@ -144,6 +144,7 @@
         <h2 id="t-page-title">Gantt</h2>
         <select class="filter-select" id="filter-company"><option value="">—</option></select>
         <select class="filter-select" id="filter-folder"><option value="">—</option></select>
+        <button class="btn btn-primary" id="btn-add-phase" style="display:none;font-size:0.82rem;padding:5px 12px">+ Phase</button>
         <div class="spacer"></div>
         <div class="legend">
           <span><span class="dot" style="background:var(--gantt-green)"></span>On track</span>
@@ -159,7 +160,61 @@
     </div>
   </div>
 
+  <!-- Modal: phase -->
+  <div class="modal-overlay" id="modal-phase">
+    <div class="modal" style="width:500px;max-width:95vw">
+      <h3 id="t-modal-phase-title">Phase</h3>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
+        <div class="field-group"><label>RU</label><input type="text" id="g-ph-name"></div>
+        <div class="field-group"><label>EN</label><input type="text" id="g-ph-name-en"></div>
+        <div class="field-group"><label>TH</label><input type="text" id="g-ph-name-th"></div>
+      </div>
+      <div class="field-group"><label>Sort order</label><input type="number" id="g-ph-sort" min="0" value="0"></div>
+      <div class="modal-actions">
+        <button class="btn btn-outline" id="btn-gph-cancel"></button>
+        <button class="btn btn-primary" id="btn-gph-save"></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: task -->
+  <div class="modal-overlay" id="modal-task">
+    <div class="modal" style="width:600px;max-width:95vw">
+      <h3 id="t-modal-task-title">Task</h3>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
+        <div class="field-group"><label>RU</label><input type="text" id="g-tk-name"></div>
+        <div class="field-group"><label>EN</label><input type="text" id="g-tk-name-en"></div>
+        <div class="field-group"><label>TH</label><input type="text" id="g-tk-name-th"></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px">
+        <div class="field-group"><label>Start</label><input type="date" id="g-tk-start"></div>
+        <div class="field-group"><label>End</label><input type="date" id="g-tk-end"></div>
+        <div class="field-group"><label>Duration (days)</label><input type="number" id="g-tk-dur" min="1" value="14"></div>
+        <div class="field-group"><label>Sort order</label><input type="number" id="g-tk-sort" min="0" value="0"></div>
+      </div>
+      <div class="field-group" style="margin-top:4px">
+        <label><input type="checkbox" id="g-tk-critical" style="width:auto;margin-right:6px">Critical path</label>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-outline" id="btn-gtk-cancel"></button>
+        <button class="btn btn-primary" id="btn-gtk-save"></button>
+      </div>
+    </div>
+  </div>
+
   <div class="toast" id="toast"></div>
+
+  <style>
+    .field-group { margin-bottom:12px; }
+    .field-group label { display:block;font-size:0.82rem;color:#666;margin-bottom:4px; }
+    .field-group input, .field-group select { width:100%;border:1px solid #ddd;border-radius:6px;padding:8px 12px;font-size:0.9rem;outline:none;box-sizing:border-box;background:#fff; }
+    .field-group input:focus, .field-group select:focus { border-color:#1a73e8; }
+    .phase-add-btn {
+      background:none;border:none;cursor:pointer;font-size:11px;color:var(--gantt-primary);
+      font-weight:600;padding:2px 8px;margin-left:auto;opacity:0.7;
+    }
+    .phase-add-btn:hover { opacity:1; }
+  </style>
 
   <script>
     let companiesCache = [];
@@ -169,6 +224,12 @@
     let depsData = [];
     let filterCompany = '';
     let filterFolder = '';
+    let editPhaseId = null;
+    let editTaskId = null;
+    let editTaskPhaseId = null;
+
+    function openModal(id) { document.getElementById(id).classList.add('open'); }
+    function closeModal(id) { document.getElementById(id).classList.remove('open'); }
 
     function showToast(msg, type) {
       const el = document.getElementById('toast');
@@ -182,6 +243,10 @@
       setText('t-guest-title', t('guestTitle'));
       setText('t-guest-sub', t('guestSub'));
       setText('t-page-title', 'Gantt');
+      setText('btn-gph-cancel', t('cancel'));
+      setText('btn-gph-save', t('save'));
+      setText('btn-gtk-cancel', t('cancel'));
+      setText('btn-gtk-save', t('save'));
       updateHeaderTexts();
     }
 
@@ -228,6 +293,7 @@
 
     document.getElementById('filter-folder').addEventListener('change', e => {
       filterFolder = e.target.value;
+      document.getElementById('btn-add-phase').style.display = filterFolder ? '' : 'none';
       if (filterFolder) loadGanttData();
       else document.getElementById('gantt-container').innerHTML = '<div class="empty-state">Выберите проект</div>';
     });
@@ -257,8 +323,8 @@
     function renderGantt() {
       const container = document.getElementById('gantt-container');
 
-      if (!tasksData.length) {
-        container.innerHTML = '<div class="empty-state">Нет задач в этом проекте</div>';
+      if (!tasksData.length && !phasesData.length) {
+        container.innerHTML = '<div class="empty-state">Нет задач. Добавьте фазу кнопкой "+ Phase"</div>';
         return;
       }
 
@@ -272,7 +338,24 @@
       });
 
       if (!minDate || !maxDate) {
-        container.innerHTML = '<div class="empty-state">У задач не заданы даты</div>';
+        // Show phases and tasks as list without chart
+        let listHTML = '<div class="gantt-wrap" style="grid-template-columns:1fr"><div class="gantt-left" style="border:none">';
+        listHTML += `<div class="gantt-header-row">${t('name')}</div>`;
+        rows.forEach(row => {
+          if (row.type === 'phase') {
+            const p = row.data;
+            const name = p['name_' + currentLang] || p.name || p.name_en || '—';
+            listHTML += `<div class="task-row phase"><span class="name">${name}</span>
+              <button class="phase-add-btn" data-action="add-task" data-phase-id="${p.id}" title="+ Task">+</button></div>`;
+          } else {
+            const tk = row.data;
+            const name = tk['name_' + currentLang] || tk.name || tk.name_en || '—';
+            listHTML += `<div class="task-row" data-action="edit-task" data-id="${tk.id}" data-phase-id="${tk.phase_id}">
+              <span class="name">${name}</span><span style="color:#bbb;font-size:0.78rem">${tk.duration_days || '—'}д</span></div>`;
+          }
+        });
+        listHTML += '</div></div>';
+        container.innerHTML = listHTML;
         return;
       }
 
@@ -308,11 +391,14 @@
         if (row.type === 'phase') {
           const p = row.data;
           const name = p['name_' + currentLang] || p.name || p.name_en || '—';
-          leftHTML += `<div class="task-row phase"><span class="name">${name}</span></div>`;
+          leftHTML += `<div class="task-row phase">
+            <span class="name">${name}</span>
+            <button class="phase-add-btn" data-action="add-task" data-phase-id="${p.id}" title="+ Task">+</button>
+          </div>`;
         } else {
           const tk = row.data;
           const name = tk['name_' + currentLang] || tk.name || tk.name_en || '—';
-          leftHTML += `<div class="task-row" data-task-id="${tk.id}">
+          leftHTML += `<div class="task-row" data-task-id="${tk.id}" data-action="edit-task" data-id="${tk.id}" data-phase-id="${tk.phase_id}">
             <span class="name">${name}</span>
           </div>`;
         }
@@ -382,6 +468,118 @@
         ganttRight.scrollLeft = scrollTo;
       }
     }
+
+    // ─── Actions ───
+
+    document.addEventListener('click', e => {
+      const btn = e.target.closest('[data-action]');
+      if (!btn) return;
+      const action = btn.dataset.action;
+
+      if (action === 'add-task') {
+        e.stopPropagation();
+        editTaskId = null;
+        editTaskPhaseId = btn.dataset.phaseId;
+        document.getElementById('g-tk-name').value = '';
+        document.getElementById('g-tk-name-en').value = '';
+        document.getElementById('g-tk-name-th').value = '';
+        document.getElementById('g-tk-start').value = '';
+        document.getElementById('g-tk-end').value = '';
+        document.getElementById('g-tk-dur').value = '14';
+        document.getElementById('g-tk-sort').value = '0';
+        document.getElementById('g-tk-critical').checked = false;
+        setText('t-modal-task-title', 'New Task');
+        openModal('modal-task');
+      }
+
+      if (action === 'edit-task') {
+        const tk = tasksData.find(t => t.id === btn.dataset.id);
+        if (!tk) return;
+        editTaskId = tk.id;
+        editTaskPhaseId = tk.phase_id;
+        document.getElementById('g-tk-name').value = tk.name || '';
+        document.getElementById('g-tk-name-en').value = tk.name_en || '';
+        document.getElementById('g-tk-name-th').value = tk.name_th || '';
+        const ps = tk.planned_start ? (tk.planned_start.value || tk.planned_start) : '';
+        const pe = tk.planned_end ? (tk.planned_end.value || tk.planned_end) : '';
+        document.getElementById('g-tk-start').value = ps ? ps.substring(0,10) : '';
+        document.getElementById('g-tk-end').value = pe ? pe.substring(0,10) : '';
+        document.getElementById('g-tk-dur').value = tk.duration_days || 14;
+        document.getElementById('g-tk-sort').value = tk.sort_order || 0;
+        document.getElementById('g-tk-critical').checked = tk.is_critical === true;
+        setText('t-modal-task-title', 'Edit Task');
+        openModal('modal-task');
+      }
+    });
+
+    // + Phase button
+    document.getElementById('btn-add-phase').addEventListener('click', () => {
+      if (!filterFolder) return;
+      editPhaseId = null;
+      document.getElementById('g-ph-name').value = '';
+      document.getElementById('g-ph-name-en').value = '';
+      document.getElementById('g-ph-name-th').value = '';
+      document.getElementById('g-ph-sort').value = phasesData.length * 1000;
+      setText('t-modal-phase-title', 'New Phase');
+      openModal('modal-phase');
+    });
+
+    // Phase modal save
+    document.getElementById('btn-gph-cancel').addEventListener('click', () => closeModal('modal-phase'));
+    document.getElementById('btn-gph-save').addEventListener('click', async () => {
+      const name = document.getElementById('g-ph-name').value.trim();
+      if (!name) { showToast(t('fillAllFields'), 'error'); return; }
+      closeModal('modal-phase');
+      try {
+        const body = {
+          folder_id: filterFolder,
+          name,
+          name_en: document.getElementById('g-ph-name-en').value.trim(),
+          name_th: document.getElementById('g-ph-name-th').value.trim(),
+          sort_order: parseInt(document.getElementById('g-ph-sort').value) || 0,
+        };
+        if (editPhaseId) {
+          await apiFetch(`/phases/${editPhaseId}`, { method: 'PUT', body: JSON.stringify(body) });
+        } else {
+          await apiFetch('/phases', { method: 'POST', body: JSON.stringify(body) });
+        }
+        showToast(t('saved'), 'success');
+        await loadGanttData();
+      } catch(e) { showToast(e.message, 'error'); }
+    });
+
+    // Task modal save
+    document.getElementById('btn-gtk-cancel').addEventListener('click', () => closeModal('modal-task'));
+    document.getElementById('btn-gtk-save').addEventListener('click', async () => {
+      const name = document.getElementById('g-tk-name').value.trim();
+      if (!name) { showToast(t('fillAllFields'), 'error'); return; }
+      closeModal('modal-task');
+      try {
+        const body = {
+          phase_id: editTaskPhaseId,
+          name,
+          name_en: document.getElementById('g-tk-name-en').value.trim(),
+          name_th: document.getElementById('g-tk-name-th').value.trim(),
+          planned_start: document.getElementById('g-tk-start').value || '',
+          planned_end: document.getElementById('g-tk-end').value || '',
+          duration_days: parseInt(document.getElementById('g-tk-dur').value) || 14,
+          sort_order: parseInt(document.getElementById('g-tk-sort').value) || 0,
+          is_critical: document.getElementById('g-tk-critical').checked,
+        };
+        if (editTaskId) {
+          await apiFetch(`/gantt_tasks/${editTaskId}`, { method: 'PUT', body: JSON.stringify(body) });
+        } else {
+          await apiFetch('/gantt_tasks', { method: 'POST', body: JSON.stringify(body) });
+        }
+        showToast(t('saved'), 'success');
+        await loadGanttData();
+      } catch(e) { showToast(e.message, 'error'); }
+    });
+
+    // Escape
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape') { closeModal('modal-phase'); closeModal('modal-task'); }
+    });
 
     // ─── Init ───
 
