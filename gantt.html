@@ -348,9 +348,9 @@
     <div class="modal" style="width:500px;max-width:95vw">
       <h3 id="t-modal-phase-title">Phase</h3>
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
-        <div class="field-group"><label>RU</label><input type="text" id="g-ph-name"></div>
-        <div class="field-group"><label>EN</label><input type="text" id="g-ph-name-en"></div>
-        <div class="field-group"><label>TH</label><input type="text" id="g-ph-name-th"></div>
+        <div class="field-group"><label>RU <button class="translate-btn" data-src="ru" data-fields="g-ph-name" data-targets="g-ph-name-en:en,g-ph-name-th:th" title="Translate to EN + TH">🌐</button></label><input type="text" id="g-ph-name"></div>
+        <div class="field-group"><label>EN <button class="translate-btn" data-src="en" data-fields="g-ph-name-en" data-targets="g-ph-name:ru,g-ph-name-th:th" title="Translate to RU + TH">🌐</button></label><input type="text" id="g-ph-name-en"></div>
+        <div class="field-group"><label>TH <button class="translate-btn" data-src="th" data-fields="g-ph-name-th" data-targets="g-ph-name:ru,g-ph-name-en:en" title="Translate to RU + EN">🌐</button></label><input type="text" id="g-ph-name-th"></div>
       </div>
       <div class="field-group"><label>Sort order</label><input type="number" id="g-ph-sort" min="0" value="0"></div>
       <div class="modal-actions">
@@ -915,7 +915,7 @@
           if (row.type === 'phase') {
             const p = row.data;
             const name = p['name_' + currentLang] || p.name || p.name_en || '—';
-            listHTML += `<div class="task-row phase"><span class="name">${name}</span>
+            listHTML += `<div class="task-row phase" data-action="edit-phase" data-phase-id="${p.id}"><span class="name">${name}</span>
               <button class="phase-add-btn" data-action="add-task" data-phase-id="${p.id}" title="+ Task">+</button></div>`;
           } else {
             const tk = row.data;
@@ -981,7 +981,7 @@
         if (row.type === 'phase') {
           const p = row.data;
           const name = p['name_' + currentLang] || p.name || p.name_en || '—';
-          leftHTML += `<div class="task-row phase" data-row-idx="${ri}">
+          leftHTML += `<div class="task-row phase" data-row-idx="${ri}" data-action="edit-phase" data-phase-id="${p.id}">
             <span class="name">${name}</span>
             <button class="phase-add-btn" data-action="add-task" data-phase-id="${p.id}" title="+ Task">+</button>
           </div>`;
@@ -1129,7 +1129,7 @@
 
     // Listen for input on all translatable fields
     document.addEventListener('input', e => {
-      if (e.target.closest('#modal-task')) updateTranslateButtons();
+      if (e.target.closest('#modal-task') || e.target.closest('#modal-phase')) updateTranslateButtons();
     });
 
     document.addEventListener('click', async e => {
@@ -1360,6 +1360,22 @@
 
       if (action === 'open-panel') {
         openSidePanel(btn.dataset.taskId);
+        return;
+      }
+
+      if (action === 'edit-phase') {
+        e.stopPropagation();
+        const phId = btn.dataset.phaseId;
+        const ph = phasesData.find(p => p.id === phId);
+        if (!ph) return;
+        editPhaseId = phId;
+        document.getElementById('g-ph-name').value = ph.name || '';
+        document.getElementById('g-ph-name-en').value = ph.name_en || '';
+        document.getElementById('g-ph-name-th').value = ph.name_th || '';
+        document.getElementById('g-ph-sort').value = ph.sort_order || 0;
+        setText('t-modal-phase-title', 'Edit Phase');
+        openModal('modal-phase');
+        updateTranslateButtons();
         return;
       }
 
