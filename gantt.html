@@ -50,10 +50,13 @@
     overflow: hidden;
     display: grid;
     grid-template-columns: var(--left-w) 1fr;
+    max-height: calc(100vh - 200px);
   }
-  .gantt-left { border-right: 1px solid var(--gantt-border); overflow: hidden; }
-  .gantt-right { overflow-x: auto; overflow-y: hidden; }
+  .gantt-left { border-right: 1px solid var(--gantt-border); overflow-y: auto; overflow-x: hidden; }
+  .gantt-right { overflow: auto; }
   .gantt-right-inner { position: relative; }
+  .gantt-left .gantt-header-row { position: sticky; top: 0; z-index: 5; }
+  .gantt-right .gantt-header-row { position: sticky; top: 0; z-index: 5; }
 
   .gantt-header-row {
     background: #fafbfc;
@@ -84,8 +87,9 @@
     cursor: pointer;
     gap: 8px;
     font-size: 13px;
+    font-weight: 400;
   }
-  .task-row:hover { background: #ebffee; }
+  .task-row.hovered, .task-row:hover { background: #ebffee; }
   .task-row.active { background: #eff6ff; }
   .task-row .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .task-row .badge {
@@ -99,9 +103,12 @@
     background: #f8fafc; font-weight: 700; text-transform: uppercase;
     font-size: 11px; color: var(--gantt-muted); letter-spacing: 0.5px;
   }
+  .task-row.phase.hovered, .task-row.phase:hover { background: #ebffee; }
 
   .bar-row { height: var(--row-h); position: relative; border-bottom: 1px solid #f1f5f9; }
   .bar-row.phase { background: #f8fafc; }
+  .bar-row.hovered { background: #ebffee; }
+  .bar-row.phase.hovered { background: #ebffee; }
   .bar {
     position: absolute; height: 20px; top: 10px; border-radius: 4px;
     cursor: pointer; box-shadow: 0 1px 2px rgba(0,0,0,0.1); transition: transform 0.1s;
@@ -738,11 +745,11 @@
 
       // Left panel
       let leftHTML = `<div class="gantt-left"><div class="gantt-header-row">${t('name')}</div>`;
-      rows.forEach(row => {
+      rows.forEach((row, ri) => {
         if (row.type === 'phase') {
           const p = row.data;
           const name = p['name_' + currentLang] || p.name || p.name_en || '—';
-          leftHTML += `<div class="task-row phase">
+          leftHTML += `<div class="task-row phase" data-row-idx="${ri}">
             <span class="name">${name}</span>
             <button class="phase-add-btn" data-action="add-task" data-phase-id="${p.id}" title="+ Task">+</button>
           </div>`;
@@ -752,7 +759,7 @@
           const tkDeps = depsData.filter(d => d.successor_id === tk.id);
           const ganttRisk = getTaskRisk(tk.id);
           const ganttRiskBadge = ganttRisk ? `<span class="badge ${ganttRisk.color}" title="${ganttRisk.label}">●</span>` : '';
-          leftHTML += `<div class="task-row" data-task-id="${tk.id}" data-action="edit-task" data-id="${tk.id}" data-phase-id="${tk.phase_id}">
+          leftHTML += `<div class="task-row" data-row-idx="${ri}" data-task-id="${tk.id}" data-action="edit-task" data-id="${tk.id}" data-phase-id="${tk.phase_id}">
             <span class="name">${name}</span>
             ${ganttRiskBadge}
             ${tkDeps.length ? `<span style="color:#1a73e8;font-size:0.72rem">⛓${tkDeps.length}</span>` : ''}
@@ -792,9 +799,9 @@
       }
 
       // Bars
-      rows.forEach(row => {
+      rows.forEach((row, ri) => {
         if (row.type === 'phase') {
-          rightHTML += '<div class="bar-row phase"></div>';
+          rightHTML += `<div class="bar-row phase" data-row-idx="${ri}"></div>`;
           return;
         }
         const tk = row.data;
@@ -802,7 +809,7 @@
         const endRaw = tk.planned_end || tk._computed_end;
         const e = endRaw ? new Date(endRaw.value || endRaw) : null;
 
-        rightHTML += '<div class="bar-row">';
+        rightHTML += `<div class="bar-row" data-row-idx="${ri}">`;
         if (s) {
           const barEnd = e || s;
           const left = dayOffset(s) * dayW;
@@ -835,12 +842,31 @@
 
       container.innerHTML = `<div class="gantt-wrap">${leftHTML}${rightHTML}</div>`;
 
-      // Sync scroll
+      // Sync scroll (horizontal → today, vertical → left+right)
+      const ganttLeft = container.querySelector('.gantt-left');
       const ganttRight = container.querySelector('.gantt-right');
       if (ganttRight && todayOff > 0) {
         const scrollTo = Math.max(0, todayOff * dayW - ganttRight.clientWidth / 3);
         ganttRight.scrollLeft = scrollTo;
       }
+      // Sync vertical scroll between left and right panels
+      if (ganttLeft && ganttRight) {
+        let syncing = false;
+        ganttLeft.addEventListener('scroll', () => { if (!syncing) { syncing = true; ganttRight.scrollTop = ganttLeft.scrollTop; syncing = false; } });
+        ganttRight.addEventListener('scroll', () => { if (!syncing) { syncing = true; ganttLeft.scrollTop = ganttRight.scrollTop; syncing = false; } });
+      }
+
+      // Sync hover: highlight matching row in both panels
+      container.addEventListener('mouseover', e => {
+        const row = e.target.closest('[data-row-idx]');
+        if (!row) return;
+        const idx = row.dataset.rowIdx;
+        container.querySelectorAll('.hovered').forEach(el => el.classList.remove('hovered'));
+        container.querySelectorAll(`[data-row-idx="${idx}"]`).forEach(el => el.classList.add('hovered'));
+      });
+      container.addEventListener('mouseleave', () => {
+        container.querySelectorAll('.hovered').forEach(el => el.classList.remove('hovered'));
+      });
     }
 
     // ─── Actions ───
