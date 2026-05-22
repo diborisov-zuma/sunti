@@ -430,6 +430,8 @@
     let currentContractMode = 'create';
     let currentContractId = null;
     let currentInvContractId = null; // contract for new invoice
+    let currentInvMode = 'create'; // 'create' or 'edit'
+    let currentInvId = null;
     let currentTrxInvoiceId = null;
     let currentTrxMode = 'create';
     let currentTrxId = null;
@@ -1083,7 +1085,8 @@
             <td>${amtCell(inv.paid_amount, dir)}</td>
             <td>${statusBadge(inv.status)}</td>
             <td style="white-space:nowrap">
-              <button class="btn btn-outline" style="padding:1px 6px;font-size:0.72rem" data-action="unlink-inv" data-inv-id="${inv.id}" data-contract-id="${contractId}">${t('unlinkInvoice')}</button>
+              <button class="btn btn-outline" style="padding:1px 6px;font-size:0.72rem" data-action="edit-inv" data-inv-id="${inv.id}" data-contract-id="${contractId}">${t('edit')}</button>
+              <button class="btn btn-outline" style="padding:1px 6px;font-size:0.72rem;margin-left:4px" data-action="unlink-inv" data-inv-id="${inv.id}" data-contract-id="${contractId}">${t('unlinkInvoice')}</button>
               ${canDeleteInvoice(inv) ? `<button class="btn btn-outline" style="padding:1px 6px;font-size:0.72rem;color:#c5221f;border-color:#c5221f;margin-left:4px" data-action="delete-inv" data-inv-id="${inv.id}" data-contract-id="${contractId}">${t('deleteInvoice')}</button>` : ''}
             </td>
           </tr>`;
@@ -1251,10 +1254,36 @@
         } catch(err) { showToast(err.message, 'error'); btn.disabled = false; }
       }
 
+      if (action === 'edit-inv') {
+        const contractId = btn.dataset.contractId;
+        const invId = btn.dataset.invId;
+        const invs = contractInvoices[contractId] || [];
+        const inv = invs.find(i => i.id === invId);
+        if (!inv) return;
+        currentInvMode = 'edit';
+        currentInvId = invId;
+        currentInvContractId = contractId;
+        document.getElementById('t-modal-inv-title').textContent = t('edit');
+        document.getElementById('i-name').value = inv.name || '';
+        document.getElementById('i-date').value = inv.date ? (inv.date.value || inv.date).substring(0,10) : '';
+        document.getElementById('i-direction').value = inv.direction || 'expense';
+        fillCategorySelect('i-category', inv.category_id || '');
+        document.getElementById('i-subtotal').value = numVal(inv.subtotal) || '';
+        document.getElementById('i-vat-rate').value = numVal(inv.vat_rate) || '7';
+        document.getElementById('i-vat-amount').value = numVal(inv.vat_amount) || '';
+        document.getElementById('i-wht-rate').value = numVal(inv.wht_rate) || '0';
+        document.getElementById('i-wht-amount').value = numVal(inv.wht_amount) || '';
+        document.getElementById('i-total').value = numVal(inv.total_amount) || '';
+        document.getElementById('i-payable-val').textContent = '—';
+        openModal('modal-invoice');
+      }
+
       if (action === 'create-inv') {
         const contractId = btn.dataset.contractId;
         const contract = allContracts.find(c => c.id === contractId);
         if (!contract) return;
+        currentInvMode = 'create';
+        currentInvId = null;
         currentInvContractId = contractId;
         document.getElementById('t-modal-inv-title').textContent = t('createInvoiceFromContract');
         document.getElementById('i-name').value = '';
@@ -1783,7 +1812,16 @@
 
       closeModal('modal-invoice');
       try {
-        await apiFetch('/invoices', { method: 'POST', body: JSON.stringify(body) });
+        if (currentInvMode === 'edit' && currentInvId) {
+          body.paid_amount = '0';
+          // Preserve paid_amount from existing invoice
+          const invs = contractInvoices[currentInvContractId] || [];
+          const existingInv = invs.find(i => i.id === currentInvId);
+          if (existingInv) body.paid_amount = String(numVal(existingInv.paid_amount));
+          await apiFetch(`/invoices/${currentInvId}`, { method: 'PUT', body: JSON.stringify(body) });
+        } else {
+          await apiFetch('/invoices', { method: 'POST', body: JSON.stringify(body) });
+        }
         showToast(t('saved'), 'success');
         loadContractDetail(currentInvContractId);
         loadContracts();
