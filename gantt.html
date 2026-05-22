@@ -1302,10 +1302,12 @@
       });
       html += '</div>';
 
-      // Comments placeholder
-      html += '<div class="sp-section"><h3>Comments</h3>';
-      html += '<div style="color:#bbb;font-size:12px;font-style:italic">Coming soon</div>';
-      html += '</div>';
+      // Task name + Comments
+      html += `<div class="sp-section" style="margin-top:8px;padding-top:16px;border-top:1px solid #e2e8f0">
+        <div style="font-size:16px;font-weight:700;color:#222;margin-bottom:12px">${taskName}</div>
+        <h3>Comments</h3>
+        <div style="color:#bbb;font-size:12px;font-style:italic">Coming soon</div>
+      </div>`;
 
       document.getElementById('sp-body').innerHTML = html;
       document.getElementById('side-panel').classList.add('open');
