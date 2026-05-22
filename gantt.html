@@ -328,6 +328,17 @@
         return;
       }
 
+      // Build rows: interleave phases and their tasks
+      const rows = [];
+      phasesData.forEach(phase => {
+        rows.push({ type: 'phase', data: phase });
+        tasksData.filter(t => t.phase_id === phase.id).forEach(task => {
+          rows.push({ type: 'task', data: task });
+        });
+      });
+      const orphanTasks = tasksData.filter(t => !phasesData.some(p => p.id === t.phase_id));
+      orphanTasks.forEach(task => rows.push({ type: 'task', data: task }));
+
       // Calculate date range
       let minDate = null, maxDate = null;
       tasksData.forEach(t => {
@@ -372,18 +383,6 @@
       function dayOffset(date) {
         return Math.round((new Date(date) - startDate) / 86400000);
       }
-
-      // Build rows: interleave phases and their tasks
-      const rows = [];
-      phasesData.forEach(phase => {
-        rows.push({ type: 'phase', data: phase });
-        tasksData.filter(t => t.phase_id === phase.id).forEach(task => {
-          rows.push({ type: 'task', data: task });
-        });
-      });
-      // Tasks without phase
-      const orphanTasks = tasksData.filter(t => !phasesData.some(p => p.id === t.phase_id));
-      orphanTasks.forEach(task => rows.push({ type: 'task', data: task }));
 
       // Left panel
       let leftHTML = `<div class="gantt-left"><div class="gantt-header-row">${t('name')}</div>`;
