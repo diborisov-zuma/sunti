@@ -47,16 +47,16 @@
     background: var(--gantt-card);
     border: 1px solid var(--gantt-border);
     border-radius: 8px;
-    overflow: hidden;
     display: grid;
     grid-template-columns: var(--left-w) 1fr;
-    max-height: calc(100vh - 200px);
+    height: calc(100vh - 220px);
+    min-height: 300px;
   }
   .gantt-left { border-right: 1px solid var(--gantt-border); overflow-y: auto; overflow-x: hidden; }
   .gantt-right { overflow: auto; }
-  .gantt-right-inner { position: relative; }
-  .gantt-left .gantt-header-row { position: sticky; top: 0; z-index: 5; }
-  .gantt-right .gantt-header-row { position: sticky; top: 0; z-index: 5; }
+  .gantt-right-inner { position: relative; min-height: 100%; }
+  .gantt-left .gantt-header-row { position: sticky; top: 0; z-index: 5; background: #fafbfc; }
+  .gantt-right .gantt-header-row { position: sticky; top: 0; z-index: 5; background: #fafbfc; }
 
   .gantt-header-row {
     background: #fafbfc;
