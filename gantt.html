@@ -1018,9 +1018,9 @@
       }
 
       // Add padding: 1 month before, 1 month after
-      const startDate = new Date(minDate.getFullYear(), minDate.getMonth() - 1, 1);
+      const startDate = new Date(minDate); startDate.setDate(startDate.getDate() - 7);
       window._ganttStartDate = startDate;
-      const endDate = new Date(maxDate.getFullYear(), maxDate.getMonth() + 2, 0);
+      const endDate = new Date(maxDate); endDate.setDate(endDate.getDate() + 7);
       const totalDays = Math.ceil((endDate - startDate) / 86400000);
       const dayW = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--day-w'));
       const totalW = totalDays * dayW;
