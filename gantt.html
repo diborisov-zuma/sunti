@@ -414,6 +414,7 @@
         </div>
       </div>
       <div class="modal-actions" style="padding:12px 20px;border-top:1px solid #e8e8e8;margin:0">
+        <button class="btn btn-outline" style="color:#c5221f;border-color:#c5221f;margin-right:auto;display:none" id="btn-gtk-delete"></button>
         <button class="btn btn-outline" id="btn-gtk-cancel"></button>
         <button class="btn btn-primary" id="btn-gtk-save"></button>
       </div>
@@ -636,6 +637,7 @@
       setText('btn-gph-save', t('save'));
       setText('btn-gtk-cancel', t('cancel'));
       setText('btn-gtk-save', t('save'));
+      setText('btn-gtk-delete', t('delete'));
       // Materials section
       setText('t-gantt-materials', t('ganttMaterials'));
       setText('btn-add-mat-contract', t('ganttAddPosition'));
@@ -1591,6 +1593,7 @@
         document.getElementById('task-materials-list').innerHTML = '<div style="color:#bbb;font-size:0.82rem">' + t('ganttSaveTaskFirst') + '</div>';
         contractsCache = [];
         setText('t-modal-task-title', 'New Task');
+        document.getElementById('btn-gtk-delete').style.display = 'none';
         openModal('modal-task');
         updateTranslateButtons();
       }
@@ -1632,6 +1635,7 @@
         document.getElementById('g-tk-notes-th').value = tk.notes_th || '';
         contractsCache = [];
         setText('t-modal-task-title', 'Edit Task');
+        document.getElementById('btn-gtk-delete').style.display = isAdmin ? '' : 'none';
         openModal('modal-task');
         updateTranslateButtons();
         loadTaskMaterials(tk.id);
@@ -1672,6 +1676,20 @@
         showToast(t('saved'), 'success');
         await loadGanttData();
       } catch(e) { showToast(e.message, 'error'); }
+    });
+
+    // Task delete
+    document.getElementById('btn-gtk-delete').addEventListener('click', async () => {
+      if (!editTaskId) return;
+      if (!confirm(t('confirmDelete'))) return;
+      document.getElementById('btn-gtk-delete').disabled = true;
+      closeModal('modal-task');
+      try {
+        await apiFetch(`/gantt_tasks/${editTaskId}`, { method: 'DELETE' });
+        showToast(t('deleted'), 'success');
+        await loadGanttData();
+      } catch(e) { showToast(e.message, 'error'); }
+      document.getElementById('btn-gtk-delete').disabled = false;
     });
 
     // Task modal save
