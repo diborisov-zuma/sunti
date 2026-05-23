@@ -1710,9 +1710,10 @@
     // Smart start: find latest predecessor end + 1 day
     document.getElementById('btn-smart-start').addEventListener('click', () => {
       if (!editTaskId) return;
+      let latest = null;
+
+      // 1. Check predecessor end dates
       const deps = depsData.filter(d => d.successor_id === editTaskId);
-      if (!deps.length) { showToast('No dependencies', 'error'); return; }
-      let latestEnd = null;
       deps.forEach(d => {
         const pred = tasksData.find(t => t.id === d.predecessor_id);
         if (!pred) return;
@@ -1721,11 +1722,28 @@
         const predEnd = new Date(predEndRaw.value || predEndRaw);
         const lag = parseInt(d.lag_days) || 0;
         predEnd.setDate(predEnd.getDate() + lag);
-        if (!latestEnd || predEnd > latestEnd) latestEnd = predEnd;
+        if (!latest || predEnd > latest) latest = predEnd;
       });
-      if (!latestEnd) { showToast('No predecessor dates', 'error'); return; }
-      latestEnd.setDate(latestEnd.getDate() + 1); // +1 day after latest predecessor
-      document.getElementById('g-tk-start').value = latestEnd.toISOString().substring(0, 10);
+
+      // 2. Check material delivery ETAs
+      const taskMats = allMaterialReqs.filter(m => m.task_id === editTaskId);
+      taskMats.forEach(m => {
+        if (!m.line_item_id && !m.contract_id) return; // skip slots
+        const dsArr = m.line_item_id ? (allDeliverySchedules[m.line_item_id] || []) : (m.contract_id ? (allDeliverySchedules['c_' + m.contract_id] || []) : []);
+        dsArr.forEach(d => {
+          const prodD = parseInt(d.production_days) || 0;
+          const delD = parseInt(d.delivery_days) || 0;
+          if (prodD === 0 && delD === 0 && !d.production_start && !d.delivery_start) return; // work-only
+          const lc = computeLifecycle(d);
+          if (lc === 'on_site' || lc === 'installed') return; // already delivered
+          const eta = computeETA(d);
+          if (!latest || eta > latest) latest = eta;
+        });
+      });
+
+      if (!latest) { showToast('No dependencies or materials', 'error'); return; }
+      latest.setDate(latest.getDate() + 1); // +1 day
+      document.getElementById('g-tk-start').value = latest.toISOString().substring(0, 10);
     });
 
     // Task delete
