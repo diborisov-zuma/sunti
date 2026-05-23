@@ -511,6 +511,7 @@
         <div class="modal-actions">
           <button class="btn btn-outline" id="btn-dep-cancel"></button>
           <button class="btn btn-primary" id="btn-dep-save"></button>
+          <button class="btn btn-primary" style="background:#1e8e3e;border-color:#1e8e3e" id="btn-dep-close"></button>
         </div>
       </div>
     </div>
@@ -672,6 +673,7 @@
       setText('t-dep-type', t('direction'));
       setText('btn-dep-cancel', t('cancel'));
       setText('btn-dep-save', t('ganttAddDep'));
+      setText('btn-dep-close', t('save'));
       // Delivery batch modal
       setText('t-ds-title', t('ganttDeliveryBatch'));
       setText('t-ds-qty', t('ganttQty'));
@@ -2186,7 +2188,8 @@
         }).join('');
     }
 
-    document.getElementById('btn-dep-cancel').addEventListener('click', () => { closeModal('modal-dep'); loadGanttData(); });
+    document.getElementById('btn-dep-cancel').addEventListener('click', () => closeModal('modal-dep'));
+    document.getElementById('btn-dep-close').addEventListener('click', () => { closeModal('modal-dep'); loadGanttData(); });
     document.getElementById('btn-dep-save').addEventListener('click', async () => {
       if (!selectedPredId) { showToast(t('ganttPredecessor'), 'error'); return; }
       try {
