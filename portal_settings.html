@@ -223,6 +223,12 @@
         </select>
       </div>`;
 
+      const ganttSection = data.sections.find(s => s.section === 'gantt');
+      html += `<div class="checkbox-row">
+        <input type="checkbox" id="sec-gantt-${userId}" ${ganttSection ? 'checked' : ''}>
+        <label for="sec-gantt-${userId}" style="font-size:0.85rem">${t('navGantt')}</label>
+      </div>`;
+
       html += `<div style="margin-top:14px">
         <button class="btn btn-primary" style="font-size:0.78rem;padding:4px 14px" data-action="save-access" data-user-id="${userId}">${t('save')}</button>
       </div>`;
@@ -286,6 +292,10 @@
           if (matCb && matCb.checked) {
             const matLevel = document.getElementById(`sec-mat-level-${userId}`).value;
             sections.push({ section: 'materials', access_level: matLevel });
+          }
+          const ganttCb = document.getElementById(`sec-gantt-${userId}`);
+          if (ganttCb && ganttCb.checked) {
+            sections.push({ section: 'gantt', access_level: 'viewer' });
           }
           await apiFetch(`/portal_users/${userId}/sections`, {
             method: 'POST', body: JSON.stringify({ sections }),

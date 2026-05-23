@@ -117,7 +117,7 @@
     <div class="nav">
       <a class="nav-link active" id="portal-nav-contracts" href="#" onclick="switchPortalSection('contracts');return false"></a>
       <a class="nav-link" id="portal-nav-materials" href="#" onclick="switchPortalSection('materials');return false" style="display:none"></a>
-      <a class="nav-link" id="portal-nav-gantt" href="portal_gantt.html"></a>
+      <a class="nav-link" id="portal-nav-gantt" href="portal_gantt.html" style="display:none"></a>
     </div>
     <div class="header-right">
       <div class="lang-switcher">
@@ -419,8 +419,10 @@
 
         const navContracts = document.getElementById('portal-nav-contracts');
         const navMaterials = document.getElementById('portal-nav-materials');
+        const navGantt = document.getElementById('portal-nav-gantt');
         if (navContracts) navContracts.style.display = portalSections.contracts ? '' : 'none';
         if (navMaterials) navMaterials.style.display = portalSections.materials ? '' : 'none';
+        if (navGantt) navGantt.style.display = portalSections.gantt ? '' : 'none';
 
         if (portalSections.contracts) switchPortalSection('contracts');
         else if (portalSections.materials) switchPortalSection('materials');

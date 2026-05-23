@@ -526,8 +526,16 @@
         // Show/hide nav links based on sections
         const navContracts = document.getElementById('portal-nav-contracts');
         const navMaterials = document.getElementById('portal-nav-materials');
+        const navGantt = document.getElementById('portal-nav-gantt');
         if (navContracts) navContracts.style.display = portalSections.contracts ? '' : 'none';
         if (navMaterials) navMaterials.style.display = portalSections.materials ? '' : 'none';
+        if (navGantt) navGantt.style.display = portalSections.gantt ? '' : 'none';
+
+        // Check gantt access
+        if (!portalSections.gantt) {
+          document.getElementById('app-view').innerHTML = '<div style="text-align:center;padding:80px 24px;color:#999">Access denied</div>';
+          return;
+        }
 
         fillFolderSelect();
         updateTexts();
