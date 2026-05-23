@@ -1,0 +1,1519 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sunti — Portal Gantt</title>
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="stylesheet" href="style.css">
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="_i18n.js"></script>
+<script src="_config.js"></script>
+<style>
+  :root {
+    --gantt-bg: #f5f7fa;
+    --gantt-card: #ffffff;
+    --gantt-border: #e2e8f0;
+    --gantt-text: #0f172a;
+    --gantt-muted: #64748b;
+    --gantt-primary: #0f4c81;
+    --gantt-green: #10b981;
+    --gantt-yellow: #f59e0b;
+    --gantt-red: #ef4444;
+    --gantt-purple: #8b5cf6;
+    --gantt-grey: #94a3b8;
+    --row-h: 40px;
+    --day-w: 6px;
+    --left-w: 300px;
+  }
+
+  .portal-header { background:#fff;border-bottom:1px solid #e8e8e8;padding:0 24px;height:56px;display:flex;align-items:center;gap:16px;position:sticky;top:0;z-index:100; }
+  .portal-header .logo { font-size:1.1rem;font-weight:600;color:#222;text-decoration:none; }
+  .portal-header .nav { display:flex;align-items:center;gap:4px;flex:1;padding-left:24px; }
+  .portal-header .nav-link { padding:6px 14px;border-radius:6px;font-size:0.88rem;color:#555;text-decoration:none;cursor:default; }
+  .portal-header .nav-link.active { background:#e8f0fe;color:#1a73e8;font-weight:500; }
+  .portal-header .header-right { display:flex;align-items:center;gap:12px; }
+
+  .gantt-page { padding: 16px 24px; }
+
+  .gantt-toolbar {
+    display: flex; align-items: center; gap: 12px; margin-bottom: 16px; flex-wrap: wrap;
+  }
+  .gantt-toolbar h2 { font-size: 1.1rem; color: #222; }
+  .gantt-toolbar .spacer { flex: 1; }
+  .gantt-toolbar .legend { display: flex; gap: 14px; align-items: center; font-size: 11px; color: var(--gantt-muted); }
+  .gantt-toolbar .legend .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 4px; vertical-align: middle; }
+
+  select.filter-select {
+    border: 1px solid #ddd; border-radius: 6px; padding: 6px 10px; font-size: 0.85rem; color: #333; outline: none; background: #fff;
+  }
+
+  .gantt-wrap {
+    background: var(--gantt-card);
+    border: 1px solid var(--gantt-border);
+    border-radius: 8px;
+    display: grid;
+    grid-template-columns: var(--left-w) 1fr;
+  }
+  .gantt-left { border-right: 1px solid var(--gantt-border); }
+  .gantt-right { overflow-x: auto; }
+  .gantt-right-inner { position: relative; }
+  .gantt-sticky-header {
+    position: sticky; top: 56px; z-index: 20; background: #fafbfc;
+    display: grid; grid-template-columns: var(--left-w) 1fr;
+    border-bottom: 1px solid var(--gantt-border);
+    border: 1px solid var(--gantt-border); border-radius: 8px 8px 0 0;
+  }
+  .gantt-sticky-header .gantt-header-left {
+    padding: 16px 16px 0 16px; font-weight: 600; font-size: 12px;
+    color: var(--gantt-text); text-transform: uppercase; letter-spacing: 0.5px;
+    height: 50px; border-right: 1px solid var(--gantt-border);
+  }
+  .gantt-sticky-header .gantt-header-right { overflow: hidden; height: 50px; }
+
+  .gantt-header-row {
+    background: #fafbfc;
+    border-bottom: 1px solid var(--gantt-border);
+    font-size: 11px;
+    color: var(--gantt-muted);
+    height: 50px;
+  }
+  .gantt-left .gantt-header-row {
+    padding: 16px 16px 0 16px;
+    font-weight: 600;
+    font-size: 12px;
+    color: var(--gantt-text);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .month-row { display: flex; height: 24px; border-bottom: 1px solid var(--gantt-border); }
+  .month-cell { text-align: center; line-height: 24px; border-right: 1px solid var(--gantt-border); font-weight: 600; color: var(--gantt-text); font-size: 11px; }
+  .week-row { display: flex; height: 26px; }
+  .week-cell { text-align: center; line-height: 26px; border-right: 1px solid #f1f5f9; font-size: 10px; color: var(--gantt-muted); }
+
+  .task-row {
+    height: var(--row-h);
+    padding: 0 16px;
+    display: flex;
+    align-items: center;
+    border-bottom: 1px solid #f1f5f9;
+    gap: 8px;
+    font-size: 13px;
+    font-weight: 400;
+  }
+  .task-row.hovered, .task-row:hover { background: #ebffee; }
+  .task-row.active { background: #eff6ff; }
+  .task-row .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .task-row .badge {
+    font-size: 10px; padding: 2px 6px; border-radius: 10px;
+    background: #e2e8f0; color: var(--gantt-muted); font-weight: 600;
+  }
+  .task-row .badge.red { background: #fee2e2; color: #991b1b; }
+  .task-row .badge.yellow { background: #fef3c7; color: #92400e; }
+  .task-row .badge.empty { background: #ede9fe; color: #6d28d9; border: 1px dashed var(--gantt-purple); }
+  .task-row.phase {
+    background: #dee1fc; font-weight: 700; text-transform: uppercase;
+    font-size: 11px; color: var(--gantt-muted); letter-spacing: 0.5px;
+  }
+  .task-row.phase.hovered, .task-row.phase:hover { background: #ebffee; }
+
+  .bar-row { height: var(--row-h); position: relative; border-bottom: 1px solid #f1f5f9; }
+  .bar-row.phase { background: #dee1fc; }
+  .bar-row.hovered { background: #ebffee; }
+  .bar-row.phase.hovered { background: #ebffee; }
+  .bar {
+    position: absolute; height: 20px; top: 10px; border-radius: 4px;
+    cursor: pointer; box-shadow: 0 1px 2px rgba(0,0,0,0.1); transition: transform 0.1s;
+    background: linear-gradient(135deg, var(--gantt-green), #059669);
+  }
+  .bar:hover { transform: scaleY(1.15); }
+  .bar.bar-yellow { background: linear-gradient(135deg, var(--gantt-yellow), #d97706); }
+  .bar.bar-red { background: linear-gradient(135deg, var(--gantt-red), #dc2626); }
+  .bar.critical { box-shadow: 0 0 0 2px var(--gantt-red), 0 1px 4px rgba(239,68,68,0.4); }
+  .bar .bar-label {
+    position: absolute; left: 8px; top: 50%; transform: translateY(-50%);
+    color: white; font-size: 11px; font-weight: 600; white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis; max-width: calc(100% - 16px);
+    text-shadow: 0 1px 1px rgba(0,0,0,0.2);
+  }
+
+  .today-line {
+    position: absolute; top: 0; bottom: 0; width: 2px;
+    background: var(--gantt-red); pointer-events: none; z-index: 10;
+  }
+  .today-label {
+    position: absolute; top: -22px; left: 50%; transform: translateX(-50%);
+    background: var(--gantt-red); color: white; padding: 2px 6px;
+    font-size: 10px; border-radius: 3px; white-space: nowrap; font-weight: 600;
+  }
+
+  .empty-state { text-align: center; padding: 64px 24px; color: #bbb; }
+  .loading { text-align: center; padding: 48px; color: #bbb; }
+
+  /* Risk badges */
+  .task-row .badge.green { background: #d1fae5; color: #065f46; }
+  .task-row .badge.blue { background: #dbeafe; color: #1e40af; }
+  .task-row .badge.purple { background: #ede9fe; color: #6d28d9; }
+
+  /* Delivery markers */
+  .delivery-marker {
+    position: absolute; width: 14px; height: 14px; transform: rotate(45deg);
+    bottom: 2px; border: 1.5px solid white; z-index: 5;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+  }
+  .delivery-marker.green { background: var(--gantt-green); }
+  .delivery-marker.yellow { background: var(--gantt-yellow); }
+  .delivery-marker.red { background: var(--gantt-red); }
+  .delivery-marker.grey { background: var(--gantt-grey); }
+  .delivery-marker.blue { background: #3b82f6; }
+  .delivery-marker.purple { background: var(--gantt-purple); }
+
+  /* Tabs */
+  .gantt-tab {
+    padding: 8px 16px; background: white; border: 1px solid var(--gantt-border);
+    border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: 500; color: var(--gantt-muted);
+  }
+  .gantt-tab.active { color: var(--gantt-primary); border-color: var(--gantt-primary); font-weight: 600; }
+  .gantt-tab .pill { background: var(--gantt-red); color: white; font-size: 10px; padding: 1px 6px; border-radius: 8px; font-weight: 700; }
+
+  /* Dashboard widget */
+  .dash-widget {
+    background: white; border: 1px solid var(--gantt-border); border-left: 4px solid var(--gantt-yellow);
+    border-radius: 6px; padding: 12px 16px; display: flex; gap: 14px; align-items: center; margin-bottom: 16px;
+  }
+  .dw-icon { font-size: 20px; }
+  .dw-text { flex: 1; }
+  .dw-title { font-weight: 700; font-size: 13px; }
+  .dw-sub { font-size: 12px; color: var(--gantt-muted); margin-top: 2px; }
+
+  /* Procurement table */
+  .proc-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .proc-table th { background: #fafbfc; text-align: left; padding: 8px 12px; border-bottom: 2px solid var(--gantt-border); font-size: 11px; text-transform: uppercase; color: var(--gantt-muted); letter-spacing: 0.5px; }
+  .proc-table td { padding: 8px 12px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
+  .proc-table tr:hover td { background: #f8fafc; }
+  .proc-pill { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+  .proc-pill.green { background: #d1fae5; color: #065f46; }
+  .proc-pill.yellow { background: #fef3c7; color: #92400e; }
+  .proc-pill.red { background: #fee2e2; color: #991b1b; }
+  .proc-pill.purple { background: #ede9fe; color: #6d28d9; }
+  .proc-pill.grey { background: #e2e8f0; color: var(--gantt-muted); }
+  .proc-filter-pill { padding: 6px 14px; border-radius: 16px; border: 1px solid var(--gantt-border); background: white; cursor: pointer; font-size: 12px; font-weight: 500; }
+  .proc-filter-pill.active { background: var(--gantt-primary); color: white; border-color: var(--gantt-primary); }
+
+  /* Delivery batches in task materials */
+  .ds-batch-row { display: flex; align-items: center; gap: 8px; padding: 4px 12px 4px 24px; font-size: 0.78rem; color: #666; }
+  .ds-batch-row .ds-lc { padding: 1px 6px; border-radius: 8px; font-size: 0.7rem; font-weight: 600; background: #e2e8f0; }
+  .ds-batch-row .ds-lc.green { background: #d1fae5; color: #065f46; }
+  .ds-batch-row .ds-lc.yellow { background: #fef3c7; color: #92400e; }
+  .ds-batch-row .ds-lc.red { background: #fee2e2; color: #991b1b; }
+
+  /* Side panel */
+  .side-panel {
+    position: fixed; top: 56px; right: -520px; width: 500px; height: calc(100vh - 56px);
+    background: white; border-left: 1px solid var(--gantt-border);
+    box-shadow: -8px 0 24px rgba(0,0,0,0.1); transition: right 0.3s ease;
+    overflow-y: auto; z-index: 90; display: flex; flex-direction: column;
+  }
+  .side-panel.open { right: 0; }
+  .sp-head {
+    padding: 18px 20px; border-bottom: 1px solid var(--gantt-border);
+    position: relative; flex-shrink: 0;
+  }
+  .sp-head .sp-close {
+    background: #f1f5f9; border: 1px solid #e2e8f0;
+    font-size: 18px; color: var(--gantt-muted); cursor: pointer; line-height: 1;
+    width: 32px; height: 32px; min-width: 32px; border-radius: 6px; display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .sp-head .sp-close:hover { background: #e2e8f0; color: #333; }
+  .sp-head .sp-phase { font-size: 10px; color: var(--gantt-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+  .sp-head h2 { font-size: 20px; margin: 4px 0 10px; color: var(--gantt-text); font-weight: 700; }
+  .sp-head .sp-meta { display: flex; gap: 16px; font-size: 12px; color: var(--gantt-muted); flex-wrap: wrap; }
+  .sp-head .sp-meta .label { font-weight: 600; color: var(--gantt-text); margin-right: 3px; }
+  .sp-head .sp-critical { display: inline-block; background: var(--gantt-red); color: white; font-size: 10px; padding: 2px 6px; border-radius: 4px; font-weight: 700; margin-left: 8px; }
+  .sp-body { padding: 16px 20px; flex: 1; overflow-y: auto; }
+  .sp-section { margin-bottom: 20px; }
+  .sp-section h3 {
+    font-size: 10px; text-transform: uppercase; color: var(--gantt-muted);
+    letter-spacing: 0.7px; margin-bottom: 10px; font-weight: 700;
+  }
+  .sp-dep-item { font-size: 12px; padding: 3px 0; color: #444; }
+  .sp-dep-item .dep-arrow { color: var(--gantt-muted); margin: 0 4px; }
+  .sp-mat-card {
+    border: 1px solid var(--gantt-border); border-radius: 8px;
+    margin-bottom: 10px; overflow: hidden;
+  }
+  .sp-mat-card.risk-red { border-left: 4px solid var(--gantt-red); }
+  .sp-mat-card.risk-yellow { border-left: 4px solid var(--gantt-yellow); }
+  .sp-mat-card.risk-blue { border-left: 4px solid #3b82f6; }
+  .sp-mat-card.risk-green { border-left: 4px solid var(--gantt-green); }
+  .sp-mat-card.risk-grey { border-left: 4px solid var(--gantt-grey); }
+  .sp-mat-card.risk-purple { border-left: 4px solid var(--gantt-purple); }
+  .sp-mat-source {
+    background: linear-gradient(to right, #eff6ff, #f8fafc); border-bottom: 1px solid var(--gantt-border);
+    padding: 8px 12px; display: flex; align-items: center; gap: 8px; font-size: 11px;
+  }
+  .sp-mat-source .ref { font-weight: 700; color: var(--gantt-primary); }
+  .sp-mat-body { padding: 10px 12px; }
+  .sp-mat-name { font-weight: 600; font-size: 13px; }
+  .sp-mat-sub { font-size: 11px; color: var(--gantt-muted); margin-top: 2px; }
+  .sp-mat-indicators { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+  .sp-ind {
+    font-size: 10px; padding: 3px 8px; border-radius: 10px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.3px;
+  }
+  .sp-ind-lc { background: #e2e8f0; color: var(--gantt-text); }
+  .sp-ind-risk { color: white; }
+  .sp-ind-risk.red { background: var(--gantt-red); }
+  .sp-ind-risk.yellow { background: var(--gantt-yellow); }
+  .sp-ind-risk.blue { background: #3b82f6; }
+  .sp-ind-risk.green { background: var(--gantt-green); }
+  .sp-ind-risk.grey { background: var(--gantt-grey); }
+  .sp-ind-risk.purple { background: var(--gantt-purple); }
+  .sp-mat-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 3px 14px;
+    margin-top: 8px; font-size: 11px; color: var(--gantt-muted);
+  }
+  .sp-mat-grid .row { display: flex; justify-content: space-between; }
+  .sp-mat-grid .row .v { font-weight: 600; color: var(--gantt-text); }
+  .sp-mat-grid .row .v.late { color: var(--gantt-red); }
+  .sp-mat-margin {
+    margin-top: 8px; font-size: 11px; padding: 6px 8px; border-radius: 4px;
+  }
+  .sp-mat-margin.red { background: #fee2e2; color: #991b1b; }
+  .sp-mat-margin.yellow { background: #fef3c7; color: #92400e; }
+  .sp-mat-margin.blue { background: #dbeafe; color: #1e40af; }
+  .sp-mat-margin.grey { background: #f1f5f9; color: #64748b; }
+  .sp-mat-margin.green { background: #d1fae5; color: #065f46; }
+
+  .dep-arrows-svg {
+    position: absolute; top: 0; left: 0; pointer-events: none; z-index: 8;
+  }
+  .dep-arrows-svg line { stroke-width: 1.5; }
+
+  #guest-view { text-align:center;padding:100px 24px; }
+  #guest-view h2 { font-size:1.4rem;color:#333;margin-bottom:8px; }
+  #guest-view p { color:#999;margin-bottom:32px; }
+
+  @media (max-width: 768px) {
+    .portal-header { padding:0 12px;gap:8px; }
+    .portal-header .nav { padding-left:8px; }
+    .portal-header .nav-link { padding:4px 8px;font-size:0.8rem; }
+    .portal-header .header-right { gap:6px; }
+    .portal-header .lang-switcher .lang-btn { font-size:0.7rem;padding:2px 5px; }
+    #portal-user-name { display:none; }
+    .gantt-page { padding:8px 12px; }
+    :root { --left-w: 180px; }
+  }
+</style>
+</head>
+<body>
+
+  <!-- Portal header -->
+  <div class="portal-header" id="portal-header" style="display:none">
+    <a class="logo" href="portal.html">Sunti</a>
+    <div class="nav">
+      <a class="nav-link" id="portal-nav-contracts" href="portal.html"></a>
+      <a class="nav-link" id="portal-nav-materials" href="portal.html#materials" style="display:none"></a>
+      <a class="nav-link active" id="portal-nav-gantt" href="portal_gantt.html"></a>
+    </div>
+    <div class="header-right">
+      <div class="lang-switcher">
+        <button class="lang-btn" data-lang="ru" onclick="setLang('ru')">RU</button>
+        <button class="lang-btn" data-lang="en" onclick="setLang('en')">EN</button>
+        <button class="lang-btn" data-lang="th" onclick="setLang('th')">TH</button>
+      </div>
+      <div id="portal-user-info" style="display:flex;align-items:center;gap:8px">
+        <span id="portal-user-name" style="font-size:0.85rem;color:#333"></span>
+        <button class="btn btn-outline" onclick="portalLogout()" id="portal-logout-btn"></button>
+      </div>
+    </div>
+  </div>
+
+  <div id="guest-view">
+    <h2 id="t-portal-welcome"></h2>
+    <p id="t-portal-login-hint"></p>
+    <div id="portal-signin">
+      <div id="g_id_onload"
+        data-client_id="6445860840-9bfshkstrc2vra49qi847ie9od38614t.apps.googleusercontent.com"
+        data-callback="handlePortalCredential"
+        data-auto_prompt="false"
+        data-itp_support="true">
+      </div>
+      <div class="g_id_signin"
+        data-type="standard" data-size="large" data-theme="outline"
+        data-text="signin_with" data-shape="rectangular">
+      </div>
+    </div>
+    <div id="auth-error-display" style="display:none;margin-top:24px;padding:12px 16px;background:#fce8e6;border-radius:8px;color:#c5221f;font-size:0.85rem;max-width:400px;margin-left:auto;margin-right:auto;text-align:left"></div>
+  </div>
+
+  <div id="app-view" style="display:none">
+    <div class="gantt-page">
+      <div class="gantt-toolbar">
+        <h2 id="t-page-title">Gantt</h2>
+        <select class="filter-select" id="filter-folder"><option value="">--</option></select>
+        <div class="spacer"></div>
+        <div class="legend">
+          <span><span class="dot" style="background:var(--gantt-green)"></span>On track</span>
+          <span><span class="dot" style="background:var(--gantt-yellow)"></span>At risk</span>
+          <span><span class="dot" style="background:var(--gantt-red)"></span>Late</span>
+          <span><span class="dot" style="background:var(--gantt-purple)"></span>Slot empty</span>
+        </div>
+      </div>
+
+      <div class="dash-widget" id="dash-widget" style="display:none">
+        <div class="dw-icon">&#9888;&#65039;</div>
+        <div class="dw-text">
+          <div class="dw-title" id="dw-title"></div>
+          <div class="dw-sub" id="dw-sub"></div>
+        </div>
+      </div>
+
+      <div class="gantt-tabs" id="gantt-tabs" style="display:none;gap:4px;margin-bottom:12px">
+        <button class="gantt-tab active" data-tab="gantt">Schedule (Gantt)</button>
+        <button class="gantt-tab" data-tab="proc">Procurement <span class="pill" id="proc-pill"></span></button>
+      </div>
+
+      <div id="view-gantt">
+        <div id="gantt-container">
+          <div class="empty-state" id="gantt-empty"></div>
+        </div>
+      </div>
+
+      <div id="view-proc" style="display:none">
+        <div id="proc-filters" style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap"></div>
+        <div id="proc-table-wrap"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Side panel overlay + panel -->
+  <div id="sp-overlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;z-index:85" onclick="closeSidePanel()"></div>
+  <div class="side-panel" id="side-panel">
+    <div class="sp-head">
+      <div class="sp-phase" id="sp-phase"></div>
+      <h2 id="sp-title"></h2>
+      <div style="display:flex;align-items:center;gap:12px">
+        <div class="sp-meta" id="sp-meta" style="flex:1"></div>
+        <button class="sp-close" id="sp-close">&#215;</button>
+      </div>
+    </div>
+    <div class="sp-body" id="sp-body"></div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    // ─── Portal Auth (same as portal.html) ───
+
+    let portalUser = null;
+    let portalSections = {};
+    let portalFolders = [];
+    let _portalAccessToken = null;
+    let _portalLoginHint = null;
+    let _tokenRefreshTimer = null;
+
+    let phasesData = [];
+    let tasksData = [];
+    let depsData = [];
+    let allMaterialReqs = [];
+    let allDeliverySchedules = {};
+    let filterFolder = '';
+    let procFilterColor = 'all';
+
+    function showToast(msg, type) {
+      const el = document.getElementById('toast');
+      el.textContent = msg; el.className = 'toast show' + (type ? ' ' + type : '');
+      clearTimeout(el._t); el._t = setTimeout(() => el.className = 'toast', 3000);
+    }
+
+    function showAuthError(email, error, step) {
+      const msg = `${error} [${step}, ${email || '?'}]`;
+      const el = document.getElementById('auth-error-display');
+      if (el) {
+        el.style.display = 'block';
+        el.innerHTML = `<strong>Login error:</strong> ${error}<br><small>Step: ${step} | Account: ${email || '?'}</small>`;
+      }
+    }
+
+    function logAuthError(email, error, step) {
+      try {
+        fetch(`${API_URL}/portal_contracts/log-error`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: email || 'unknown', error: String(error), step }),
+        }).catch(() => {});
+      } catch(_) {}
+    }
+
+    async function handlePortalCredential(response) {
+      const credential = response.credential;
+      if (!credential) {
+        showAuthError('', 'No credential in response', 'callback_empty');
+        return;
+      }
+      const payload = JSON.parse(atob(credential.split('.')[1]));
+      const loginHint = payload.email;
+
+      _portalAccessToken = credential;
+      _portalLoginHint = loginHint;
+      sessionStorage.setItem('portal_token', credential);
+      sessionStorage.setItem('portal_hint', loginHint);
+
+      try {
+        await initApp();
+        upgradeToAccessToken(loginHint);
+      } catch(e) {
+        logAuthError(loginHint, e.message, 'initApp_idtoken');
+        showAuthError(loginHint, e.message, 'initApp_idtoken');
+      }
+    }
+
+    function upgradeToAccessToken(loginHint) {
+      try {
+        const tokenClient = google.accounts.oauth2.initTokenClient({
+          client_id: '6445860840-9bfshkstrc2vra49qi847ie9od38614t.apps.googleusercontent.com',
+          scope: 'email profile',
+          hint: loginHint,
+          callback: (tokenResponse) => {
+            if (!tokenResponse.error) {
+              _portalAccessToken = tokenResponse.access_token;
+              sessionStorage.setItem('portal_token', tokenResponse.access_token);
+              scheduleTokenRefresh();
+            }
+          },
+        });
+        tokenClient.requestAccessToken();
+      } catch(_) {}
+    }
+
+    function scheduleTokenRefresh() {
+      if (_tokenRefreshTimer) clearTimeout(_tokenRefreshTimer);
+      _tokenRefreshTimer = setTimeout(() => {
+        if (_portalLoginHint) upgradeToAccessToken(_portalLoginHint);
+      }, 50 * 60 * 1000);
+    }
+
+    async function portalFetch(path, options = {}) {
+      const res = await fetch(`${API_URL}${path}`, {
+        ...options,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${_portalAccessToken}`,
+          ...(options.headers || {}),
+        },
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: res.statusText }));
+        throw new Error(err.error || res.statusText);
+      }
+      return res.json();
+    }
+
+    async function initApp() {
+      try {
+        const me = await portalFetch('/portal_contracts/me');
+        portalUser = me.user;
+        portalSections = me.sections;
+        portalFolders = me.folders;
+
+        document.getElementById('guest-view').style.display = 'none';
+        document.getElementById('app-view').style.display = 'block';
+        document.getElementById('portal-header').style.display = 'flex';
+        document.getElementById('portal-user-name').textContent = portalUser.name || portalUser.email;
+
+        // Show/hide nav links based on sections
+        const navContracts = document.getElementById('portal-nav-contracts');
+        const navMaterials = document.getElementById('portal-nav-materials');
+        if (navContracts) navContracts.style.display = portalSections.contracts ? '' : 'none';
+        if (navMaterials) navMaterials.style.display = portalSections.materials ? '' : 'none';
+
+        fillFolderSelect();
+        updateTexts();
+      } catch(e) {
+        console.error('Portal initApp error:', e);
+        logAuthError(_portalLoginHint, e.message, 'initApp');
+        sessionStorage.removeItem('portal_token');
+        sessionStorage.removeItem('portal_hint');
+        _portalAccessToken = null;
+        document.getElementById('guest-view').style.display = 'block';
+        document.getElementById('app-view').style.display = 'none';
+        document.getElementById('portal-header').style.display = 'none';
+        showAuthError(_portalLoginHint, e.message, 'initApp');
+      }
+    }
+
+    async function tryRestoreSession() {
+      const savedToken = sessionStorage.getItem('portal_token');
+      const savedHint = sessionStorage.getItem('portal_hint');
+      if (savedToken) {
+        _portalAccessToken = savedToken;
+        _portalLoginHint = savedHint;
+        scheduleTokenRefresh();
+        await initApp();
+      }
+    }
+
+    function portalLogout() {
+      _portalAccessToken = null;
+      _portalLoginHint = null;
+      if (_tokenRefreshTimer) clearTimeout(_tokenRefreshTimer);
+      sessionStorage.removeItem('portal_token');
+      sessionStorage.removeItem('portal_hint');
+      portalUser = null;
+      document.getElementById('guest-view').style.display = 'block';
+      document.getElementById('app-view').style.display = 'none';
+      document.getElementById('portal-header').style.display = 'none';
+    }
+
+    // ─── Texts ───
+
+    function updateTexts() {
+      document.getElementById('t-portal-welcome').textContent = t('portalWelcome');
+      document.getElementById('t-portal-login-hint').textContent = t('guestSub');
+      document.getElementById('portal-nav-contracts').textContent = t('portalContracts');
+      const navMat = document.getElementById('portal-nav-materials');
+      if (navMat) navMat.textContent = t('navMaterials');
+      document.getElementById('portal-nav-gantt').textContent = 'Gantt';
+      document.getElementById('portal-logout-btn').textContent = t('logout');
+      document.getElementById('t-page-title').textContent = 'Gantt';
+      document.querySelectorAll('.lang-btn').forEach(b => b.classList.toggle('active', b.dataset.lang === currentLang));
+    }
+
+    // ─── Folder filter ───
+
+    function fillFolderSelect() {
+      const sel = document.getElementById('filter-folder');
+      sel.innerHTML = `<option value="">${t('portalSelectProject')}</option>`;
+      portalFolders.forEach(f => {
+        const opt = document.createElement('option');
+        opt.value = f.id; opt.textContent = f.name;
+        sel.appendChild(opt);
+      });
+    }
+
+    document.getElementById('filter-folder').addEventListener('change', e => {
+      filterFolder = e.target.value;
+      if (filterFolder) {
+        loadGanttData();
+      } else {
+        document.getElementById('gantt-container').innerHTML = '<div class="empty-state">' + t('portalSelectProject') + '</div>';
+        document.getElementById('dash-widget').style.display = 'none';
+        document.getElementById('gantt-tabs').style.display = 'none';
+        document.getElementById('view-gantt').style.display = '';
+        document.getElementById('view-proc').style.display = 'none';
+      }
+    });
+
+    // ─── Helper functions ───
+
+    function fmtDateDMY(val) {
+      if (!val) return '\u2014';
+      const d = new Date(val.value || val);
+      if (isNaN(d)) return '\u2014';
+      return `${String(d.getUTCDate()).padStart(2,'0')}.${String(d.getUTCMonth()+1).padStart(2,'0')}.${d.getUTCFullYear()}`;
+    }
+
+    // ─── Load data ───
+
+    async function loadGanttData() {
+      const container = document.getElementById('gantt-container');
+      container.innerHTML = '<div class="loading">' + t('loading') + '</div>';
+      try {
+        const [phases, tasks, deps, matReqs] = await Promise.all([
+          portalFetch(`/phases?folder_id=${filterFolder}`),
+          portalFetch(`/gantt_tasks?folder_id=${filterFolder}`),
+          portalFetch(`/task_dependencies?folder_id=${filterFolder}`),
+          portalFetch(`/material_requirements?folder_id=${filterFolder}`).catch(() => []),
+        ]);
+        phasesData = phases;
+        tasksData = tasks;
+        depsData = deps;
+        allMaterialReqs = matReqs;
+
+        // Load delivery schedules for all line items and whole contracts
+        const lineItemIds = [...new Set(matReqs.filter(m => m.line_item_id).map(m => m.line_item_id))];
+        const wholeContractIds = [...new Set(matReqs.filter(m => !m.line_item_id && m.contract_id).map(m => m.contract_id))];
+        const dsPromises = [
+          ...lineItemIds.map(id => portalFetch(`/delivery_schedule?line_item_id=${id}`).catch(() => [])),
+          ...wholeContractIds.map(id => portalFetch(`/delivery_schedule?contract_id=${id}`).catch(() => [])),
+        ];
+        const dsResults = await Promise.all(dsPromises);
+        allDeliverySchedules = {};
+        lineItemIds.forEach((id, i) => { allDeliverySchedules[id] = dsResults[i]; });
+        wholeContractIds.forEach((id, i) => { allDeliverySchedules['c_' + id] = dsResults[lineItemIds.length + i]; });
+
+        renderGantt();
+        updateDashboard();
+      } catch(e) {
+        container.innerHTML = `<div class="empty-state" style="color:#c33">${e.message}</div>`;
+      }
+    }
+
+    // ─── Compute functions ───
+
+    function computeLifecycle(ds) {
+      if (ds.lifecycle === 'in_transit' || ds.lifecycle === 'installed') return ds.lifecycle;
+      if (ds.delivery_end) return 'on_site';
+      if (ds.delivery_start) return 'on_delivery';
+      if (ds.production_end) return 'produced';
+      if (ds.production_start) return 'in_production';
+      return ds.lifecycle || 'planned';
+    }
+
+    function computeETA(ds) {
+      const prodDays = parseInt(ds.production_days) || 0;
+      const delDays = parseInt(ds.delivery_days) || 0;
+      const today = new Date(); today.setHours(0,0,0,0);
+
+      if (ds.delivery_end) return new Date(ds.delivery_end.value || ds.delivery_end);
+      if (ds.delivery_start) {
+        const d = new Date(ds.delivery_start.value || ds.delivery_start);
+        d.setDate(d.getDate() + delDays);
+        return d;
+      }
+      if (ds.production_end) {
+        const d = new Date(ds.production_end.value || ds.production_end);
+        d.setDate(d.getDate() + delDays);
+        return d;
+      }
+      if (ds.production_start) {
+        const d = new Date(ds.production_start.value || ds.production_start);
+        d.setDate(d.getDate() + prodDays + delDays);
+        return d;
+      }
+      const d = new Date(today);
+      d.setDate(d.getDate() + prodDays + delDays);
+      return d;
+    }
+
+    function computeRisk(mr, deliveries, taskStart) {
+      if (!mr.line_item_id && !mr.contract_id) return { level: 'no_contract', color: 'purple', label: 'No contract' };
+
+      const cs = mr.contract_status;
+      if (cs === 'delivered' || cs === 'completed') return { level: 'delivered', color: 'green', label: 'Delivered' };
+      if (cs === 'cancelled') return { level: 'cancelled', color: 'grey', label: 'Cancelled' };
+      if (cs === 'in_stock') {
+        const today2 = new Date(); today2.setHours(0,0,0,0);
+        const needByRaw2 = mr.required_by_date ? (mr.required_by_date.value || mr.required_by_date) : null;
+        const needBy2 = needByRaw2 ? new Date(needByRaw2) : (taskStart ? new Date(taskStart) : null);
+        if (needBy2) {
+          const delDays = deliveries.length ? Math.max(...deliveries.map(d => parseInt(d.delivery_days) || 0)) : 0;
+          const deliveryDeadline = new Date(needBy2);
+          deliveryDeadline.setDate(deliveryDeadline.getDate() - delDays);
+          const margin = Math.round((deliveryDeadline - today2) / 86400000);
+          if (margin < 0) return { level: 'late', color: 'red', label: 'In stock, late' };
+          if (margin < 14) return { level: 'at_risk', color: 'yellow', label: 'In stock, order delivery' };
+          return { level: 'in_stock', color: 'blue', label: 'In stock' };
+        }
+        return { level: 'in_stock', color: 'blue', label: 'In stock' };
+      }
+      if (cs === 'estimate') return { level: 'estimate', color: 'grey', label: 'Estimate' };
+
+      const today = new Date(); today.setHours(0,0,0,0);
+      const needByRaw = mr.required_by_date ? (mr.required_by_date.value || mr.required_by_date) : null;
+      const needBy = needByRaw ? new Date(needByRaw) : (taskStart ? new Date(taskStart) : null);
+      if (!needBy) return { level: 'unknown', color: 'grey', label: '\u2014' };
+
+      const realDeliveries = (deliveries || []).filter(d => {
+        const pd = parseInt(d.production_days) || 0;
+        const dd = parseInt(d.delivery_days) || 0;
+        return pd > 0 || dd > 0 || d.production_start || d.delivery_start;
+      });
+
+      if (!realDeliveries.length) {
+        return { level: 'work_only', color: 'grey', label: 'Work' };
+      }
+
+      let worstETA = null;
+      let allDelivered = true;
+      let worstLC = 'installed';
+      const lcOrder = ['planned','quoted','in_production','produced','on_delivery','in_transit','on_site','installed'];
+      realDeliveries.forEach(ds => {
+        const lc = computeLifecycle(ds);
+        if (lc !== 'on_site' && lc !== 'installed') {
+          allDelivered = false;
+          const eta = computeETA(ds);
+          if (!worstETA || eta > worstETA) worstETA = eta;
+        }
+        if (lcOrder.indexOf(lc) < lcOrder.indexOf(worstLC)) worstLC = lc;
+      });
+
+      if (allDelivered) return { level: 'delivered', color: 'green', label: 'Delivered' };
+
+      if (worstLC === 'planned' || worstLC === 'quoted') {
+        const prodDays = Math.max(...realDeliveries.map(d => parseInt(d.production_days) || 0));
+        const delDays = Math.max(...realDeliveries.map(d => parseInt(d.delivery_days) || 0));
+        const orderDeadline = new Date(needBy);
+        orderDeadline.setDate(orderDeadline.getDate() - prodDays - delDays);
+        const margin = Math.round((orderDeadline - today) / 86400000);
+        if (margin < 0) return { level: 'too_late', color: 'red', label: 'Too late' };
+        if (margin < 14) return { level: 'order_now', color: 'yellow', label: 'Order now' };
+        return { level: 'ok_to_wait', color: 'grey', label: 'OK' };
+      } else {
+        const margin = worstETA ? Math.round((needBy - worstETA) / 86400000) : 999;
+        if (margin < 0) return { level: 'late', color: 'red', label: 'Late' };
+        if (margin < 14) return { level: 'at_risk', color: 'yellow', label: 'At risk' };
+        return { level: 'on_track', color: 'blue', label: 'On track' };
+      }
+    }
+
+    const lifecycleLabelsI18n = {
+      ru: { planned: '\u041d\u0435 \u0437\u0430\u043a\u0430\u0437\u0430\u043d', quoted: '\u041a\u041f \u043f\u043e\u043b\u0443\u0447\u0435\u043d\u043e', in_production: '\u0412 \u043f\u0440\u043e\u0438\u0437\u0432\u043e\u0434\u0441\u0442\u0432\u0435', produced: '\u041f\u0440\u043e\u0438\u0437\u0432\u0435\u0434\u0435\u043d\u043e', on_delivery: '\u0412 \u0434\u043e\u0441\u0442\u0430\u0432\u043a\u0435', in_transit: '\u041d\u0430 \u0441\u043a\u043b\u0430\u0434\u0435', on_site: '\u041d\u0430 \u043e\u0431\u044a\u0435\u043a\u0442\u0435', installed: '\u0421\u043c\u043e\u043d\u0442\u0438\u0440\u043e\u0432\u0430\u043d\u043e' },
+      en: { planned: 'Not ordered', quoted: 'Quoted', in_production: 'In production', produced: 'Produced', on_delivery: 'In delivery', in_transit: 'In transit', on_site: 'On site', installed: 'Installed' },
+      th: { planned: '\u0e22\u0e31\u0e07\u0e44\u0e21\u0e48\u0e2a\u0e31\u0e48\u0e07', quoted: '\u0e44\u0e14\u0e49\u0e43\u0e1a\u0e40\u0e2a\u0e19\u0e2d\u0e23\u0e32\u0e04\u0e32', in_production: '\u0e01\u0e33\u0e25\u0e31\u0e07\u0e1c\u0e25\u0e34\u0e15', produced: '\u0e1c\u0e25\u0e34\u0e15\u0e41\u0e25\u0e49\u0e27', on_delivery: '\u0e01\u0e33\u0e25\u0e31\u0e07\u0e08\u0e31\u0e14\u0e2a\u0e48\u0e07', in_transit: '\u0e23\u0e30\u0e2b\u0e27\u0e48\u0e32\u0e07\u0e02\u0e19\u0e2a\u0e48\u0e07', on_site: '\u0e17\u0e35\u0e48\u0e2b\u0e19\u0e49\u0e32\u0e07\u0e32\u0e19', installed: '\u0e15\u0e34\u0e14\u0e15\u0e31\u0e49\u0e07\u0e41\u0e25\u0e49\u0e27' },
+    };
+    const lifecycleLabels = new Proxy({}, { get(_, key) { return (lifecycleLabelsI18n[currentLang] || lifecycleLabelsI18n.en)[key] || key; } });
+
+    function getTaskStartForMat(mr) {
+      const tk = tasksData.find(t => t.id === mr.task_id);
+      return tk?.planned_start ? (tk.planned_start.value || tk.planned_start) : null;
+    }
+
+    function getTaskRisk(taskId) {
+      const mats = allMaterialReqs.filter(m => m.task_id === taskId);
+      if (!mats.length) return null;
+      const tk = tasksData.find(t => t.id === taskId);
+      const taskStart = tk?.planned_start ? (tk.planned_start.value || tk.planned_start) : null;
+      let worst = null;
+      const priority = { red: 3, purple: 2, yellow: 1, blue: 0, green: 0, grey: -1 };
+      mats.forEach(m => {
+        const ds = m.line_item_id ? (allDeliverySchedules[m.line_item_id] || []) : (m.contract_id ? (allDeliverySchedules['c_' + m.contract_id] || []) : []);
+        const risk = computeRisk(m, ds, taskStart);
+        if (!worst || (priority[risk.color] || 0) > (priority[worst.color] || 0)) worst = risk;
+      });
+      return worst;
+    }
+
+    function getDepIconColor(taskId) {
+      const deps = depsData.filter(d => d.successor_id === taskId);
+      if (!deps.length) return 'grey';
+      const tk = tasksData.find(t => t.id === taskId);
+      const tkStart = tk?.planned_start ? new Date(tk.planned_start.value || tk.planned_start) : null;
+      if (!tkStart) return '#333';
+      for (const d of deps) {
+        const pred = tasksData.find(t => t.id === d.predecessor_id);
+        if (!pred) continue;
+        const predEndRaw = pred.planned_end || pred._computed_end;
+        const predEnd = predEndRaw ? new Date(predEndRaw.value || predEndRaw) : null;
+        if (!predEnd) continue;
+        const lag = parseInt(d.lag_days) || 0;
+        const predEndWithLag = new Date(predEnd); predEndWithLag.setDate(predEndWithLag.getDate() + lag);
+        if (!pred.actual_end && predEndWithLag > tkStart) return '#c5221f';
+      }
+      return '#333';
+    }
+
+    function getBarDepStatus(taskId) {
+      const deps = depsData.filter(d => d.successor_id === taskId);
+      if (!deps.length) return 'ok';
+      const tk = tasksData.find(t => t.id === taskId);
+      const tkStart = tk?.planned_start ? new Date(tk.planned_start.value || tk.planned_start) : null;
+      if (!tkStart) return 'ok';
+      let worstMargin = 999;
+      for (const d of deps) {
+        const pred = tasksData.find(t => t.id === d.predecessor_id);
+        if (!pred) continue;
+        const predEndRaw = pred.planned_end || pred._computed_end;
+        const predEnd = predEndRaw ? new Date(predEndRaw.value || predEndRaw) : null;
+        if (!predEnd) continue;
+        if (pred.actual_end) continue;
+        const lag = parseInt(d.lag_days) || 0;
+        const predEndWithLag = new Date(predEnd); predEndWithLag.setDate(predEndWithLag.getDate() + lag);
+        const margin = Math.round((tkStart - predEndWithLag) / 86400000);
+        if (margin < worstMargin) worstMargin = margin;
+      }
+      if (worstMargin < 0) return 'late';
+      if (worstMargin < 7) return 'tight';
+      return 'ok';
+    }
+
+    // ─── Render Gantt (READ-ONLY) ───
+
+    function renderGantt() {
+      const container = document.getElementById('gantt-container');
+
+      if (!tasksData.length && !phasesData.length) {
+        container.innerHTML = '<div class="empty-state">' + t('ganttNoTasks') + '</div>';
+        return;
+      }
+
+      // Build rows: interleave phases and their tasks
+      const rows = [];
+      phasesData.forEach(phase => {
+        rows.push({ type: 'phase', data: phase });
+        tasksData.filter(t => t.phase_id === phase.id).forEach(task => {
+          rows.push({ type: 'task', data: task });
+        });
+      });
+      const orphanTasks = tasksData.filter(t => !phasesData.some(p => p.id === t.phase_id));
+      orphanTasks.forEach(task => rows.push({ type: 'task', data: task }));
+
+      // Compute planned_end from start + duration if missing
+      tasksData.forEach(t => {
+        const s = t.planned_start ? (t.planned_start.value || t.planned_start) : null;
+        if (s && !t.planned_end) {
+          const d = new Date(s);
+          d.setDate(d.getDate() + (parseInt(t.duration_days) || 14));
+          t._computed_end = d.toISOString().substring(0, 10);
+        }
+      });
+
+      // Calculate date range
+      let minDate = null, maxDate = null;
+      tasksData.forEach(t => {
+        const s = t.planned_start ? new Date(t.planned_start.value || t.planned_start) : null;
+        const endRaw = t.planned_end || t._computed_end;
+        const e = endRaw ? new Date(endRaw.value || endRaw) : null;
+        if (s && (!minDate || s < minDate)) minDate = s;
+        if (e && (!maxDate || e > maxDate)) maxDate = e;
+        if (s && !e && (!maxDate || s > maxDate)) maxDate = s;
+      });
+
+      if (!minDate || !maxDate) {
+        let listHTML = '<div class="gantt-wrap" style="grid-template-columns:1fr"><div class="gantt-left" style="border:none">';
+        listHTML += `<div class="gantt-header-row">${t('name')}</div>`;
+        rows.forEach(row => {
+          if (row.type === 'phase') {
+            const p = row.data;
+            const name = p['name_' + currentLang] || p.name || p.name_en || '\u2014';
+            listHTML += `<div class="task-row phase"><span class="name">${name}</span></div>`;
+          } else {
+            const tk = row.data;
+            const name = tk['name_' + currentLang] || tk.name || tk.name_en || '\u2014';
+            const tkDeps = depsData.filter(d => d.successor_id === tk.id);
+            const listRisk = getTaskRisk(tk.id);
+            const listRiskBadge = listRisk ? `<span class="badge ${listRisk.color}" title="${listRisk.label}">\u25cf</span>` : '';
+            listHTML += `<div class="task-row">
+              <span class="name">${name}</span>
+              ${listRiskBadge}
+              ${tkDeps.length ? `<span style="color:${getDepIconColor(tk.id)};font-size:11px;font-weight:600">\u26d3${tkDeps.length}</span>` : ''}
+              <span style="color:#bbb;font-size:0.78rem">${tk.duration_days || '\u2014'}d</span></div>`;
+          }
+        });
+        listHTML += '</div></div>';
+        container.innerHTML = listHTML;
+        return;
+      }
+
+      // Add padding
+      const startDate = new Date(minDate); startDate.setDate(startDate.getDate() - 7);
+      window._ganttStartDate = startDate;
+      const endDate = new Date(maxDate); endDate.setDate(endDate.getDate() + 7);
+      const totalDays = Math.ceil((endDate - startDate) / 86400000);
+      const dayW = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--day-w'));
+      const totalW = totalDays * dayW;
+
+      const today = new Date();
+      today.setHours(0,0,0,0);
+
+      function dayOffset(date) {
+        return Math.round((new Date(date) - startDate) / 86400000);
+      }
+
+      // Build header HTML (months + weeks)
+      let headerMonths = '';
+      let cursor2 = new Date(startDate);
+      while (cursor2 < endDate) {
+        const next = new Date(cursor2.getFullYear(), cursor2.getMonth() + 1, 1);
+        const spanDays = Math.min(Math.ceil((next - cursor2) / 86400000), totalDays - dayOffset(cursor2));
+        if (spanDays <= 0) break;
+        const langLocale = currentLang === 'ru' ? 'ru-RU' : (currentLang === 'th' ? 'th-TH' : 'en-GB');
+        const label = cursor2.toLocaleDateString(langLocale, { month: 'short', year: '2-digit' });
+        headerMonths += `<div class="month-cell" style="width:${spanDays * dayW}px">${label}</div>`;
+        cursor2 = next;
+      }
+      let headerWeeks = '';
+      const weeks2 = Math.ceil(totalDays / 7);
+      for (let i = 0; i < weeks2; i++) headerWeeks += `<div class="week-cell" style="width:${7 * dayW}px">W${i + 1}</div>`;
+
+      const stickyHeaderHTML = `<div class="gantt-sticky-header">
+        <div class="gantt-header-left">${t('name')}</div>
+        <div class="gantt-header-right" id="gantt-header-scroll"><div style="width:${totalW}px">
+          <div class="month-row">${headerMonths}</div>
+          <div class="week-row">${headerWeeks}</div>
+        </div></div>
+      </div>`;
+
+      // Left panel (READ-ONLY: no click handlers, no + buttons)
+      let leftHTML = '<div class="gantt-left">';
+      rows.forEach((row, ri) => {
+        if (row.type === 'phase') {
+          const p = row.data;
+          const name = p['name_' + currentLang] || p.name || p.name_en || '\u2014';
+          leftHTML += `<div class="task-row phase" data-row-idx="${ri}">
+            <span class="name">${name}</span>
+          </div>`;
+        } else {
+          const tk = row.data;
+          const name = tk['name_' + currentLang] || tk.name || tk.name_en || '\u2014';
+          const tkDeps = depsData.filter(d => d.successor_id === tk.id);
+          const ganttRisk = getTaskRisk(tk.id);
+          const ganttRiskBadge = ganttRisk ? `<span class="badge ${ganttRisk.color}" title="${ganttRisk.label}">\u25cf</span>` : '';
+          leftHTML += `<div class="task-row" data-row-idx="${ri}" data-task-id="${tk.id}">
+            <span class="name">${name}</span>
+            ${ganttRiskBadge}
+            ${tkDeps.length ? `<span style="color:${getDepIconColor(tk.id)};font-size:11px;font-weight:600;opacity:${tkDeps.length ? '1' : '0.4'}">\u26d3${tkDeps.length}</span>` : ''}
+          </div>`;
+        }
+      });
+      leftHTML += '</div>';
+
+      // Right panel
+      let rightHTML = `<div class="gantt-right" id="gantt-body-scroll"><div class="gantt-right-inner" style="width:${totalW}px">`;
+
+      // Today line
+      const todayOff = dayOffset(today);
+      if (todayOff >= 0 && todayOff <= totalDays) {
+        const todayLabel = fmtDateDMY(today);
+        rightHTML += `<div class="today-line" style="left:${todayOff * dayW}px"><div class="today-label">${todayLabel}</div></div>`;
+      }
+
+      // Bars
+      rows.forEach((row, ri) => {
+        if (row.type === 'phase') {
+          rightHTML += `<div class="bar-row phase" data-row-idx="${ri}"></div>`;
+          return;
+        }
+        const tk = row.data;
+        const s = tk.planned_start ? new Date(tk.planned_start.value || tk.planned_start) : null;
+        const endRaw = tk.planned_end || tk._computed_end;
+        const e = endRaw ? new Date(endRaw.value || endRaw) : null;
+        const barEnd = e || s;
+
+        rightHTML += `<div class="bar-row" data-row-idx="${ri}">`;
+        if (s) {
+          const left = dayOffset(s) * dayW;
+          const width = Math.max((dayOffset(barEnd) - dayOffset(s) + 1) * dayW, 4);
+          const critical = tk.is_critical ? ' critical' : '';
+          const depStatus = getBarDepStatus(tk.id);
+          const barColorCls = depStatus === 'late' ? ' bar-red' : (depStatus === 'tight' ? ' bar-yellow' : '');
+          const name = tk['name_' + currentLang] || tk.name || tk.name_en || '';
+          rightHTML += `<div class="bar${barColorCls}${critical}" style="left:${left}px;width:${width}px" data-action="open-panel" data-task-id="${tk.id}">
+            <div class="bar-label">${name}</div>
+          </div>`;
+        }
+        // Delivery markers (diamonds)
+        const taskMatsForBar = allMaterialReqs.filter(m => m.task_id === tk.id);
+        taskMatsForBar.forEach(m => {
+          if (!m.line_item_id && !m.contract_id) return;
+          const dsArr = m.line_item_id ? (allDeliverySchedules[m.line_item_id] || []) : (m.contract_id ? (allDeliverySchedules['c_' + m.contract_id] || []) : []);
+          dsArr.forEach(d => {
+            const prodD = parseInt(d.production_days) || 0;
+            const delD = parseInt(d.delivery_days) || 0;
+            if (prodD === 0 && delD === 0 && !d.production_start && !d.delivery_start) return;
+            const eta = computeETA(d);
+            const lc = computeLifecycle(d);
+            const off = dayOffset(eta);
+            if (off >= 0 && off <= totalDays) {
+              const needBy = s || barEnd;
+              let markerColor;
+              if (lc === 'on_site' || lc === 'installed') {
+                markerColor = 'green';
+              } else if (lc === 'planned' || lc === 'quoted') {
+                const prodDays = parseInt(d.production_days) || 0;
+                const delDays = parseInt(d.delivery_days) || 0;
+                const orderDeadline = new Date(needBy);
+                orderDeadline.setDate(orderDeadline.getDate() - prodDays - delDays);
+                const marginDays = Math.round((orderDeadline - today) / 86400000);
+                if (marginDays < 0) markerColor = 'red';
+                else if (marginDays < 14) markerColor = 'yellow';
+                else markerColor = 'grey';
+              } else {
+                const marginDays = Math.round((needBy - eta) / 86400000);
+                if (marginDays < 0) markerColor = 'red';
+                else if (marginDays < 14) markerColor = 'yellow';
+                else markerColor = 'blue';
+              }
+              rightHTML += `<div class="delivery-marker ${markerColor}" style="left:${off * dayW}px" title="${m.contract_item_name || m.contract_name || m.category || '?'}: ${lifecycleLabels[lc] || lc}"></div>`;
+            }
+          });
+        });
+        rightHTML += '</div>';
+      });
+
+      rightHTML += '</div></div>';
+
+      container.innerHTML = `${stickyHeaderHTML}<div class="gantt-wrap">${leftHTML}${rightHTML}</div>`;
+
+      // Sync horizontal scroll
+      const headerScroll = document.getElementById('gantt-header-scroll');
+      const bodyScroll = document.getElementById('gantt-body-scroll');
+      if (headerScroll && bodyScroll) {
+        let syncing = false;
+        bodyScroll.addEventListener('scroll', () => {
+          if (!syncing) { syncing = true; headerScroll.scrollLeft = bodyScroll.scrollLeft; syncing = false; }
+        });
+        headerScroll.addEventListener('scroll', () => {
+          if (!syncing) { syncing = true; bodyScroll.scrollLeft = headerScroll.scrollLeft; syncing = false; }
+        });
+        if (todayOff > 0) {
+          const scrollTo = Math.max(0, todayOff * dayW - bodyScroll.clientWidth / 3);
+          bodyScroll.scrollLeft = scrollTo;
+          headerScroll.scrollLeft = scrollTo;
+        }
+      }
+
+      // Sync hover
+      container.addEventListener('mouseover', e => {
+        const row = e.target.closest('[data-row-idx]');
+        if (!row) return;
+        const idx = row.dataset.rowIdx;
+        container.querySelectorAll('.hovered').forEach(el => el.classList.remove('hovered'));
+        container.querySelectorAll(`[data-row-idx="${idx}"]`).forEach(el => el.classList.add('hovered'));
+      });
+      container.addEventListener('mouseleave', () => {
+        container.querySelectorAll('.hovered').forEach(el => el.classList.remove('hovered'));
+      });
+    }
+
+    // ─── Side panel (READ-ONLY) ───
+
+    document.getElementById('sp-close').addEventListener('click', closeSidePanel);
+
+    function closeSidePanel() {
+      document.getElementById('side-panel').classList.remove('open');
+      document.getElementById('sp-overlay').style.display = 'none';
+      clearDepArrows();
+    }
+
+    function clearDepArrows() {
+      const old = document.querySelector('.dep-arrows-svg');
+      if (old) old.remove();
+    }
+
+    function drawDepArrows(taskId) {
+      clearDepArrows();
+      const rightInner = document.querySelector('.gantt-right-inner');
+      if (!rightInner) return;
+      const rowH = 40;
+      const dayW = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--day-w'));
+
+      const rowMap = {};
+      document.querySelectorAll('.bar-row[data-row-idx]').forEach(el => {
+        const tid = el.querySelector('.bar[data-task-id]');
+        if (tid) rowMap[tid.dataset.taskId] = parseInt(el.dataset.rowIdx);
+      });
+      document.querySelectorAll('.task-row[data-task-id]').forEach(el => {
+        rowMap[el.dataset.taskId] = parseInt(el.dataset.rowIdx);
+      });
+
+      const predsOf = depsData.filter(d => d.successor_id === taskId);
+      const succsOf = depsData.filter(d => d.predecessor_id === taskId);
+      const allDeps = [...predsOf.map(d => ({ from: d.predecessor_id, to: d.successor_id, type: 'pred' })),
+                        ...succsOf.map(d => ({ from: d.predecessor_id, to: d.successor_id, type: 'succ' }))];
+
+      if (!allDeps.length) return;
+
+      const svgNS = 'http://www.w3.org/2000/svg';
+      const svg = document.createElementNS(svgNS, 'svg');
+      svg.classList.add('dep-arrows-svg');
+      svg.setAttribute('width', rightInner.scrollWidth);
+      svg.setAttribute('height', rightInner.scrollHeight);
+
+      function getBarPos(tid) {
+        const tk = tasksData.find(t => t.id === tid);
+        if (!tk) return null;
+        const ri = rowMap[tid];
+        if (ri === undefined) return null;
+        const ps = tk.planned_start ? new Date(tk.planned_start.value || tk.planned_start) : null;
+        const endRaw = tk.planned_end || tk._computed_end;
+        const pe = endRaw ? new Date(endRaw.value || endRaw) : ps;
+        if (!ps) return null;
+        const startDate = window._ganttStartDate;
+        if (!startDate) return null;
+        const startOff = Math.round((ps - startDate) / 86400000) * dayW;
+        const endOff = Math.round((pe - startDate) / 86400000) * dayW + dayW;
+        const y = ri * rowH;
+        return { left: startOff, right: endOff, midY: y + rowH / 2 };
+      }
+
+      allDeps.forEach(dep => {
+        const fromPos = getBarPos(dep.from);
+        const toPos = getBarPos(dep.to);
+        if (!fromPos || !toPos) return;
+
+        const color = dep.type === 'pred' ? '#f59e0b' : '#3b82f6';
+        const x1 = fromPos.right;
+        const y1 = fromPos.midY;
+        const x2 = toPos.left;
+        const y2 = toPos.midY;
+
+        const midX = x1 + 12;
+        const path = document.createElementNS(svgNS, 'path');
+        path.setAttribute('d', `M${x1},${y1} H${midX} V${y2} H${x2}`);
+        path.setAttribute('fill', 'none');
+        path.setAttribute('stroke', color);
+        path.setAttribute('stroke-width', '2');
+        path.setAttribute('stroke-dasharray', dep.type === 'pred' ? '' : '4,3');
+        svg.appendChild(path);
+
+        const arrow = document.createElementNS(svgNS, 'polygon');
+        const ax = x2, ay = y2;
+        arrow.setAttribute('points', `${ax},${ay} ${ax-6},${ay-4} ${ax-6},${ay+4}`);
+        arrow.setAttribute('fill', color);
+        svg.appendChild(arrow);
+      });
+
+      rightInner.appendChild(svg);
+    }
+
+    function openSidePanel(taskId) {
+      const tk = tasksData.find(t => t.id === taskId);
+      if (!tk) return;
+
+      const phase = phasesData.find(p => p.id === tk.phase_id);
+      const phaseName = phase ? (phase['name_' + currentLang] || phase.name || phase.name_en || '') : '';
+      const taskName = tk['name_' + currentLang] || tk.name || tk.name_en || '\u2014';
+      const ps = tk.planned_start ? (tk.planned_start.value || tk.planned_start) : null;
+      const dur = tk.duration_days || 0;
+      const endRaw = tk.planned_end || tk._computed_end;
+
+      document.getElementById('sp-phase').textContent = phaseName;
+      document.getElementById('sp-title').innerHTML = '';
+      document.getElementById('sp-meta').innerHTML = `
+        <div><span class="label">Start:</span> ${ps ? fmtDateDMY(ps) : '\u2014'}</div>
+        <div><span class="label">End:</span> ${endRaw ? fmtDateDMY(endRaw) : '\u2014'}</div>
+        <div><span class="label">Duration:</span> ${dur}d</div>
+        ${tk.is_critical ? '<span class="sp-critical">CRITICAL PATH</span>' : ''}
+      `;
+
+      let html = '';
+
+      // Task name
+      html += `<div style="font-size:18px;font-weight:700;color:#222;margin-bottom:14px">${taskName}</div>`;
+
+      // Notes
+      const noteText = tk['notes_' + currentLang] || tk.notes || tk.notes_en || '';
+      if (noteText) {
+        html += `<div style="font-size:13px;color:#444;line-height:1.6;white-space:pre-wrap;margin-bottom:16px;padding:10px 14px;background:#f8fafc;border-radius:6px;border-left:3px solid #3b82f6">${noteText}</div>`;
+      }
+
+      // Dependencies
+      const predsOf = depsData.filter(d => d.successor_id === taskId);
+      const succsOf = depsData.filter(d => d.predecessor_id === taskId);
+      if (predsOf.length || succsOf.length) {
+        html += '<div class="sp-section"><h3>' + t('ganttDependency') + '</h3>';
+        predsOf.forEach(d => {
+          const pred = tasksData.find(t => t.id === d.predecessor_id);
+          const predName = pred ? (pred['name_' + currentLang] || pred.name || '?') : '?';
+          html += `<div class="sp-dep-item">\u2190 ${predName} <span class="dep-arrow">${d.type || 'FS'}${d.lag_days ? ' +' + d.lag_days + 'd' : ''}</span></div>`;
+        });
+        succsOf.forEach(d => {
+          const succ = tasksData.find(t => t.id === d.successor_id);
+          const succName = succ ? (succ['name_' + currentLang] || succ.name || '?') : '?';
+          html += `<div class="sp-dep-item">\u2192 ${succName} <span class="dep-arrow">${d.type || 'FS'}${d.lag_days ? ' +' + d.lag_days + 'd' : ''}</span></div>`;
+        });
+        html += '</div>';
+      }
+
+      // Materials
+      const taskMats = allMaterialReqs.filter(m => m.task_id === taskId);
+
+      const fmtAmt0 = v => { const n = parseFloat(v?.value ?? v ?? 0); return isNaN(n) ? 0 : n; };
+      const fmtN = n => n ? n.toLocaleString('en-US',{minimumFractionDigits:2}) : '\u2014';
+      let grandTotal = 0, grandPaid = 0, slotsCount = 0;
+      const seenContracts = new Set();
+      taskMats.forEach(m => {
+        if (!m.line_item_id && !m.contract_id) { slotsCount++; return; }
+        const cKey = m.contract_id || (m.line_item_id + '_li');
+        if (m.contract_id && seenContracts.has(m.contract_id)) return;
+        if (m.contract_id) seenContracts.add(m.contract_id);
+        const total = m.contract_id ? fmtAmt0(m.contract_total) : fmtAmt0(m.contract_item_amount);
+        const paid = m.contract_id ? fmtAmt0(m.contract_paid) : 0;
+        grandTotal += total;
+        grandPaid += paid;
+      });
+      const grandRemaining = grandTotal - grandPaid;
+
+      html += '<div class="sp-section"><h3>' + t('ganttMaterials') + ' (' + taskMats.length + ')</h3>';
+
+      if (taskMats.length) {
+        html += `<div style="background:#f0f4ff;border:1px solid #d0d8f0;border-radius:8px;padding:14px;margin-bottom:14px">
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;text-align:center">
+            <div>
+              <div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:0.5px">Total</div>
+              <div style="font-size:14px;font-weight:600;color:#555;margin-top:2px">${fmtN(grandTotal)}</div>
+            </div>
+            <div>
+              <div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:0.5px">Paid</div>
+              <div style="font-size:14px;font-weight:600;color:#1e8e3e;margin-top:2px">${fmtN(grandPaid)}</div>
+            </div>
+            <div>
+              <div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:0.5px">Remaining</div>
+              <div style="font-size:20px;font-weight:700;color:#c5221f;margin-top:2px">${fmtN(grandRemaining)}</div>
+            </div>
+          </div>
+          ${slotsCount ? `<div style="text-align:center;margin-top:6px;font-size:11px;color:#8b5cf6">+ ${slotsCount} slot(s) without price</div>` : ''}
+        </div>`;
+      }
+
+      if (!taskMats.length) {
+        html += '<div style="color:#bbb;font-size:12px;font-style:italic">' + t('ganttNoMaterials') + '</div>';
+      }
+      taskMats.forEach(m => {
+        const isSlot = !m.line_item_id && !m.contract_id;
+        const isWhole = !m.line_item_id && m.contract_id;
+        const ds = m.line_item_id ? (allDeliverySchedules[m.line_item_id] || []) : (m.contract_id ? (allDeliverySchedules['c_' + m.contract_id] || []) : []);
+        const risk = computeRisk(m, ds, ps);
+
+        if (isSlot) {
+          html += `<div class="sp-mat-card risk-purple">
+            <div class="sp-mat-body">
+              <div class="sp-mat-name">SLOT \u2014 ${m.category || '\u2014'}</div>
+              <div class="sp-mat-grid"><div class="row"><span>Need by:</span><span class="v">${m.required_by_date ? fmtDateDMY(m.required_by_date) : '\u2014'}</span></div></div>
+              <div class="sp-mat-margin purple" style="background:#ede9fe;color:#6d28d9;margin-top:8px">No contract</div>
+            </div>
+          </div>`;
+          return;
+        }
+
+        const matName = isWhole ? (m.contract_name || '\u2014') : (m.contract_item_name || '\u2014');
+        const contractor = m.contractor_name_en || m.contractor_name_th || '';
+        const fmtAmt = v => { const n = parseFloat(v?.value ?? v ?? 0); return isNaN(n)||n===0 ? '' : n.toLocaleString('en-US',{minimumFractionDigits:2}); };
+        const amount = isWhole ? fmtAmt(m.contract_total) : fmtAmt(m.contract_item_amount);
+        const paid = fmtAmt(m.contract_paid);
+        const totalNum = fmtAmt0(isWhole ? m.contract_total : m.contract_item_amount);
+        const paidNum = fmtAmt0(m.contract_paid);
+        const remainingNum = totalNum - paidNum;
+        const contractStatus = m.contract_status || '';
+
+        let worstLC = 'installed', worstETA = null;
+        const lcOrder = ['planned','quoted','in_production','produced','on_delivery','in_transit','on_site','installed'];
+        ds.forEach(d => {
+          const lc = computeLifecycle(d);
+          if (lcOrder.indexOf(lc) < lcOrder.indexOf(worstLC)) worstLC = lc;
+          const eta = computeETA(d);
+          if (lc !== 'on_site' && lc !== 'installed' && (!worstETA || eta > worstETA)) worstETA = eta;
+        });
+        if (!ds.length) worstLC = 'planned';
+
+        let marginText, marginCls;
+        if (worstLC === 'planned' || worstLC === 'quoted') {
+          const prodDays = ds.length ? Math.max(...ds.map(d => parseInt(d.production_days) || 0)) : 0;
+          const delDays = ds.length ? Math.max(...ds.map(d => parseInt(d.delivery_days) || 0)) : 0;
+          const needBy = ps ? new Date(ps) : null;
+          if (needBy) {
+            const orderDeadline = new Date(needBy);
+            orderDeadline.setDate(orderDeadline.getDate() - prodDays - delDays);
+            const margin = Math.round((orderDeadline - new Date()) / 86400000);
+            if (margin < 0) { marginText = 'Order deadline passed ' + Math.abs(margin) + 'd ago'; marginCls = 'red'; }
+            else if (margin < 14) { marginText = 'Order within ' + margin + 'd'; marginCls = 'yellow'; }
+            else { marginText = 'Order margin: ' + margin + 'd'; marginCls = 'grey'; }
+          } else { marginText = '\u2014'; marginCls = 'grey'; }
+        } else if (worstLC === 'on_site' || worstLC === 'installed') {
+          marginText = 'Delivered'; marginCls = 'green';
+        } else {
+          const needBy = ps ? new Date(ps) : null;
+          if (needBy && worstETA) {
+            const margin = Math.round((needBy - worstETA) / 86400000);
+            if (margin < 0) { marginText = 'Late by ' + Math.abs(margin) + 'd'; marginCls = 'red'; }
+            else if (margin < 14) { marginText = 'Buffer: ' + margin + 'd (tight)'; marginCls = 'yellow'; }
+            else { marginText = 'On track, buffer: ' + margin + 'd'; marginCls = 'blue'; }
+          } else { marginText = '\u2014'; marginCls = 'grey'; }
+        }
+
+        const sourceLabel = isWhole ? 'CONTRACT' : (m.contract_name || '');
+
+        html += `<div class="sp-mat-card risk-${risk.color}">
+          ${sourceLabel ? `<div class="sp-mat-source"><span>📄</span><span class="ref">${sourceLabel}</span></div>` : ''}
+          <div class="sp-mat-body">
+            <div style="display:flex;justify-content:space-between;align-items:baseline">
+              <div class="sp-mat-name">${matName}</div>
+              ${amount ? `<div style="font-size:15px;font-weight:700;color:#0f4c81;white-space:nowrap">${amount}</div>` : ''}
+            </div>
+            <div class="sp-mat-sub">${contractor ? contractor + ' \u00b7 ' : ''}${m.qty || ''} ${m.unit || ''}${contractStatus ? ' \u00b7 <span style="text-transform:uppercase;font-weight:600;font-size:10px">' + contractStatus + '</span>' : ''}</div>
+            ${totalNum ? `<div style="display:flex;gap:10px;margin-top:4px;font-size:11px">
+              <span style="color:#888">Paid: <strong style="color:#1e8e3e">${fmtN(paidNum)}</strong></span>
+              <span style="color:#888">Remaining: <strong style="color:#c5221f">${fmtN(remainingNum)}</strong></span>
+            </div>` : ''}
+            <div class="sp-mat-indicators">
+              <span class="sp-ind sp-ind-lc">${lifecycleLabels[worstLC] || worstLC}</span>
+              <span class="sp-ind sp-ind-risk ${risk.color}">\u25cf ${risk.label}</span>
+            </div>
+            <div class="sp-mat-grid">
+              <div class="row"><span>Need by:</span><span class="v">${ps ? fmtDateDMY(ps) : '\u2014'}</span></div>
+              <div class="row"><span>ETA:</span><span class="v${worstETA && ps && worstETA > new Date(ps) ? ' late' : ''}">${worstETA ? fmtDateDMY(worstETA) : '\u2014'}</span></div>
+              <div class="row"><span>${t('ganttProductionDays')}:</span><span class="v">${ds.length ? Math.max(...ds.map(d => parseInt(d.production_days) || 0)) + 'd' : '\u2014'}</span></div>
+              <div class="row"><span>${t('ganttDeliveryDays')}:</span><span class="v">${ds.length ? Math.max(...ds.map(d => parseInt(d.delivery_days) || 0)) + 'd' : '\u2014'}</span></div>
+            </div>
+            <div class="sp-mat-margin ${marginCls}">${marginText}</div>
+            ${ds.length ? '<div style="margin-top:6px;font-size:10px;color:#999">' + ds.map((d,i) => {
+              const lc = computeLifecycle(d);
+              return 'Batch ' + (d.batch_number || i+1) + ': ' + (d.qty||'?') + ' ' + (d.unit||'') + ' \u00b7 ' + (lifecycleLabels[lc]||lc) + ' \u00b7 ETA ' + fmtDateDMY(computeETA(d));
+            }).join('<br>') + '</div>' : ''}
+          </div>
+        </div>`;
+      });
+      html += '</div>';
+
+      document.getElementById('sp-body').innerHTML = html;
+      document.getElementById('side-panel').classList.add('open');
+      document.getElementById('sp-overlay').style.display = 'block';
+      drawDepArrows(taskId);
+    }
+
+    // ─── Actions (READ-ONLY: only open-panel) ───
+
+    document.addEventListener('click', e => {
+      const btn = e.target.closest('[data-action]');
+      if (!btn) return;
+      const action = btn.dataset.action;
+
+      if (action === 'open-panel') {
+        openSidePanel(btn.dataset.taskId);
+        return;
+      }
+    });
+
+    // ─── Dashboard widget ───
+
+    function updateDashboard() {
+      const widget = document.getElementById('dash-widget');
+      const tabs = document.getElementById('gantt-tabs');
+      if (!filterFolder || !allMaterialReqs.length) {
+        widget.style.display = 'none';
+        tabs.style.display = 'none';
+        return;
+      }
+      tabs.style.display = 'flex';
+
+      const reds = allMaterialReqs.filter(m => {
+        const ds = m.line_item_id ? (allDeliverySchedules[m.line_item_id] || []) : (m.contract_id ? (allDeliverySchedules['c_' + m.contract_id] || []) : []);
+        return computeRisk(m, ds, getTaskStartForMat(m)).color === 'red';
+      });
+      const slots = allMaterialReqs.filter(m => !m.line_item_id);
+      const yellows = allMaterialReqs.filter(m => {
+        const ds = m.line_item_id ? (allDeliverySchedules[m.line_item_id] || []) : (m.contract_id ? (allDeliverySchedules['c_' + m.contract_id] || []) : []);
+        return computeRisk(m, ds, getTaskStartForMat(m)).color === 'yellow';
+      });
+      const total = reds.length + slots.length + yellows.length;
+      if (!total) { widget.style.display = 'none'; return; }
+      widget.style.display = 'flex';
+      document.getElementById('dw-title').textContent = total + ' alerts';
+      const parts = [];
+      if (reds.length) parts.push(reds.length + ' late/too late');
+      if (yellows.length) parts.push(yellows.length + ' at risk');
+      if (slots.length) parts.push(slots.length + ' no contract');
+      document.getElementById('dw-sub').textContent = parts.join(' \u00b7 ');
+
+      const pill = document.getElementById('proc-pill');
+      if (reds.length) { pill.textContent = reds.length; pill.style.display = ''; }
+      else { pill.style.display = 'none'; }
+    }
+
+    // ─── Procurement view (READ-ONLY) ───
+
+    function renderProcurement() {
+      const filtersEl = document.getElementById('proc-filters');
+      const tableWrap = document.getElementById('proc-table-wrap');
+
+      const counts = { all: 0, red: 0, yellow: 0, purple: 0 };
+      allMaterialReqs.forEach(m => {
+        const ds = m.line_item_id ? (allDeliverySchedules[m.line_item_id] || []) : (m.contract_id ? (allDeliverySchedules['c_' + m.contract_id] || []) : []);
+        const risk = computeRisk(m, ds, getTaskStartForMat(m));
+        counts.all++;
+        if (risk.color === 'red') counts.red++;
+        if (risk.color === 'yellow') counts.yellow++;
+        if (risk.color === 'purple') counts.purple++;
+      });
+
+      filtersEl.innerHTML = [
+        { key: 'all', label: `All (${counts.all})` },
+        { key: 'red', label: `Late (${counts.red})` },
+        { key: 'yellow', label: `Order now (${counts.yellow})` },
+        { key: 'purple', label: `No contract (${counts.purple})` },
+      ].map(f => `<button class="proc-filter-pill ${procFilterColor === f.key ? 'active' : ''}" data-proc-filter="${f.key}">${f.label}</button>`).join('');
+
+      filtersEl.querySelectorAll('.proc-filter-pill').forEach(btn => {
+        btn.addEventListener('click', () => {
+          procFilterColor = btn.dataset.procFilter;
+          renderProcurement();
+        });
+      });
+
+      let rows = allMaterialReqs.map(m => {
+        const ds = m.line_item_id ? (allDeliverySchedules[m.line_item_id] || []) : (m.contract_id ? (allDeliverySchedules['c_' + m.contract_id] || []) : []);
+        const risk = computeRisk(m, ds, getTaskStartForMat(m));
+        const needBy = m.required_by_date ? new Date(m.required_by_date.value || m.required_by_date) : null;
+        let worstETA = null;
+        ds.forEach(d => {
+          const lc = computeLifecycle(d);
+          if (lc !== 'on_site' && lc !== 'installed') {
+            const eta = computeETA(d);
+            if (!worstETA || eta > worstETA) worstETA = eta;
+          }
+        });
+        const margin = (needBy && worstETA) ? Math.round((needBy - worstETA) / 86400000) : null;
+        const lcAgg = ds.length ? computeLifecycle(ds[0]) : '\u2014';
+        return { m, risk, needBy, worstETA, margin, lcAgg, ds };
+      });
+
+      if (procFilterColor !== 'all') {
+        rows = rows.filter(r => r.risk.color === procFilterColor);
+      }
+
+      if (!rows.length) {
+        tableWrap.innerHTML = '<div style="text-align:center;padding:32px;color:#bbb">' + t('ganttNoMaterials') + '</div>';
+        return;
+      }
+
+      let html = `<table class="proc-table"><thead><tr>
+        <th>${t('ganttMaterials')}</th><th>${t('contract')}</th><th>Lifecycle</th><th>Need by</th><th>ETA</th><th>Margin</th><th>Risk</th>
+      </tr></thead><tbody>`;
+
+      rows.forEach(r => {
+        const m = r.m;
+        const name = m.line_item_id ? (m.contract_item_name || m.contract_item_description || '\u2014') : `<span style="color:#8b5cf6">SLOT</span> ${m.category || '\u2014'}`;
+        const contract = m.contractor_name || '\u2014';
+        const lc = r.ds.length ? lifecycleLabels[computeLifecycle(r.ds[0])] || computeLifecycle(r.ds[0]) : '\u2014';
+        const needByStr = r.needBy ? fmtDateDMY(r.needBy) : '\u2014';
+        const etaStr = r.worstETA ? fmtDateDMY(r.worstETA) : '\u2014';
+        const marginStr = r.margin !== null ? (r.margin >= 0 ? `+${r.margin}d` : `${r.margin}d`) : '\u2014';
+        const marginColor = r.margin !== null ? (r.margin < 0 ? 'color:#ef4444' : (r.margin < 7 ? 'color:#f59e0b' : 'color:#10b981')) : '';
+
+        html += `<tr>
+          <td>${name}<div style="color:#999;font-size:11px">${m.task_name || ''}</div></td>
+          <td>${contract}</td>
+          <td>${lc}</td>
+          <td>${needByStr}</td>
+          <td>${etaStr}</td>
+          <td style="${marginColor};font-weight:600">${marginStr}</td>
+          <td><span class="proc-pill ${r.risk.color}">${r.risk.label}</span></td>
+        </tr>`;
+      });
+
+      html += '</tbody></table>';
+      tableWrap.innerHTML = html;
+    }
+
+    // ─── Tab switching ───
+
+    document.querySelectorAll('.gantt-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('.gantt-tab').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        document.getElementById('view-gantt').style.display = tab.dataset.tab === 'gantt' ? '' : 'none';
+        document.getElementById('view-proc').style.display = tab.dataset.tab === 'proc' ? '' : 'none';
+        if (tab.dataset.tab === 'proc') renderProcurement();
+      });
+    });
+
+    // Escape closes side panel
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape') closeSidePanel();
+    });
+
+    // ─── Lang change ───
+    window.onLangChange = () => {
+      updateTexts();
+      if (tasksData.length) renderGantt();
+    };
+
+    // ─── Init ───
+    updateTexts();
+    tryRestoreSession();
+  </script>
+</body>
+</html>

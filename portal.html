@@ -117,6 +117,7 @@
     <div class="nav">
       <a class="nav-link active" id="portal-nav-contracts" href="#" onclick="switchPortalSection('contracts');return false"></a>
       <a class="nav-link" id="portal-nav-materials" href="#" onclick="switchPortalSection('materials');return false" style="display:none"></a>
+      <a class="nav-link" id="portal-nav-gantt" href="portal_gantt.html"></a>
     </div>
     <div class="header-right">
       <div class="lang-switcher">
@@ -278,6 +279,7 @@
       const ps = document.getElementById('portal-search');
       if (ps) ps.placeholder = t('search');
       document.getElementById('portal-nav-materials').textContent = t('navMaterials');
+      document.getElementById('portal-nav-gantt').textContent = 'Gantt';
       const matTitle = document.getElementById('t-mat-title');
       if (matTitle) matTitle.textContent = t('materials');
       document.getElementById('portal-logout-btn').textContent = t('logout');
