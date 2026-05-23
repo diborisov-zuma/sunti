@@ -123,6 +123,8 @@
     background: linear-gradient(135deg, var(--gantt-green), #059669);
   }
   .bar:hover { transform: scaleY(1.15); }
+  .bar.bar-yellow { background: linear-gradient(135deg, var(--gantt-yellow), #d97706); }
+  .bar.bar-red { background: linear-gradient(135deg, var(--gantt-red), #dc2626); }
   .bar.critical { box-shadow: 0 0 0 2px var(--gantt-red), 0 1px 4px rgba(239,68,68,0.4); }
   .bar .bar-label {
     position: absolute; left: 8px; top: 50%; transform: translateY(-50%);
@@ -946,6 +948,31 @@
       return '#333'; // black - has deps, all ok
     }
 
+    // Bar color based on dependency status: green/yellow/red
+    function getBarDepStatus(taskId) {
+      const deps = depsData.filter(d => d.successor_id === taskId);
+      if (!deps.length) return 'ok'; // no dependencies
+      const tk = tasksData.find(t => t.id === taskId);
+      const tkStart = tk?.planned_start ? new Date(tk.planned_start.value || tk.planned_start) : null;
+      if (!tkStart) return 'ok';
+      let worstMargin = 999;
+      for (const d of deps) {
+        const pred = tasksData.find(t => t.id === d.predecessor_id);
+        if (!pred) continue;
+        const predEndRaw = pred.planned_end || pred._computed_end;
+        const predEnd = predEndRaw ? new Date(predEndRaw.value || predEndRaw) : null;
+        if (!predEnd) continue;
+        if (pred.actual_end) continue; // predecessor finished, no risk
+        const lag = parseInt(d.lag_days) || 0;
+        const predEndWithLag = new Date(predEnd); predEndWithLag.setDate(predEndWithLag.getDate() + lag);
+        const margin = Math.round((tkStart - predEndWithLag) / 86400000);
+        if (margin < worstMargin) worstMargin = margin;
+      }
+      if (worstMargin < 0) return 'late';    // predecessor ends after task start
+      if (worstMargin < 7) return 'tight';   // less than 7 days buffer
+      return 'ok';
+    }
+
     // ─── Render Gantt ───
 
     function renderGantt() {
@@ -1108,8 +1135,10 @@
           const left = dayOffset(s) * dayW;
           const width = Math.max((dayOffset(barEnd) - dayOffset(s) + 1) * dayW, 4);
           const critical = tk.is_critical ? ' critical' : '';
+          const depStatus = getBarDepStatus(tk.id);
+          const barColorCls = depStatus === 'late' ? ' bar-red' : (depStatus === 'tight' ? ' bar-yellow' : '');
           const name = tk['name_' + currentLang] || tk.name || tk.name_en || '';
-          rightHTML += `<div class="bar${critical}" style="left:${left}px;width:${width}px" data-action="open-panel" data-task-id="${tk.id}">
+          rightHTML += `<div class="bar${barColorCls}${critical}" style="left:${left}px;width:${width}px" data-action="open-panel" data-task-id="${tk.id}">
             <div class="bar-label">${name}</div>
           </div>`;
         }
