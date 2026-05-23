@@ -388,7 +388,7 @@
           <div class="field-group"><label>TH <button class="translate-btn" data-src="th" data-fields="g-tk-name-th" data-targets="g-tk-name:ru,g-tk-name-en:en" title="Translate to RU + EN">🌐</button></label><input type="text" id="g-tk-name-th"></div>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
-          <div class="field-group"><label>Start</label><input type="date" id="g-tk-start" lang="en-GB"></div>
+          <div class="field-group"><label>Start <button type="button" id="btn-smart-start" title="Auto-calculate start from dependencies" style="background:none;border:none;cursor:pointer;font-size:16px;vertical-align:middle;opacity:0.6">🧠</button></label><input type="date" id="g-tk-start" lang="en-GB"></div>
           <div class="field-group"><label>Duration (days)</label><input type="number" id="g-tk-dur" min="1" value="14"></div>
           <div class="field-group"><label>Sort order</label><input type="number" id="g-tk-sort" min="0" value="0"></div>
         </div>
@@ -1705,6 +1705,27 @@
         showToast(t('saved'), 'success');
         await loadGanttData();
       } catch(e) { showToast(e.message, 'error'); }
+    });
+
+    // Smart start: find latest predecessor end + 1 day
+    document.getElementById('btn-smart-start').addEventListener('click', () => {
+      if (!editTaskId) return;
+      const deps = depsData.filter(d => d.successor_id === editTaskId);
+      if (!deps.length) { showToast('No dependencies', 'error'); return; }
+      let latestEnd = null;
+      deps.forEach(d => {
+        const pred = tasksData.find(t => t.id === d.predecessor_id);
+        if (!pred) return;
+        const predEndRaw = pred.planned_end || pred._computed_end;
+        if (!predEndRaw) return;
+        const predEnd = new Date(predEndRaw.value || predEndRaw);
+        const lag = parseInt(d.lag_days) || 0;
+        predEnd.setDate(predEnd.getDate() + lag);
+        if (!latestEnd || predEnd > latestEnd) latestEnd = predEnd;
+      });
+      if (!latestEnd) { showToast('No predecessor dates', 'error'); return; }
+      latestEnd.setDate(latestEnd.getDate() + 1); // +1 day after latest predecessor
+      document.getElementById('g-tk-start').value = latestEnd.toISOString().substring(0, 10);
     });
 
     // Task delete
