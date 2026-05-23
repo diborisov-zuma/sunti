@@ -2168,7 +2168,7 @@
         }).join('');
     }
 
-    document.getElementById('btn-dep-cancel').addEventListener('click', () => closeModal('modal-dep'));
+    document.getElementById('btn-dep-cancel').addEventListener('click', () => { closeModal('modal-dep'); loadGanttData(); });
     document.getElementById('btn-dep-save').addEventListener('click', async () => {
       if (!selectedPredId) { showToast(t('ganttPredecessor'), 'error'); return; }
       try {
