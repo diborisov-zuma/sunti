@@ -663,7 +663,8 @@
 
     document.getElementById('filter-company').addEventListener('change', e => {
       filterCompany = e.target.value; filterFolder = ''; filterContractor = '';
-      fillFolderFilter(); fillContractorFilter(); loadContracts();
+      fillFolderFilter(); fillContractorFilter();
+      allContracts = []; renderContracts();
     });
     document.getElementById('filter-folder').addEventListener('change', e => { filterFolder = e.target.value; loadContracts(); });
     document.getElementById('filter-search').addEventListener('input', e => {
