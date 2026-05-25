@@ -391,6 +391,17 @@
     </div>
   </div>
 
+  <!-- History modal -->
+  <div class="modal-overlay" id="modal-history">
+    <div class="modal" style="width:800px;max-width:95vw;max-height:90vh;display:flex;flex-direction:column">
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:16px 20px;border-bottom:1px solid #e8e8e8">
+        <h3 style="margin:0">History</h3>
+        <button class="btn btn-outline" id="btn-history-close">×</button>
+      </div>
+      <div id="history-content" style="padding:16px 20px;overflow-y:auto;flex:1"></div>
+    </div>
+  </div>
+
   <!-- PDF Viewer injected by _pdf_viewer.js -->
 
   <div class="toast" id="toast"></div>
@@ -938,6 +949,7 @@
       }
       // Edit/Delete buttons — top right
       html += `<div style="display:flex;justify-content:flex-end;gap:6px;margin-bottom:8px">
+        <button class="btn btn-outline" style="padding:4px 10px;font-size:0.78rem" data-action="show-history" data-contract-id="${contractId}">🕐</button>
         <button class="btn btn-outline" style="padding:2px 8px;font-size:0.75rem" data-action="edit-contract" data-id="${contractId}">${t('edit')}</button>
         <button class="icon-btn" data-action="delete-contract" data-id="${contractId}" title="${t('delete')}">${ICON_TRASH}</button>
       </div>`;
@@ -1254,6 +1266,18 @@
         } catch(err) { showToast(err.message, 'error'); btn.disabled = false; }
       }
 
+      if (action === 'show-history') {
+        const contractId = btn.dataset.contractId;
+        btn.disabled = true;
+        try {
+          const entries = await apiFetch(`/audit_log?contract_id=${contractId}`);
+          renderHistory(entries, contractId);
+          openModal('modal-history');
+        } catch(err) { showToast(err.message, 'error'); }
+        btn.disabled = false;
+        return;
+      }
+
       if (action === 'edit-inv') {
         const contractId = btn.dataset.contractId;
         const invId = btn.dataset.invId;
@@ -1523,6 +1547,51 @@
         } catch(err) { showToast(err.message, 'error'); btn.disabled = false; }
       }
     });
+
+    // ─── History ───
+
+    function renderHistory(entries, contractId) {
+      const content = document.getElementById('history-content');
+      if (!entries.length) { content.innerHTML = '<div style="color:#bbb;padding:20px;text-align:center">No changes recorded</div>'; return; }
+
+      const contractEntries = entries.filter(e => e.entity_type === 'contract');
+      const invoiceEntries = entries.filter(e => e.entity_type === 'invoice');
+      const txEntries = entries.filter(e => e.entity_type === 'transaction');
+
+      function fmtDate(val) {
+        if (!val) return '';
+        const d = new Date(val.value || val);
+        return d.toLocaleDateString('en-GB', { day:'2-digit', month:'2-digit', year:'numeric' }) + ' ' + d.toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit' });
+      }
+
+      function renderEntries(entries, title, icon) {
+        if (!entries.length) return '';
+        let html = `<div style="margin-bottom:20px"><h4 style="font-size:0.82rem;color:#555;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px">${icon} ${title}</h4>`;
+        entries.forEach(e => {
+          const actionColor = e.action === 'create' ? '#1e8e3e' : (e.action === 'delete' ? '#c5221f' : '#1a73e8');
+          const actionLabel = e.action === 'create' ? 'Created' : (e.action === 'delete' ? 'Deleted' : e.field);
+          let detail = '';
+          if (e.action === 'update') {
+            detail = `<span style="color:#999;text-decoration:line-through">${e.old_value || '\u2014'}</span> \u2192 <strong>${e.new_value || '\u2014'}</strong>`;
+          }
+          html += `<div style="display:flex;gap:10px;padding:6px 0;border-bottom:1px solid #f5f5f5;font-size:0.82rem">
+            <span style="color:#999;min-width:120px;font-size:0.75rem">${fmtDate(e.changed_at)}</span>
+            <span style="color:${actionColor};font-weight:600;min-width:100px">${actionLabel}</span>
+            <span style="flex:1">${detail}</span>
+            <span style="color:#bbb;font-size:0.75rem">${e.changed_by || ''}</span>
+          </div>`;
+        });
+        html += '</div>';
+        return html;
+      }
+
+      content.innerHTML =
+        renderEntries(contractEntries, 'Contract', '\uD83D\uDCCB') +
+        renderEntries(invoiceEntries, 'Invoices', '\uD83D\uDCC4') +
+        renderEntries(txEntries, 'Payments', '\uD83D\uDCB3');
+    }
+
+    document.getElementById('btn-history-close').addEventListener('click', () => closeModal('modal-history'));
 
     // ─── Link invoice modal ───
 
@@ -1946,6 +2015,7 @@
         closeModal('modal-trx');
         closeModal('modal-link-inv');
         closeModal('modal-file');
+        closeModal('modal-history');
         closePdfViewer();
       }
     });

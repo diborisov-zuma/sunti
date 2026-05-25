@@ -17,9 +17,34 @@ async function deleteGcsFiles(urls) {
     }
   }
 }
+const crypto = require('crypto');
 const PROJECT  = 'project-9718e7d4-4cd7-4f52-8d6';
 const DATASET  = 'sunti';
 const TABLE    = 'invoices';
+const auditTable = `\`${PROJECT}.${DATASET}.audit_log\``;
+
+async function logAudit(entries) {
+  if (!entries.length) return;
+  const values = entries.map((e, i) => {
+    return `(@id${i}, @type${i}, @eid${i}, @cid${i}, @action${i}, @field${i}, @old${i}, @new${i}, @by${i}, CURRENT_TIMESTAMP())`;
+  }).join(',');
+  const params = {};
+  entries.forEach((e, i) => {
+    params['id' + i] = crypto.randomUUID();
+    params['type' + i] = e.entity_type;
+    params['eid' + i] = e.entity_id;
+    params['cid' + i] = e.contract_id || '';
+    params['action' + i] = e.action;
+    params['field' + i] = e.field || '';
+    params['old' + i] = e.old_value != null ? String(e.old_value) : '';
+    params['new' + i] = e.new_value != null ? String(e.new_value) : '';
+    params['by' + i] = e.changed_by;
+  });
+  await bigquery.query({
+    query: `INSERT INTO ${auditTable} (id, entity_type, entity_id, contract_id, action, field, old_value, new_value, changed_by, changed_at) VALUES ${values}`,
+    params,
+  });
+}
 
 function setCors(res) {
   res.set('Access-Control-Allow-Origin', '*');
@@ -214,6 +239,9 @@ exports.invoices = async (req, res) => {
       // Recalc contract if linked
       if (b.contract_id) await recalcContractPaid(b.contract_id);
 
+      // Audit: log create
+      await logAudit([{ entity_type: 'invoice', entity_id: id, contract_id: b.contract_id || '', action: 'create', changed_by: email }]);
+
       res.json({ success: true, id });
       return;
     }
@@ -226,13 +254,36 @@ exports.invoices = async (req, res) => {
       if (parseFloat(b.total_amount || 0) < 0) { res.status(400).json({ error: 'amounts must be non-negative' }); return; }
 
       const [rows] = await bigquery.query({
-        query: `SELECT folder_id, contract_id, uploaded_by, FORMAT_TIMESTAMP('%Y-%m-%dT%H:%M:%S', uploaded_at) as uploaded_at FROM ${table} WHERE id = @id`,
+        query: `SELECT folder_id, contract_id, uploaded_by, name, status, total_amount, vat_amount,
+                       wht_amount, subtotal, category_id, contractor_id, date,
+                       FORMAT_TIMESTAMP('%Y-%m-%dT%H:%M:%S', uploaded_at) as uploaded_at FROM ${table} WHERE id = @id`,
         params: { id },
       });
       if (!rows.length) { res.status(404).json({ error: 'Not found' }); return; }
       const cur = rows[0];
       const oldContractId = cur.contract_id || '';
       const newContractId = b.contract_id !== undefined ? (b.contract_id || '') : oldContractId;
+
+      // Audit: compare tracked fields
+      const auditEntries = [];
+      const auditContractId = newContractId || oldContractId;
+      const invTrackFields = {
+        status: b.status || 'active', name: b.name,
+        total_amount: b.total_amount != null ? String(b.total_amount) : '0',
+        vat_amount: b.vat_amount != null ? String(b.vat_amount) : '0',
+        wht_amount: b.wht_amount != null ? String(b.wht_amount) : '0',
+        subtotal: b.subtotal != null ? String(b.subtotal) : '0',
+        category_id: b.category_id || '', contractor_id: b.contractor_id || '',
+        contract_id: newContractId, date: b.date || '',
+      };
+      for (const [field, newVal] of Object.entries(invTrackFields)) {
+        const oldVal = cur[field]?.value ?? cur[field] ?? '';
+        const nv = newVal ?? '';
+        if (String(oldVal) !== String(nv)) {
+          auditEntries.push({ entity_type: 'invoice', entity_id: id, contract_id: auditContractId, action: 'update', field, old_value: oldVal, new_value: nv, changed_by: email });
+        }
+      }
+      if (auditEntries.length) await logAudit(auditEntries);
 
       // Validate contract link
       if (newContractId) {
@@ -387,6 +438,9 @@ exports.invoices = async (req, res) => {
 
         // Recalc contract paid if linked
         if (cur.contract_id) await recalcContractPaid(cur.contract_id);
+
+        // Audit: log delete
+        await logAudit([{ entity_type: 'invoice', entity_id: id, contract_id: cur.contract_id || '', action: 'delete', changed_by: email }]);
       }
 
       res.json({ success: true });

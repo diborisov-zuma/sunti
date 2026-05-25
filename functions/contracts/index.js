@@ -1,10 +1,35 @@
 const { BigQuery } = require('@google-cloud/bigquery');
 const { v4: uuidv4 } = require('uuid');
+const crypto = require('crypto');
 
 const bigquery = new BigQuery();
 const PROJECT  = 'project-9718e7d4-4cd7-4f52-8d6';
 const DATASET  = 'sunti';
 const TABLE    = 'contracts';
+const auditTable = `\`${PROJECT}.${DATASET}.audit_log\``;
+
+async function logAudit(entries) {
+  if (!entries.length) return;
+  const values = entries.map((e, i) => {
+    return `(@id${i}, @type${i}, @eid${i}, @cid${i}, @action${i}, @field${i}, @old${i}, @new${i}, @by${i}, CURRENT_TIMESTAMP())`;
+  }).join(',');
+  const params = {};
+  entries.forEach((e, i) => {
+    params['id' + i] = crypto.randomUUID();
+    params['type' + i] = e.entity_type;
+    params['eid' + i] = e.entity_id;
+    params['cid' + i] = e.contract_id || '';
+    params['action' + i] = e.action;
+    params['field' + i] = e.field || '';
+    params['old' + i] = e.old_value != null ? String(e.old_value) : '';
+    params['new' + i] = e.new_value != null ? String(e.new_value) : '';
+    params['by' + i] = e.changed_by;
+  });
+  await bigquery.query({
+    query: `INSERT INTO ${auditTable} (id, entity_type, entity_id, contract_id, action, field, old_value, new_value, changed_by, changed_at) VALUES ${values}`,
+    params,
+  });
+}
 
 function setCors(res) {
   res.set('Access-Control-Allow-Origin', '*');
@@ -223,6 +248,8 @@ exports.contracts = async (req, res) => {
           created_by:    email,
         },
       });
+      // Audit: log create
+      await logAudit([{ entity_type: 'contract', entity_id: id, contract_id: id, action: 'create', changed_by: email }]);
       res.json({ success: true, id });
       return;
     }
@@ -233,9 +260,11 @@ exports.contracts = async (req, res) => {
       const b = req.body || {};
       if (!id || !b.name) { res.status(400).json({ error: 'id and name are required' }); return; }
 
-      // Check exists + get folder for RBAC
+      // Check exists + get folder for RBAC + fetch current values for audit
       const [existing] = await bigquery.query({
-        query: `SELECT folder_id, contractor_id FROM ${table} WHERE id = @id AND IFNULL(status, 'active') != 'deleted'`,
+        query: `SELECT folder_id, contractor_id, name, status, total_amount, subtotal,
+                       vat_amount, paid_amount, responsible_email, progress_pct, notes
+                FROM ${table} WHERE id = @id AND IFNULL(status, 'active') != 'deleted'`,
         params: { id },
       });
       if (!existing.length) { res.status(404).json({ error: 'Not found' }); return; }
@@ -245,10 +274,30 @@ exports.contracts = async (req, res) => {
         if (acc !== 'editor') { res.status(403).json({ error: 'Forbidden' }); return; }
       }
 
-      const oldFolderId = existing[0].folder_id;
+      const cur = existing[0];
+      const oldFolderId = cur.folder_id;
       const newFolderId = b.folder_id || oldFolderId;
-      const oldContractorId = existing[0].contractor_id;
+      const oldContractorId = cur.contractor_id;
       const newContractorId = b.contractor_id || oldContractorId;
+
+      // Audit: compare tracked fields
+      const auditEntries = [];
+      const trackFields = {
+        status: b.status || 'active', name: b.name, total_amount: b.total_amount != null ? String(b.total_amount) : '0',
+        subtotal: b.subtotal != null ? String(b.subtotal) : '0',
+        vat_amount: b.vat_amount != null ? String(b.vat_amount) : '0',
+        contractor_id: newContractorId,
+        responsible_email: b.responsible_email || '', progress_pct: b.progress_pct != null ? String(b.progress_pct) : '0',
+        notes: b.notes || '',
+      };
+      for (const [field, newVal] of Object.entries(trackFields)) {
+        const oldVal = cur[field]?.value ?? cur[field] ?? '';
+        const nv = newVal ?? '';
+        if (String(oldVal) !== String(nv)) {
+          auditEntries.push({ entity_type: 'contract', entity_id: id, contract_id: id, action: 'update', field, old_value: oldVal, new_value: nv, changed_by: email });
+        }
+      }
+      if (auditEntries.length) await logAudit(auditEntries);
 
       await bigquery.query({
         query: `UPDATE ${table}

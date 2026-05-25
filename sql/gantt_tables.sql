@@ -74,6 +74,20 @@ ADD COLUMN IF NOT EXISTS contract_id STRING;
 ALTER TABLE `project-9718e7d4-4cd7-4f52-8d6.sunti.material_requirements`
 ADD COLUMN IF NOT EXISTS contract_id STRING;
 
+-- 7. Audit log
+CREATE TABLE IF NOT EXISTS `project-9718e7d4-4cd7-4f52-8d6.sunti.audit_log` (
+  id STRING NOT NULL,
+  entity_type STRING,
+  entity_id STRING,
+  contract_id STRING,
+  action STRING,
+  field STRING,
+  old_value STRING,
+  new_value STRING,
+  changed_by STRING,
+  changed_at TIMESTAMP
+);
+
 -- 6. Material requirements
 CREATE TABLE IF NOT EXISTS `project-9718e7d4-4cd7-4f52-8d6.sunti.material_requirements` (
   id STRING NOT NULL,

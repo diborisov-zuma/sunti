@@ -1,10 +1,44 @@
 const { BigQuery } = require('@google-cloud/bigquery');
 const { v4: uuidv4 } = require('uuid');
 
+const crypto = require('crypto');
 const bigquery = new BigQuery();
 const PROJECT  = 'project-9718e7d4-4cd7-4f52-8d6';
 const DATASET  = 'sunti';
 const TABLE    = 'transactions';
+const auditTable = `\`${PROJECT}.${DATASET}.audit_log\``;
+
+async function logAudit(entries) {
+  if (!entries.length) return;
+  const values = entries.map((e, i) => {
+    return `(@id${i}, @type${i}, @eid${i}, @cid${i}, @action${i}, @field${i}, @old${i}, @new${i}, @by${i}, CURRENT_TIMESTAMP())`;
+  }).join(',');
+  const params = {};
+  entries.forEach((e, i) => {
+    params['id' + i] = crypto.randomUUID();
+    params['type' + i] = e.entity_type;
+    params['eid' + i] = e.entity_id;
+    params['cid' + i] = e.contract_id || '';
+    params['action' + i] = e.action;
+    params['field' + i] = e.field || '';
+    params['old' + i] = e.old_value != null ? String(e.old_value) : '';
+    params['new' + i] = e.new_value != null ? String(e.new_value) : '';
+    params['by' + i] = e.changed_by;
+  });
+  await bigquery.query({
+    query: `INSERT INTO ${auditTable} (id, entity_type, entity_id, contract_id, action, field, old_value, new_value, changed_by, changed_at) VALUES ${values}`,
+    params,
+  });
+}
+
+async function getContractIdForInvoice(invoiceId) {
+  if (!invoiceId) return '';
+  const [rows] = await bigquery.query({
+    query: `SELECT contract_id FROM \`${PROJECT}.${DATASET}.invoices\` WHERE id = @id`,
+    params: { id: invoiceId },
+  });
+  return rows[0]?.contract_id || '';
+}
 
 function setCors(res) {
   res.set('Access-Control-Allow-Origin', '*');
@@ -182,6 +216,9 @@ exports.transactions = async (req, res) => {
       });
       if (invoice_id) await recalcInvoicePaid(invoice_id);
       if (contract_id) await recalcContractPaid(contract_id);
+      // Audit: log create
+      const auditCid = contract_id || (invoice_id ? await getContractIdForInvoice(invoice_id) : '');
+      await logAudit([{ entity_type: 'transaction', entity_id: id, contract_id: auditCid, action: 'create', changed_by: email }]);
       res.json({ success: true, id });
       return;
     }
@@ -206,11 +243,31 @@ exports.transactions = async (req, res) => {
       }
 
       const [rows] = await bigquery.query({
-        query: `SELECT invoice_id, folder_id, contractor_id, FORMAT_TIMESTAMP('%Y-%m-%dT%H:%M:%S', created_at) as created_at FROM ${table} WHERE id = @id`,
+        query: `SELECT invoice_id, folder_id, contractor_id, contract_id, amount, date, direction,
+                       account_id, category_id, description, status,
+                       FORMAT_TIMESTAMP('%Y-%m-%dT%H:%M:%S', created_at) as created_at FROM ${table} WHERE id = @id`,
         params: { id },
       });
       if (!rows.length) { res.status(404).json({ error: 'Not found' }); return; }
       const cur = rows[0];
+
+      // Audit: compare tracked fields
+      const auditCid = cur.contract_id || (cur.invoice_id ? await getContractIdForInvoice(cur.invoice_id) : '');
+      const auditEntries = [];
+      const txTrackFields = {
+        amount: parseFloat(amount), date, direction,
+        account_id: account_id || '', category_id: category_id || '',
+        invoice_id: (invoice_id !== undefined ? (invoice_id || '') : (cur.invoice_id || '')),
+        description: description || '', status: 'active',
+      };
+      for (const [field, newVal] of Object.entries(txTrackFields)) {
+        const oldVal = cur[field]?.value ?? cur[field] ?? '';
+        const nv = newVal ?? '';
+        if (String(oldVal) !== String(nv)) {
+          auditEntries.push({ entity_type: 'transaction', entity_id: id, contract_id: auditCid, action: 'update', field, old_value: oldVal, new_value: nv, changed_by: email });
+        }
+      }
+      if (auditEntries.length) await logAudit(auditEntries);
 
       await bigquery.query({ query: `DELETE FROM ${table} WHERE id = @id`, params: { id } });
       await bigquery.query({
@@ -245,9 +302,9 @@ exports.transactions = async (req, res) => {
       const hard = req.query.hard === 'true';
       if (!id) { res.status(400).json({ error: 'id is required' }); return; }
 
-      // сохраняем invoice_id ДО изменений для recalc
+      // сохраняем invoice_id и contract_id ДО изменений для recalc и audit
       const [preRows] = await bigquery.query({
-        query: `SELECT invoice_id FROM ${table} WHERE id = @id`, params: { id },
+        query: `SELECT invoice_id, contract_id FROM ${table} WHERE id = @id`, params: { id },
       });
       const linkedInv = preRows[0]?.invoice_id || '';
 
@@ -288,6 +345,10 @@ exports.transactions = async (req, res) => {
         });
       }
       if (linkedInv) await recalcInvoicePaid(linkedInv);
+
+      // Audit: log delete
+      const delAuditCid = preRows[0]?.contract_id || (linkedInv ? await getContractIdForInvoice(linkedInv) : '');
+      await logAudit([{ entity_type: 'transaction', entity_id: id, contract_id: delAuditCid, action: 'delete', changed_by: email }]);
 
       res.json({ success: true });
       return;
