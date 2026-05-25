@@ -134,7 +134,8 @@ exports.contracts = async (req, res) => {
                        ct.name_en AS contractor_name_en, ct.name_th AS contractor_name_th,
                        IFNULL(inv_agg.invoiced_total, CAST(0 AS NUMERIC)) AS invoiced_total,
                        IFNULL(inv_agg.invoice_count, 0) AS invoice_count,
-                       IFNULL(cf_agg.file_count, 0) AS file_count
+                       IFNULL(cf_agg.file_count, 0) AS file_count,
+                       IFNULL(task_link.task_count, 0) AS linked_tasks_count
                 FROM ${table} c
                 JOIN ${fldTable} f ON c.folder_id = f.id
                 LEFT JOIN ${ctrTable} ct ON c.contractor_id = ct.id
@@ -151,6 +152,20 @@ exports.contracts = async (req, res) => {
                   FROM \`${PROJECT}.${DATASET}.contract_files\`
                   GROUP BY contract_id
                 ) cf_agg ON cf_agg.contract_id = c.id
+                LEFT JOIN (
+                  SELECT cid, SUM(cnt) AS task_count FROM (
+                    SELECT contract_id AS cid, COUNT(*) AS cnt
+                    FROM \`${PROJECT}.${DATASET}.material_requirements\`
+                    WHERE contract_id IS NOT NULL
+                    GROUP BY contract_id
+                    UNION ALL
+                    SELECT ci.contract_id AS cid, COUNT(*) AS cnt
+                    FROM \`${PROJECT}.${DATASET}.material_requirements\` mr
+                    JOIN \`${PROJECT}.${DATASET}.contract_items\` ci ON mr.line_item_id = ci.id
+                    WHERE mr.line_item_id IS NOT NULL
+                    GROUP BY ci.contract_id
+                  ) GROUP BY cid
+                ) task_link ON task_link.cid = c.id
                 ${where}
                 ORDER BY c.date DESC NULLS LAST, c.created_at DESC`,
         params,

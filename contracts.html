@@ -725,7 +725,7 @@
         <td>${formatDate(c.date)}</td>
         <td>${statusBadge(c.status)}</td>
         <td style="text-align:center">${parseInt(c.file_count) > 0 ? '<span style="font-size:1rem" title="Files">📄</span>' : ''}</td>
-        <td><strong>${c.name || '—'}</strong>${c.external_ref ? `<br><span style="font-size:0.75rem;color:#999">${c.external_ref}</span>` : ''}</td>
+        <td><strong>${c.name || '—'}</strong>${c.external_ref ? `<br><span style="font-size:0.75rem;color:#999">${c.external_ref}</span>` : ''}${parseInt(c.linked_tasks_count) > 0 ? ` <span style="font-size:0.68rem;background:#d1fae5;color:#065f46;padding:1px 5px;border-radius:8px;font-weight:600" title="Linked to ${c.linked_tasks_count} task(s)">📌 ${c.linked_tasks_count}</span>` : ''}</td>
         <td style="font-size:0.82rem">${contractorName(c)}</td>
         <td>${amtCell(c.total_amount, dir)}</td>
         <td>${amtCell(c.paid_amount, dir)}</td>
@@ -823,7 +823,7 @@
           <td>${formatDate(c.date)}</td>
           <td>${statusBadge(c.status)}</td>
           <td style="text-align:center">${parseInt(c.file_count) > 0 ? '<span style="font-size:1rem" title="Files">📄</span>' : ''}</td>
-          <td><strong>${c.name || '—'}</strong>${c.external_ref ? `<br><span style="font-size:0.75rem;color:#999">${c.external_ref}</span>` : ''}</td>
+          <td><strong>${c.name || '—'}</strong>${c.external_ref ? `<br><span style="font-size:0.75rem;color:#999">${c.external_ref}</span>` : ''}${parseInt(c.linked_tasks_count) > 0 ? ` <span style="font-size:0.68rem;background:#d1fae5;color:#065f46;padding:1px 5px;border-radius:8px;font-weight:600" title="Linked to ${c.linked_tasks_count} task(s)">📌 ${c.linked_tasks_count}</span>` : ''}</td>
           <td style="font-size:0.82rem">${contractorName(c)}</td>
           <td>${amtCell(c.total_amount, dir)}</td>
           <td>${amtCell(c.paid_amount, dir)}</td>
