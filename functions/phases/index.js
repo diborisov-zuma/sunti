@@ -45,17 +45,26 @@ exports.phases = async (req, res) => {
   const path     = (req.url || '').split('?')[0];
 
   try {
-    // GET /phases?folder_id=X
+    // GET /phases?folder_id=X or ?group_id=X
     if (req.method === 'GET') {
-      const { folder_id } = req.query;
-      if (!folder_id) { res.status(400).json({ error: 'folder_id is required' }); return; }
+      const { folder_id, group_id } = req.query;
+      if (!folder_id && !group_id) { res.status(400).json({ error: 'folder_id or group_id is required' }); return; }
+
+      let where, params;
+      if (group_id) {
+        where = 'group_id = @group_id';
+        params = { group_id };
+      } else {
+        where = 'folder_id = @folder_id';
+        params = { folder_id };
+      }
 
       const [rows] = await bigquery.query({
-        query: `SELECT id, folder_id, name, name_en, name_th, sort_order
+        query: `SELECT id, folder_id, group_id, name, name_en, name_th, sort_order
                 FROM ${table}
-                WHERE folder_id = @folder_id
+                WHERE ${where}
                 ORDER BY sort_order`,
-        params: { folder_id },
+        params,
       });
       res.json(rows);
       return;
@@ -65,19 +74,20 @@ exports.phases = async (req, res) => {
     if (req.method === 'POST') {
       if (!(await isAdmin(email))) { res.status(403).json({ error: 'Forbidden' }); return; }
       const b = req.body || {};
-      if (!b.folder_id || !b.name) {
-        res.status(400).json({ error: 'folder_id and name are required' });
+      if ((!b.folder_id && !b.group_id) || !b.name) {
+        res.status(400).json({ error: 'folder_id or group_id, and name are required' });
         return;
       }
       const id = crypto.randomUUID();
       await bigquery.query({
         query: `INSERT INTO ${table}
-                  (id, folder_id, name, name_en, name_th, sort_order)
+                  (id, folder_id, group_id, name, name_en, name_th, sort_order)
                 VALUES
-                  (@id, @folder_id, @name, NULLIF(@name_en,''), NULLIF(@name_th,''), @sort_order)`,
+                  (@id, NULLIF(@folder_id,''), NULLIF(@group_id,''), @name, NULLIF(@name_en,''), NULLIF(@name_th,''), @sort_order)`,
         params: {
           id,
-          folder_id:  b.folder_id,
+          folder_id:  b.folder_id || '',
+          group_id:   b.group_id || '',
           name:       b.name,
           name_en:    b.name_en || '',
           name_th:    b.name_th || '',

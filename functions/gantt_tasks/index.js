@@ -45,10 +45,19 @@ exports.gantt_tasks = async (req, res) => {
   const path      = (req.url || '').split('?')[0];
 
   try {
-    // GET /gantt_tasks?folder_id=X
+    // GET /gantt_tasks?folder_id=X or ?group_id=X
     if (req.method === 'GET') {
-      const { folder_id } = req.query;
-      if (!folder_id) { res.status(400).json({ error: 'folder_id is required' }); return; }
+      const { folder_id, group_id } = req.query;
+      if (!folder_id && !group_id) { res.status(400).json({ error: 'folder_id or group_id is required' }); return; }
+
+      let where, params;
+      if (group_id) {
+        where = 'p.group_id = @group_id';
+        params = { group_id };
+      } else {
+        where = 'p.folder_id = @folder_id';
+        params = { folder_id };
+      }
 
       const [rows] = await bigquery.query({
         query: `SELECT t.id, t.phase_id, t.name, t.name_en, t.name_th,
@@ -58,9 +67,9 @@ exports.gantt_tasks = async (req, res) => {
                        p.name AS phase_name, p.name_en AS phase_name_en, p.name_th AS phase_name_th
                 FROM ${table} t
                 JOIN ${phasesTbl} p ON t.phase_id = p.id
-                WHERE p.folder_id = @folder_id
+                WHERE ${where}
                 ORDER BY p.sort_order, t.sort_order`,
-        params: { folder_id },
+        params,
       });
       res.json(rows);
       return;

@@ -6,6 +6,25 @@
 ALTER TABLE `project-9718e7d4-4cd7-4f52-8d6.sunti.folders`
 ADD COLUMN IF NOT EXISTS is_template BOOL;
 
+-- 1b. Tasks groups
+CREATE TABLE IF NOT EXISTS `project-9718e7d4-4cd7-4f52-8d6.sunti.tasks_groups` (
+  id STRING NOT NULL,
+  folder_id STRING NOT NULL,
+  name STRING,
+  name_en STRING,
+  name_th STRING,
+  description STRING,
+  responsible_email STRING,
+  status STRING,
+  sort_order INT64,
+  created_by STRING,
+  created_at TIMESTAMP
+);
+
+-- 1c. Add group_id to phases
+ALTER TABLE `project-9718e7d4-4cd7-4f52-8d6.sunti.phases`
+ADD COLUMN IF NOT EXISTS group_id STRING;
+
 -- 2. Phases
 CREATE TABLE IF NOT EXISTS `project-9718e7d4-4cd7-4f52-8d6.sunti.phases` (
   id STRING NOT NULL,

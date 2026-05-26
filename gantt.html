@@ -323,6 +323,8 @@
         <h2 id="t-page-title">Gantt</h2>
         <select class="filter-select" id="filter-company"><option value="">—</option></select>
         <select class="filter-select" id="filter-folder"><option value="">—</option></select>
+        <select class="filter-select" id="filter-group" style="display:none"><option value="">—</option></select>
+        <button class="btn btn-outline" id="btn-add-group" style="display:none;font-size:0.82rem;padding:5px 12px">+ Gantt</button>
         <button class="btn btn-primary" id="btn-add-phase" style="display:none;font-size:0.82rem;padding:5px 12px">+ Phase</button>
         <button class="btn btn-outline" id="btn-print-gantt" style="display:none;font-size:0.82rem;padding:5px 12px" onclick="printGantt()">🖨 PDF</button>
         <div class="spacer"></div>
@@ -608,6 +610,8 @@
     let allDeliverySchedules = {}; // line_item_id → [batches]
     let filterCompany = '';
     let filterFolder = '';
+    let filterGroup = '';
+    let groupsCache = [];
     let editPhaseId = null;
     let editTaskId = null;
     let editTaskPhaseId = null;
@@ -735,19 +739,70 @@
       document.getElementById('view-proc').style.display = 'none';
     });
 
-    document.getElementById('filter-folder').addEventListener('change', e => {
+    document.getElementById('filter-folder').addEventListener('change', async e => {
       filterFolder = e.target.value;
-      document.getElementById('btn-add-phase').style.display = filterFolder ? '' : 'none';
-      document.getElementById('btn-print-gantt').style.display = filterFolder ? '' : 'none';
+      filterGroup = '';
+      document.getElementById('btn-add-phase').style.display = 'none';
+      document.getElementById('btn-print-gantt').style.display = 'none';
+      document.getElementById('filter-group').style.display = filterFolder ? '' : 'none';
+      document.getElementById('btn-add-group').style.display = filterFolder ? '' : 'none';
       if (filterFolder) {
+        try {
+          groupsCache = await apiFetch(`/tasks_groups?folder_id=${filterFolder}`);
+        } catch(e) { groupsCache = []; }
+        fillGroupFilter();
+        document.getElementById('gantt-container').innerHTML = '<div class="empty-state">' + t('ganttSelectProject') + '</div>';
+      } else {
+        groupsCache = [];
+        fillGroupFilter();
+        document.getElementById('gantt-container').innerHTML = '<div class="empty-state">' + t('ganttSelectProject') + '</div>';
+        document.getElementById('dash-widget').style.display = 'none';
+        document.getElementById('gantt-tabs').style.display = 'none';
+      }
+    });
+
+    function fillGroupFilter() {
+      const sel = document.getElementById('filter-group');
+      sel.innerHTML = '<option value="">— Gantt —</option>';
+      groupsCache.forEach(g => {
+        const name = g['name_' + currentLang] || g.name || g.name_en || '—';
+        sel.innerHTML += `<option value="${g.id}">${name}</option>`;
+      });
+      // Auto-select if only one group
+      if (groupsCache.length === 1) {
+        sel.value = groupsCache[0].id;
+        filterGroup = groupsCache[0].id;
+        onGroupSelected();
+      }
+    }
+
+    document.getElementById('filter-group').addEventListener('change', e => {
+      filterGroup = e.target.value;
+      onGroupSelected();
+    });
+
+    function onGroupSelected() {
+      document.getElementById('btn-add-phase').style.display = filterGroup ? '' : 'none';
+      document.getElementById('btn-print-gantt').style.display = filterGroup ? '' : 'none';
+      if (filterGroup) {
         loadGanttData();
       } else {
         document.getElementById('gantt-container').innerHTML = '<div class="empty-state">' + t('ganttSelectProject') + '</div>';
         document.getElementById('dash-widget').style.display = 'none';
         document.getElementById('gantt-tabs').style.display = 'none';
-        document.getElementById('view-gantt').style.display = '';
-        document.getElementById('view-proc').style.display = 'none';
       }
+    }
+
+    // Add new group
+    document.getElementById('btn-add-group').addEventListener('click', async () => {
+      const name = prompt('Gantt name:');
+      if (!name) return;
+      try {
+        await apiFetch('/tasks_groups', { method: 'POST', body: JSON.stringify({ folder_id: filterFolder, name }) });
+        groupsCache = await apiFetch(`/tasks_groups?folder_id=${filterFolder}`);
+        fillGroupFilter();
+        showToast(t('saved'), 'success');
+      } catch(e) { showToast(e.message, 'error'); }
     });
 
     // ─── Load data ───
@@ -756,10 +811,11 @@
       const container = document.getElementById('gantt-container');
       container.innerHTML = '<div class="loading">' + t('loading') + '</div>';
       try {
+        const qParam = filterGroup ? `group_id=${filterGroup}` : `folder_id=${filterFolder}`;
         const [phases, tasks, deps, matReqs] = await Promise.all([
-          apiFetch(`/phases?folder_id=${filterFolder}`),
-          apiFetch(`/gantt_tasks?folder_id=${filterFolder}`),
-          apiFetch(`/task_dependencies?folder_id=${filterFolder}`),
+          apiFetch(`/phases?${qParam}`),
+          apiFetch(`/gantt_tasks?${qParam}`),
+          apiFetch(`/task_dependencies?${qParam}`),
           apiFetch(`/material_requirements?folder_id=${filterFolder}`).catch(() => []),
         ]);
         phasesData = phases;
@@ -1641,7 +1697,7 @@
         btn.disabled = true;
         try {
           await apiFetch(`/task_dependencies/${btn.dataset.depId}`, { method: 'DELETE' });
-          depsData = await apiFetch(`/task_dependencies?folder_id=${filterFolder}`);
+          depsData = await apiFetch(`/task_dependencies?${filterGroup ? 'group_id=' + filterGroup : 'folder_id=' + filterFolder}`);
           renderExistingDeps(depTaskId);
           showToast(t('deleted'), 'success');
         } catch(err) { showToast(err.message, 'error'); btn.disabled = false; }
@@ -1694,6 +1750,7 @@
       try {
         const body = {
           folder_id: filterFolder,
+          group_id: filterGroup || '',
           name,
           name_en: document.getElementById('g-ph-name-en').value.trim(),
           name_th: document.getElementById('g-ph-name-th').value.trim(),
@@ -2203,7 +2260,7 @@
           }),
         });
         showToast(t('saved'), 'success');
-        depsData = await apiFetch(`/task_dependencies?folder_id=${filterFolder}`);
+        depsData = await apiFetch(`/task_dependencies?${filterGroup ? 'group_id=' + filterGroup : 'folder_id=' + filterFolder}`);
         selectedPredId = null;
         renderDepTaskList(document.getElementById('dep-search').value);
         renderExistingDeps(depTaskId);

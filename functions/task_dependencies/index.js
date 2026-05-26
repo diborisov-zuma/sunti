@@ -46,8 +46,11 @@ exports.task_dependencies = async (req, res) => {
   try {
     // GET /task_dependencies?folder_id=X
     if (req.method === 'GET') {
-      const { folder_id } = req.query;
-      if (!folder_id) { res.status(400).json({ error: 'folder_id is required' }); return; }
+      const { folder_id, group_id } = req.query;
+      if (!folder_id && !group_id) { res.status(400).json({ error: 'folder_id or group_id is required' }); return; }
+
+      const phaseWhere = group_id ? 'p.group_id = @gid' : 'p.folder_id = @fid';
+      const params = group_id ? { gid: group_id } : { fid: folder_id };
 
       const [rows] = await bigquery.query({
         query: `SELECT d.id, d.predecessor_id, d.successor_id, d.type, d.lag_days
@@ -55,9 +58,9 @@ exports.task_dependencies = async (req, res) => {
                 WHERE d.predecessor_id IN (
                   SELECT t.id FROM ${tasksTbl} t
                   JOIN ${phasesTbl} p ON t.phase_id = p.id
-                  WHERE p.folder_id = @folder_id
+                  WHERE ${phaseWhere}
                 )`,
-        params: { folder_id },
+        params,
       });
       res.json(rows);
       return;
