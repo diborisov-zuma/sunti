@@ -23,9 +23,10 @@ function renderHeader(activePage) {
       <a href="materials.html" class="nav-link ${activePage === 'materials' ? 'active' : ''}" id="t-nav-materials" style="display:none"></a>
       <a href="whatsapp.html" class="nav-link ${activePage === 'whatsapp' ? 'active' : ''}" id="t-nav-whatsapp" style="display:none"></a>
       <a href="statements.html" class="nav-link ${activePage === 'statements' ? 'active' : ''}" id="t-nav-statements"></a>
+      <a href="missions.html" class="nav-link ${activePage === 'missions' ? 'active' : ''}" id="t-nav-missions"></a>
       <a href="ai_chat.html" class="nav-link ${activePage === 'ai_chat' ? 'active' : ''}" id="t-nav-ai-chat" style="display:none"></a>
       <div class="nav-dropdown" id="nav-settings" style="display:none">
-        <a class="nav-link ${['folders','companies','users','categories','portal','buyers','templates','help'].includes(activePage) ? 'active' : ''}" id="t-nav-settings">⚙</a>
+        <a class="nav-link ${['folders','companies','users','categories','portal','buyers','templates','help','mission_templates','user_roles'].includes(activePage) ? 'active' : ''}" id="t-nav-settings">⚙</a>
         <div class="nav-dropdown-menu">
           <a href="folders.html"      class="${activePage === 'folders'      ? 'active' : ''}" id="t-nav-folders"></a>
           <a href="companies.html"    class="${activePage === 'companies'    ? 'active' : ''}" id="t-nav-companies"></a>
@@ -34,12 +35,17 @@ function renderHeader(activePage) {
           <a href="categories.html"   class="${activePage === 'categories'   ? 'active' : ''}" id="t-nav-categories"></a>
           <a href="buyers.html"       class="${activePage === 'buyers'       ? 'active' : ''}" id="t-nav-buyers"></a>
           <a href="portal_settings.html" class="${activePage === 'portal' ? 'active' : ''}" id="t-nav-portal"></a>
+          <a href="mission_templates.html" class="${activePage === 'mission_templates' ? 'active' : ''}" id="t-nav-mission-templates"></a>
+          <a href="user_roles.html" class="${activePage === 'user_roles' ? 'active' : ''}" id="t-nav-user-roles"></a>
           <a href="help.html" class="${activePage === 'help' ? 'active' : ''}" id="t-nav-help"></a>
         </div>
       </div>
     </nav>
 
     <div class="header-right">
+
+      <!-- Global + Mission button -->
+      <button id="global-new-mission" style="background:#1a73e8;color:#fff;border:none;border-radius:6px;padding:5px 12px;font-size:0.82rem;cursor:pointer;font-weight:600;display:none" onclick="openGlobalMissionModal()">+ Mission</button>
 
       <!-- Уведомления -->
       <div id="notifications-btn" style="display:none;position:relative;cursor:pointer" onclick="toggleNotifications()">
@@ -203,6 +209,21 @@ function updateHeaderTexts() {
     const meAic = typeof currentMe !== 'undefined' ? currentMe : null;
     naic.style.display = (meAic && meAic.is_admin === true) ? '' : 'none';
   }
+  // Missions nav link
+  const nmissions = document.getElementById('t-nav-missions');
+  if (nmissions) nmissions.textContent = t('navMissions');
+  // Mission Templates in settings
+  const nmtpl = document.getElementById('t-nav-mission-templates');
+  if (nmtpl) nmtpl.textContent = t('navMissionTemplates');
+  // User Roles in settings
+  const nuroles = document.getElementById('t-nav-user-roles');
+  if (nuroles) nuroles.textContent = t('navUserRoles');
+  // Global + Mission button
+  const gmBtn = document.getElementById('global-new-mission');
+  if (gmBtn) {
+    const meGm = typeof currentMe !== 'undefined' ? currentMe : null;
+    gmBtn.style.display = meGm ? '' : 'none';
+  }
   if (nc) nc.textContent = t('navCompanies');
   const ntpl = document.getElementById('t-nav-templates');
   if (ntpl) ntpl.textContent = t('navTemplates');
@@ -303,4 +324,12 @@ function startUnreadPolling() {
 }
 function stopUnreadPolling() {
   if (_unreadInterval) clearInterval(_unreadInterval);
+}
+
+function openGlobalMissionModal() {
+  if (typeof window._openMissionModal === 'function') {
+    window._openMissionModal();
+  } else {
+    window.location.href = 'missions.html?action=new';
+  }
 }

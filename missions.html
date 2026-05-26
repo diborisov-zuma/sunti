@@ -1,0 +1,882 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sunti — Missions</title>
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="stylesheet" href="style.css">
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="_i18n.js"></script>
+<script src="_config.js"></script>
+<script src="_auth.js"></script>
+<script src="_header.js"></script>
+<style>
+  :root {
+    --m-bg: #f5f7fa;
+    --m-border: #e2e8f0;
+    --m-text: #0f172a;
+    --m-muted: #64748b;
+    --m-primary: #1a73e8;
+    --m-red: #ef4444;
+    --m-orange: #f59e0b;
+    --m-blue: #3b82f6;
+    --m-grey: #94a3b8;
+    --m-green: #10b981;
+  }
+  .missions-page { display: flex; gap: 0; height: calc(100vh - 56px); background: var(--m-bg); }
+  .missions-main { flex: 1; overflow-y: auto; padding: 20px 28px; }
+  .missions-toolbar { display: flex; align-items: center; gap: 16px; margin-bottom: 20px; }
+  .missions-toolbar h2 { margin: 0; font-size: 1.4rem; font-weight: 700; color: var(--m-text); }
+
+  /* Mission groups */
+  .mission-group { margin-bottom: 16px; }
+  .mission-group-header {
+    display: flex; align-items: center; gap: 8px; padding: 8px 14px;
+    border-radius: 8px; font-size: 0.85rem; font-weight: 700; cursor: pointer;
+    user-select: none;
+  }
+  .mission-group-header .group-icon { font-size: 1rem; }
+  .mission-group-header .group-count {
+    background: rgba(0,0,0,0.08); border-radius: 10px; padding: 1px 8px;
+    font-size: 0.72rem; font-weight: 600;
+  }
+  .mission-group-header .group-toggle { margin-left: auto; font-size: 0.7rem; color: var(--m-muted); }
+  .mission-group-header.overdue { background: #fee2e2; color: #991b1b; }
+  .mission-group-header.today { background: #dbeafe; color: #1e40af; }
+  .mission-group-header.week { background: #f0fdf4; color: #166534; }
+  .mission-group-header.nodate { background: #f1f5f9; color: #475569; }
+  .mission-group-header.watching { background: #fef3c7; color: #92400e; }
+  .mission-group-header.done { background: #f0fdf4; color: #065f46; }
+  .mission-group-body { }
+  .mission-group-body.collapsed { display: none; }
+
+  /* Mission rows */
+  .mission-row {
+    display: flex; align-items: center; gap: 10px; padding: 10px 14px;
+    background: #fff; border: 1px solid var(--m-border); border-radius: 8px;
+    margin: 4px 0; cursor: pointer; transition: box-shadow 0.15s;
+    font-size: 0.88rem;
+  }
+  .mission-row:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+  .mission-row.active { border-color: var(--m-primary); box-shadow: 0 0 0 2px rgba(26,115,232,0.15); }
+  .mission-priority-dot {
+    width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0;
+  }
+  .mission-priority-dot.urgent { background: var(--m-red); }
+  .mission-priority-dot.high { background: var(--m-orange); }
+  .mission-priority-dot.normal { background: var(--m-blue); }
+  .mission-priority-dot.low { background: var(--m-grey); }
+  .mission-title { flex: 1; font-weight: 500; color: var(--m-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mission-entity { font-size: 0.78rem; color: var(--m-muted); white-space: nowrap; }
+  .mission-due { font-size: 0.78rem; color: var(--m-muted); white-space: nowrap; }
+  .mission-assignee { font-size: 0.78rem; color: var(--m-muted); white-space: nowrap; max-width: 120px; overflow: hidden; text-overflow: ellipsis; }
+
+  /* Side panel */
+  .side-panel {
+    position: fixed; top: 56px; right: -540px; width: 520px; height: calc(100vh - 56px);
+    background: white; border-left: 1px solid var(--m-border);
+    box-shadow: -8px 0 24px rgba(0,0,0,0.1); transition: right 0.3s ease;
+    overflow-y: auto; z-index: 90; display: flex; flex-direction: column;
+  }
+  .side-panel.open { right: 0; }
+  .sp-head {
+    padding: 18px 20px; border-bottom: 1px solid var(--m-border);
+    position: relative; flex-shrink: 0;
+  }
+  .sp-head .sp-close {
+    background: #f1f5f9; border: 1px solid #e2e8f0;
+    font-size: 18px; color: var(--m-muted); cursor: pointer; line-height: 1;
+    width: 32px; height: 32px; min-width: 32px; border-radius: 6px; display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .sp-head .sp-close:hover { background: #e2e8f0; color: #333; }
+  .sp-body { flex: 1; padding: 16px 20px; overflow-y: auto; }
+  .sp-field { margin-bottom: 14px; }
+  .sp-field label { display: block; font-size: 0.78rem; color: var(--m-muted); margin-bottom: 4px; font-weight: 600; }
+  .sp-field select, .sp-field input { width: 100%; border: 1px solid #ddd; border-radius: 6px; padding: 7px 10px; font-size: 0.88rem; box-sizing: border-box; }
+  .sp-field select:focus, .sp-field input:focus { border-color: var(--m-primary); outline: none; }
+  .sp-actions { display: flex; gap: 8px; padding: 14px 20px; border-top: 1px solid var(--m-border); flex-shrink: 0; }
+  .sp-actions button { padding: 8px 16px; border-radius: 6px; font-size: 0.85rem; font-weight: 600; cursor: pointer; border: 1px solid #ddd; background: #fff; }
+  .sp-actions .btn-done { background: var(--m-green); color: #fff; border-color: var(--m-green); }
+  .sp-actions .btn-block { background: #fbbf24; color: #333; border-color: #fbbf24; }
+  .sp-actions .btn-cancel-m { background: var(--m-red); color: #fff; border-color: var(--m-red); }
+  .sp-actions .btn-reopen { background: var(--m-primary); color: #fff; border-color: var(--m-primary); }
+
+  /* Comments */
+  .comment-item { padding: 8px 0; border-bottom: 1px solid #f0f0f0; font-size: 0.84rem; }
+  .comment-item .comment-author { font-weight: 600; color: var(--m-text); }
+  .comment-item .comment-date { font-size: 0.72rem; color: var(--m-muted); margin-left: 8px; }
+  .comment-item .comment-body { margin-top: 4px; color: #444; white-space: pre-wrap; }
+  .comment-form { display: flex; gap: 8px; margin-top: 8px; }
+  .comment-form input { flex: 1; border: 1px solid #ddd; border-radius: 6px; padding: 7px 10px; font-size: 0.85rem; }
+  .comment-form button { padding: 7px 14px; background: var(--m-primary); color: #fff; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 0.85rem; }
+
+  /* History */
+  .history-item { font-size: 0.78rem; color: var(--m-muted); padding: 4px 0; border-bottom: 1px solid #f8f8f8; }
+
+  /* Modal */
+  .modal-overlay {
+    display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.35); z-index: 200; align-items: center; justify-content: center;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal-box {
+    background: #fff; border-radius: 12px; width: 580px; max-height: 90vh; overflow-y: auto;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.18); padding: 24px;
+  }
+  .modal-box h3 { margin: 0 0 16px; font-size: 1.1rem; }
+  .modal-field { margin-bottom: 12px; }
+  .modal-field label { display: block; font-size: 0.82rem; color: #666; margin-bottom: 4px; }
+  .modal-field input, .modal-field select, .modal-field textarea {
+    width: 100%; border: 1px solid #ddd; border-radius: 6px; padding: 8px 12px;
+    font-size: 0.9rem; outline: none; box-sizing: border-box; background: #fff;
+  }
+  .modal-field input:focus, .modal-field select:focus, .modal-field textarea:focus { border-color: var(--m-primary); }
+  .modal-field textarea { min-height: 60px; resize: vertical; }
+  .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 16px; }
+  .priority-selector { display: flex; gap: 6px; }
+  .priority-selector button {
+    padding: 6px 14px; border-radius: 6px; border: 1px solid #ddd; background: #f8f8f8;
+    cursor: pointer; font-size: 0.82rem; font-weight: 600;
+  }
+  .priority-selector button.active { color: #fff; }
+  .priority-selector button[data-p="low"].active { background: var(--m-grey); border-color: var(--m-grey); }
+  .priority-selector button[data-p="normal"].active { background: var(--m-blue); border-color: var(--m-blue); }
+  .priority-selector button[data-p="high"].active { background: var(--m-orange); border-color: var(--m-orange); }
+  .priority-selector button[data-p="urgent"].active { background: var(--m-red); border-color: var(--m-red); }
+  .lang-tabs { display: flex; gap: 4px; margin-bottom: 6px; }
+  .lang-tabs button { padding: 3px 10px; border: 1px solid #ddd; border-radius: 4px; background: #f8f8f8; cursor: pointer; font-size: 0.75rem; }
+  .lang-tabs button.active { background: var(--m-primary); color: #fff; border-color: var(--m-primary); }
+  .translate-btn { background: none; border: none; cursor: pointer; font-size: 0.9rem; margin-left: 4px; }
+
+  .watcher-chip { display: inline-flex; align-items: center; gap: 4px; background: #e8f0fe; border-radius: 12px; padding: 2px 10px 2px 8px; font-size: 0.78rem; margin: 2px; }
+  .watcher-chip .remove-watcher { cursor: pointer; font-size: 0.9rem; color: var(--m-muted); }
+
+  .sub-mission-row { display: flex; align-items: center; gap: 8px; padding: 6px 0; font-size: 0.84rem; border-bottom: 1px solid #f0f0f0; cursor: pointer; }
+  .sub-mission-row:hover { background: #f8f8f8; }
+
+  .entity-link { color: var(--m-primary); text-decoration: none; font-size: 0.84rem; }
+  .entity-link:hover { text-decoration: underline; }
+
+  .collapsible-header { cursor: pointer; font-size: 0.82rem; font-weight: 600; color: var(--m-muted); padding: 6px 0; user-select: none; }
+  .collapsible-header:hover { color: var(--m-text); }
+  .collapsible-body.collapsed { display: none; }
+
+  .empty-state { text-align: center; padding: 60px 20px; color: var(--m-muted); }
+  .empty-state .icon { font-size: 3rem; margin-bottom: 12px; }
+</style>
+</head>
+<body>
+  <div id="header"></div>
+
+  <div id="guest-view">
+    <h2 id="t-guest-title"></h2>
+    <p id="t-guest-sub"></p>
+  </div>
+
+  <div id="app-view" style="display:none">
+    <div class="missions-page">
+      <div class="missions-main" id="missions-main">
+        <div class="missions-toolbar">
+          <h2>My Day</h2>
+          <button class="btn btn-primary" id="btn-new-mission" style="font-size:0.82rem;padding:5px 14px">+ Mission</button>
+        </div>
+        <div id="missions-list">
+          <div class="empty-state"><div class="icon">📋</div><div>Loading...</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Side panel overlay + panel -->
+  <div id="sp-overlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;z-index:85" onclick="closeSidePanel()"></div>
+  <div class="side-panel" id="side-panel">
+    <div class="sp-head">
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <h2 id="sp-title" style="margin:0;font-size:1.1rem;font-weight:700"></h2>
+        <button class="sp-close" onclick="closeSidePanel()">×</button>
+      </div>
+    </div>
+    <div class="sp-body" id="sp-body"></div>
+    <div class="sp-actions" id="sp-actions"></div>
+  </div>
+
+  <!-- Create Mission modal -->
+  <div class="modal-overlay" id="modal-new-mission">
+    <div class="modal-box">
+      <h3 id="t-modal-title"></h3>
+
+      <div class="modal-field">
+        <label id="t-lbl-title">Title</label>
+        <div style="display:flex;gap:6px;align-items:center;margin-bottom:4px">
+          <div class="lang-tabs" id="title-lang-tabs">
+            <button class="active" data-lang="ru" onclick="switchTitleLang('ru')">RU</button>
+            <button data-lang="en" onclick="switchTitleLang('en')">EN</button>
+            <button data-lang="th" onclick="switchTitleLang('th')">TH</button>
+          </div>
+          <button class="translate-btn" onclick="translateTitle()" title="Translate">🌐</button>
+        </div>
+        <input type="text" id="m-title-ru" placeholder="Заголовок" style="display:block">
+        <input type="text" id="m-title-en" placeholder="Title" style="display:none">
+        <input type="text" id="m-title-th" placeholder="หัวข้อ" style="display:none">
+      </div>
+
+      <div class="modal-field">
+        <label>Description</label>
+        <div style="display:flex;gap:6px;align-items:center;margin-bottom:4px">
+          <div class="lang-tabs" id="desc-lang-tabs">
+            <button class="active" data-lang="ru" onclick="switchDescLang('ru')">RU</button>
+            <button data-lang="en" onclick="switchDescLang('en')">EN</button>
+            <button data-lang="th" onclick="switchDescLang('th')">TH</button>
+          </div>
+          <button class="translate-btn" onclick="translateDesc()" title="Translate">🌐</button>
+        </div>
+        <textarea id="m-desc-ru" rows="3" placeholder="Описание" style="display:block"></textarea>
+        <textarea id="m-desc-en" rows="3" placeholder="Description" style="display:none"></textarea>
+        <textarea id="m-desc-th" rows="3" placeholder="คำอธิบาย" style="display:none"></textarea>
+      </div>
+
+      <div class="modal-field">
+        <label id="t-lbl-priority">Priority</label>
+        <div class="priority-selector" id="priority-selector">
+          <button data-p="low" onclick="setPriority('low')">Low</button>
+          <button data-p="normal" class="active" onclick="setPriority('normal')">Normal</button>
+          <button data-p="high" onclick="setPriority('high')">High</button>
+          <button data-p="urgent" onclick="setPriority('urgent')">Urgent</button>
+        </div>
+      </div>
+
+      <div class="modal-field">
+        <label id="t-lbl-due">Due date</label>
+        <input type="date" id="m-due-date" lang="en-GB">
+      </div>
+
+      <div class="modal-field">
+        <label id="t-lbl-entity">Link to entity</label>
+        <input type="text" id="m-entity-search" placeholder="Search..." autocomplete="off">
+        <div id="m-entity-results" style="max-height:150px;overflow-y:auto;border:1px solid #ddd;border-radius:6px;display:none"></div>
+        <div id="m-entity-selected" style="margin-top:4px"></div>
+      </div>
+
+      <div class="modal-field">
+        <label id="t-lbl-assignee">Assignee</label>
+        <select id="m-assignee"><option value="">—</option></select>
+      </div>
+
+      <div class="modal-field">
+        <label id="t-lbl-watchers">Watchers</label>
+        <select id="m-watcher-add"><option value="">+ Add watcher</option></select>
+        <div id="m-watchers-list" style="margin-top:4px"></div>
+      </div>
+
+      <div class="modal-field" style="display:flex;gap:16px">
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+          <input type="checkbox" id="m-notify-tg-assignee"> Notify assignee TG
+        </label>
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+          <input type="checkbox" id="m-notify-tg-watchers"> Notify watchers TG
+        </label>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn btn-outline" onclick="closeNewMissionModal()">Cancel</button>
+        <button class="btn btn-primary" onclick="saveMission()">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    const entityIcons = { contract:'📋', invoice:'💼', material:'📦', payment:'💵', payment_schedules:'📅', sales:'🛒', sales_contracts:'📝', sales_payments:'💰', task:'🏗', wa_contacts:'💬', delivery_schedule:'🚚' };
+
+    let missionsData = [];
+    let usersCache = {};
+    let selectedMission = null;
+    let newMissionPriority = 'normal';
+    let newMissionEntity = null;
+    let newMissionWatchers = [];
+    let currentTitleLang = 'ru';
+    let currentDescLang = 'ru';
+
+    function fmtDateDMY(val) {
+      if (!val) return '—';
+      const d = new Date(val.value || val);
+      if (isNaN(d)) return '—';
+      return `${String(d.getUTCDate()).padStart(2,'0')}.${String(d.getUTCMonth()+1).padStart(2,'0')}.${d.getUTCFullYear()}`;
+    }
+
+    function showToast(msg, isError) {
+      const el = document.getElementById('toast');
+      el.textContent = msg;
+      el.className = 'toast show' + (isError ? ' error' : '');
+      setTimeout(() => el.className = 'toast', 3000);
+    }
+
+    function getMissionTitle(m) {
+      if (!m) return '';
+      if (m['title_' + currentLang]) return m['title_' + currentLang];
+      return m.title_en || m.title_ru || m.title_th || '';
+    }
+
+    function getUserName(userId) {
+      const u = usersCache[userId];
+      if (!u) return '—';
+      return u.name || u.email || '—';
+    }
+
+    function getEntityIcon(type) {
+      return entityIcons[type] || '🔗';
+    }
+
+    // --- Data loading ---
+
+    async function loadDashboard() {
+      try {
+        const [missionsRes, usersRes] = await Promise.all([
+          apiFetch(`/missions?view=dashboard&user_id=${currentMe.id}`),
+          apiFetch('/users')
+        ]);
+        missionsData = missionsRes;
+        usersRes.forEach(u => { usersCache[u.id] = u; });
+        renderMissions();
+        populateUserSelects();
+      } catch (e) {
+        console.error('Failed to load dashboard:', e);
+        document.getElementById('missions-list').innerHTML = `<div class="empty-state"><div class="icon">⚠️</div><div>${e.message}</div></div>`;
+      }
+    }
+
+    function populateUserSelects() {
+      const users = Object.values(usersCache).filter(u => u.is_active !== false);
+      const assigneeSel = document.getElementById('m-assignee');
+      const watcherSel = document.getElementById('m-watcher-add');
+      assigneeSel.innerHTML = '<option value="">—</option>' + users.map(u => `<option value="${u.id}">${u.name || u.email}</option>`).join('');
+      watcherSel.innerHTML = '<option value="">+ Add watcher</option>' + users.map(u => `<option value="${u.id}">${u.name || u.email}</option>`).join('');
+    }
+
+    // --- Render groups ---
+
+    function groupMissions(missions) {
+      const now = new Date();
+      const todayStr = now.toISOString().slice(0, 10);
+      const endOfWeek = new Date(now);
+      endOfWeek.setDate(endOfWeek.getDate() + (7 - endOfWeek.getDay()));
+      const endOfWeekStr = endOfWeek.toISOString().slice(0, 10);
+
+      const groups = {
+        overdue: [], today: [], week: [], nodate: [], watching: [], done: []
+      };
+
+      missions.forEach(m => {
+        if (m.group) {
+          // API may provide a computed group
+          if (groups[m.group]) { groups[m.group].push(m); return; }
+        }
+        // Fallback: compute client-side
+        if (m.status === 'done' || m.status === 'completed') { groups.done.push(m); return; }
+        if (m.is_watching && m.assignee_user_id !== currentMe.id) { groups.watching.push(m); return; }
+        if (!m.due_at) { groups.nodate.push(m); return; }
+        const due = m.due_at.slice(0, 10);
+        if (due < todayStr) { groups.overdue.push(m); return; }
+        if (due === todayStr) { groups.today.push(m); return; }
+        if (due <= endOfWeekStr) { groups.week.push(m); return; }
+        groups.nodate.push(m);
+      });
+
+      return groups;
+    }
+
+    function renderMissions() {
+      const groups = groupMissions(missionsData);
+      const container = document.getElementById('missions-list');
+
+      const groupDefs = [
+        { key: 'overdue', icon: '🔥', label: t('missionOverdue'), cls: 'overdue', collapsed: false },
+        { key: 'today', icon: '📅', label: t('missionToday'), cls: 'today', collapsed: false },
+        { key: 'week', icon: '⏰', label: t('missionThisWeek'), cls: 'week', collapsed: false },
+        { key: 'nodate', icon: '🌫', label: t('missionNoDate'), cls: 'nodate', collapsed: false },
+        { key: 'watching', icon: '👀', label: t('missionWatching'), cls: 'watching', collapsed: true },
+        { key: 'done', icon: '✅', label: t('missionDoneToday'), cls: 'done', collapsed: true },
+      ];
+
+      let html = '';
+      groupDefs.forEach(gd => {
+        const items = groups[gd.key] || [];
+        html += `<div class="mission-group">
+          <div class="mission-group-header ${gd.cls}" onclick="toggleGroup(this)">
+            <span class="group-icon">${gd.icon}</span>
+            <span>${gd.label}</span>
+            <span class="group-count">${items.length}</span>
+            <span class="group-toggle">${gd.collapsed ? '▸' : '▾'}</span>
+          </div>
+          <div class="mission-group-body${gd.collapsed ? ' collapsed' : ''}">`;
+        if (items.length === 0) {
+          html += `<div style="padding:10px 14px;color:var(--m-muted);font-size:0.82rem">—</div>`;
+        } else {
+          items.forEach(m => {
+            const title = getMissionTitle(m);
+            const entityIcon = m.entity_type ? getEntityIcon(m.entity_type) : '';
+            const entityName = m.entity_name || '';
+            html += `<div class="mission-row" data-mission-id="${m.id}" onclick="openMission('${m.id}')">
+              <span class="mission-priority-dot ${m.priority || 'normal'}"></span>
+              <span class="mission-title">${escHtml(title)}</span>
+              <span class="mission-entity">${entityIcon} ${escHtml(entityName)}</span>
+              <span class="mission-due">${fmtDateDMY(m.due_at)}</span>
+              <span class="mission-assignee">${escHtml(getUserName(m.assignee_user_id))}</span>
+            </div>`;
+          });
+        }
+        html += `</div></div>`;
+      });
+
+      container.innerHTML = html;
+    }
+
+    function escHtml(s) {
+      if (!s) return '';
+      return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    function toggleGroup(header) {
+      const body = header.nextElementSibling;
+      const toggle = header.querySelector('.group-toggle');
+      body.classList.toggle('collapsed');
+      toggle.textContent = body.classList.contains('collapsed') ? '▸' : '▾';
+    }
+
+    // --- Side panel ---
+
+    function openMission(id) {
+      const m = missionsData.find(x => x.id === id || x.id === parseInt(id));
+      if (!m) return;
+      selectedMission = m;
+
+      // Highlight active row
+      document.querySelectorAll('.mission-row').forEach(r => r.classList.remove('active'));
+      const row = document.querySelector(`.mission-row[data-mission-id="${m.id}"]`);
+      if (row) row.classList.add('active');
+
+      const title = getMissionTitle(m);
+      document.getElementById('sp-title').textContent = title;
+
+      const body = document.getElementById('sp-body');
+      let html = '';
+
+      // Status
+      html += `<div class="sp-field">
+        <label>${t('missionPriority')}</label>
+        <select id="sp-status" onchange="changeStatus(this.value)">
+          <option value="open"${m.status==='open'?' selected':''}>Open</option>
+          <option value="in_progress"${m.status==='in_progress'?' selected':''}>In Progress</option>
+          <option value="blocked"${m.status==='blocked'?' selected':''}>Blocked</option>
+          <option value="done"${m.status==='done'?' selected':''}>Done</option>
+          <option value="cancelled"${m.status==='cancelled'?' selected':''}>Cancelled</option>
+        </select>
+      </div>`;
+
+      // Priority
+      html += `<div class="sp-field">
+        <label>${t('missionPriority')}</label>
+        <select id="sp-priority" onchange="changePriority(this.value)">
+          <option value="low"${m.priority==='low'?' selected':''}>Low</option>
+          <option value="normal"${m.priority==='normal'?' selected':''}>Normal</option>
+          <option value="high"${m.priority==='high'?' selected':''}>High</option>
+          <option value="urgent"${m.priority==='urgent'?' selected':''}>Urgent</option>
+        </select>
+      </div>`;
+
+      // Due date
+      html += `<div class="sp-field">
+        <label>${t('missionDueDate')}</label>
+        <input type="date" id="sp-due" value="${m.due_at ? m.due_at.slice(0,10) : ''}" lang="en-GB" onchange="changeDue(this.value)">
+      </div>`;
+
+      // Assignee
+      html += `<div class="sp-field">
+        <label>${t('missionAssignee')}</label>
+        <div>${escHtml(getUserName(m.assignee_user_id))}</div>
+      </div>`;
+
+      // Watchers
+      const watcherNames = (m.watchers || []).map(w => getUserName(w.user_id || w)).join(', ');
+      html += `<div class="sp-field">
+        <label>${t('missionWatchers')}</label>
+        <div>${watcherNames || '—'}</div>
+      </div>`;
+
+      // Linked entity
+      if (m.entity_type && m.entity_id) {
+        const icon = getEntityIcon(m.entity_type);
+        html += `<div class="sp-field">
+          <label>${t('missionLinkedTo')}</label>
+          <div>${icon} ${escHtml(m.entity_name || m.entity_type + ' #' + m.entity_id)}</div>
+        </div>`;
+      }
+
+      // Sub-missions
+      html += `<div class="sp-field">
+        <div class="collapsible-header" onclick="this.nextElementSibling.classList.toggle('collapsed')">${t('missionSubMissions')} ▾</div>
+        <div id="sp-sub-missions"></div>
+      </div>`;
+
+      // Comments
+      html += `<div class="sp-field">
+        <label>${t('missionComments')}</label>
+        <div id="sp-comments"><div style="color:var(--m-muted);font-size:0.82rem">Loading...</div></div>
+        <div class="comment-form">
+          <input type="text" id="sp-comment-input" placeholder="Add a comment...">
+          <button onclick="postComment()">Send</button>
+        </div>
+      </div>`;
+
+      // History (collapsed)
+      html += `<div class="sp-field">
+        <div class="collapsible-header" onclick="this.nextElementSibling.classList.toggle('collapsed')">
+          ${t('missionHistory')} ▸
+        </div>
+        <div class="collapsible-body collapsed" id="sp-history"><div style="color:var(--m-muted);font-size:0.82rem">Loading...</div></div>
+      </div>`;
+
+      body.innerHTML = html;
+
+      // Actions
+      const actions = document.getElementById('sp-actions');
+      let actHtml = '';
+      if (m.status !== 'done' && m.status !== 'cancelled') {
+        actHtml += `<button class="btn-done" onclick="setMissionStatus('done')">✓ ${t('missionDone')}</button>`;
+        actHtml += `<button class="btn-block" onclick="setMissionStatus('blocked')">⏸ ${t('missionBlock')}</button>`;
+        actHtml += `<button class="btn-cancel-m" onclick="setMissionStatus('cancelled')">✕ ${t('missionCancel')}</button>`;
+      } else {
+        actHtml += `<button class="btn-reopen" onclick="setMissionStatus('open')">↺ ${t('missionReopen')}</button>`;
+      }
+      actions.innerHTML = actHtml;
+
+      document.getElementById('sp-overlay').style.display = 'block';
+      document.getElementById('side-panel').classList.add('open');
+
+      // Load comments and history
+      loadComments(m.id);
+      loadSubMissions(m.id);
+    }
+
+    function closeSidePanel() {
+      document.getElementById('sp-overlay').style.display = 'none';
+      document.getElementById('side-panel').classList.remove('open');
+      document.querySelectorAll('.mission-row').forEach(r => r.classList.remove('active'));
+      selectedMission = null;
+    }
+
+    async function loadComments(missionId) {
+      try {
+        const comments = await apiFetch(`/mission_comments?mission_id=${missionId}`);
+        const el = document.getElementById('sp-comments');
+        if (!comments.length) { el.innerHTML = '<div style="color:var(--m-muted);font-size:0.82rem">No comments</div>'; return; }
+        el.innerHTML = comments.map(c => `<div class="comment-item">
+          <span class="comment-author">${escHtml(getUserName(c.user_id))}</span>
+          <span class="comment-date">${fmtDateDMY(c.created_at)}</span>
+          <div class="comment-body">${escHtml(c.body || c.text || '')}</div>
+        </div>`).join('');
+      } catch (e) {
+        document.getElementById('sp-comments').innerHTML = `<div style="color:var(--m-red);font-size:0.82rem">${e.message}</div>`;
+      }
+    }
+
+    async function loadSubMissions(missionId) {
+      try {
+        const subs = await apiFetch(`/missions?parent_id=${missionId}`);
+        const el = document.getElementById('sp-sub-missions');
+        if (!subs.length) { el.innerHTML = '<div style="color:var(--m-muted);font-size:0.82rem">—</div>'; return; }
+        el.innerHTML = subs.map(s => `<div class="sub-mission-row" onclick="openMission('${s.id}')">
+          <span class="mission-priority-dot ${s.priority || 'normal'}"></span>
+          <span>${escHtml(getMissionTitle(s))}</span>
+        </div>`).join('');
+      } catch (e) {
+        document.getElementById('sp-sub-missions').innerHTML = '—';
+      }
+    }
+
+    async function postComment() {
+      if (!selectedMission) return;
+      const input = document.getElementById('sp-comment-input');
+      const text = input.value.trim();
+      if (!text) return;
+      try {
+        await apiFetch('/mission_comments', {
+          method: 'POST',
+          body: JSON.stringify({ mission_id: selectedMission.id, body: text })
+        });
+        input.value = '';
+        loadComments(selectedMission.id);
+      } catch (e) { showToast(e.message, true); }
+    }
+
+    async function changeStatus(val) {
+      if (!selectedMission) return;
+      try {
+        await apiFetch(`/missions/${selectedMission.id}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ status: val })
+        });
+        selectedMission.status = val;
+        showToast('Status updated');
+      } catch (e) { showToast(e.message, true); }
+    }
+
+    async function changePriority(val) {
+      if (!selectedMission) return;
+      try {
+        await apiFetch(`/missions/${selectedMission.id}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ priority: val })
+        });
+        selectedMission.priority = val;
+        showToast('Priority updated');
+      } catch (e) { showToast(e.message, true); }
+    }
+
+    async function changeDue(val) {
+      if (!selectedMission) return;
+      try {
+        await apiFetch(`/missions/${selectedMission.id}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ due_at: val || null })
+        });
+        selectedMission.due_at = val || null;
+        showToast('Due date updated');
+      } catch (e) { showToast(e.message, true); }
+    }
+
+    async function setMissionStatus(status) {
+      if (!selectedMission) return;
+      let body = { status };
+
+      if (status === 'blocked') {
+        const reason = prompt(t('missionBlockReason'));
+        if (reason === null) return;
+        body.block_reason = reason;
+        // Also post a comment
+        if (reason) {
+          try { await apiFetch('/mission_comments', { method: 'POST', body: JSON.stringify({ mission_id: selectedMission.id, body: '⏸ ' + reason }) }); } catch(e) {}
+        }
+      }
+      if (status === 'cancelled') {
+        const reason = prompt(t('missionCancelReason'));
+        if (reason === null) return;
+        body.completion_note = reason;
+      }
+
+      try {
+        await apiFetch(`/missions/${selectedMission.id}`, {
+          method: 'PATCH',
+          body: JSON.stringify(body)
+        });
+        showToast('Status updated');
+        closeSidePanel();
+        loadDashboard();
+      } catch (e) { showToast(e.message, true); }
+    }
+
+    // --- Create Mission modal ---
+
+    function openNewMissionModal() {
+      document.getElementById('modal-new-mission').classList.add('open');
+      document.getElementById('t-modal-title').textContent = t('missionNew');
+      // Reset form
+      ['m-title-ru','m-title-en','m-title-th','m-desc-ru','m-desc-en','m-desc-th','m-due-date','m-entity-search'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = '';
+      });
+      document.getElementById('m-assignee').value = '';
+      newMissionPriority = 'normal';
+      newMissionEntity = null;
+      newMissionWatchers = [];
+      updatePriorityButtons();
+      renderWatcherChips();
+      document.getElementById('m-entity-selected').innerHTML = '';
+      document.getElementById('m-entity-results').style.display = 'none';
+    }
+
+    window._openMissionModal = openNewMissionModal;
+
+    function closeNewMissionModal() {
+      document.getElementById('modal-new-mission').classList.remove('open');
+    }
+
+    function switchTitleLang(lang) {
+      currentTitleLang = lang;
+      ['ru','en','th'].forEach(l => {
+        document.getElementById('m-title-' + l).style.display = l === lang ? 'block' : 'none';
+      });
+      document.querySelectorAll('#title-lang-tabs button').forEach(b => {
+        b.classList.toggle('active', b.dataset.lang === lang);
+      });
+    }
+
+    function switchDescLang(lang) {
+      currentDescLang = lang;
+      ['ru','en','th'].forEach(l => {
+        document.getElementById('m-desc-' + l).style.display = l === lang ? 'block' : 'none';
+      });
+      document.querySelectorAll('#desc-lang-tabs button').forEach(b => {
+        b.classList.toggle('active', b.dataset.lang === lang);
+      });
+    }
+
+    function setPriority(p) {
+      newMissionPriority = p;
+      updatePriorityButtons();
+    }
+
+    function updatePriorityButtons() {
+      document.querySelectorAll('#priority-selector button').forEach(b => {
+        b.classList.toggle('active', b.dataset.p === newMissionPriority);
+      });
+    }
+
+    async function translateTitle() {
+      const ru = document.getElementById('m-title-ru').value;
+      const en = document.getElementById('m-title-en').value;
+      const source = ru || en;
+      if (!source) return;
+      try {
+        const res = await apiFetch('/translate', {
+          method: 'POST',
+          body: JSON.stringify({ text: source, source_lang: ru ? 'ru' : 'en' })
+        });
+        if (res.en) document.getElementById('m-title-en').value = res.en;
+        if (res.ru) document.getElementById('m-title-ru').value = res.ru;
+        if (res.th) document.getElementById('m-title-th').value = res.th;
+      } catch (e) { showToast('Translation failed', true); }
+    }
+
+    async function translateDesc() {
+      const ru = document.getElementById('m-desc-ru').value;
+      const en = document.getElementById('m-desc-en').value;
+      const source = ru || en;
+      if (!source) return;
+      try {
+        const res = await apiFetch('/translate', {
+          method: 'POST',
+          body: JSON.stringify({ text: source, source_lang: ru ? 'ru' : 'en' })
+        });
+        if (res.en) document.getElementById('m-desc-en').value = res.en;
+        if (res.ru) document.getElementById('m-desc-ru').value = res.ru;
+        if (res.th) document.getElementById('m-desc-th').value = res.th;
+      } catch (e) { showToast('Translation failed', true); }
+    }
+
+    // Entity search
+    let entitySearchTimer = null;
+    document.addEventListener('DOMContentLoaded', () => {
+      const esInput = document.getElementById('m-entity-search');
+      if (esInput) {
+        esInput.addEventListener('input', () => {
+          clearTimeout(entitySearchTimer);
+          entitySearchTimer = setTimeout(() => searchEntity(esInput.value), 300);
+        });
+      }
+
+      const watcherSel = document.getElementById('m-watcher-add');
+      if (watcherSel) {
+        watcherSel.addEventListener('change', () => {
+          const uid = watcherSel.value;
+          if (uid && !newMissionWatchers.includes(uid)) {
+            newMissionWatchers.push(uid);
+            renderWatcherChips();
+          }
+          watcherSel.value = '';
+        });
+      }
+    });
+
+    async function searchEntity(q) {
+      const resultsEl = document.getElementById('m-entity-results');
+      if (!q || q.length < 2) { resultsEl.style.display = 'none'; return; }
+      try {
+        const results = await apiFetch(`/search?q=${encodeURIComponent(q)}&limit=10`);
+        if (!results.length) { resultsEl.style.display = 'none'; return; }
+        resultsEl.style.display = 'block';
+        resultsEl.innerHTML = results.map(r => `
+          <div style="padding:8px 12px;cursor:pointer;border-bottom:1px solid #f0f0f0;font-size:0.84rem"
+               onmouseover="this.style.background='#f0f4ff'" onmouseout="this.style.background=''"
+               onclick="selectEntity('${r.entity_type}','${r.entity_id}','${escHtml(r.name || r.title || '')}')">
+            ${getEntityIcon(r.entity_type)} ${escHtml(r.name || r.title || r.entity_type + ' #' + r.entity_id)}
+          </div>
+        `).join('');
+      } catch (e) { resultsEl.style.display = 'none'; }
+    }
+
+    function selectEntity(type, id, name) {
+      newMissionEntity = { entity_type: type, entity_id: id };
+      document.getElementById('m-entity-selected').innerHTML = `<span style="font-size:0.84rem">${getEntityIcon(type)} ${name} <span style="cursor:pointer;color:var(--m-red)" onclick="clearEntity()">✕</span></span>`;
+      document.getElementById('m-entity-results').style.display = 'none';
+      document.getElementById('m-entity-search').value = '';
+    }
+
+    function clearEntity() {
+      newMissionEntity = null;
+      document.getElementById('m-entity-selected').innerHTML = '';
+    }
+
+    function renderWatcherChips() {
+      const el = document.getElementById('m-watchers-list');
+      el.innerHTML = newMissionWatchers.map(uid => `
+        <span class="watcher-chip">${escHtml(getUserName(uid))} <span class="remove-watcher" onclick="removeWatcher('${uid}')">×</span></span>
+      `).join('');
+    }
+
+    function removeWatcher(uid) {
+      newMissionWatchers = newMissionWatchers.filter(w => w !== uid);
+      renderWatcherChips();
+    }
+
+    async function saveMission() {
+      const payload = {
+        title_ru: document.getElementById('m-title-ru').value,
+        title_en: document.getElementById('m-title-en').value,
+        title_th: document.getElementById('m-title-th').value,
+        description_ru: document.getElementById('m-desc-ru').value,
+        description_en: document.getElementById('m-desc-en').value,
+        description_th: document.getElementById('m-desc-th').value,
+        priority: newMissionPriority,
+        due_at: document.getElementById('m-due-date').value || null,
+        assignee_user_id: document.getElementById('m-assignee').value || null,
+        watcher_user_ids: newMissionWatchers,
+        notify_assignee_tg: document.getElementById('m-notify-tg-assignee').checked,
+        notify_watchers_tg: document.getElementById('m-notify-tg-watchers').checked,
+      };
+      if (newMissionEntity) {
+        payload.entity_type = newMissionEntity.entity_type;
+        payload.entity_id = newMissionEntity.entity_id;
+      }
+      if (!payload.title_ru && !payload.title_en && !payload.title_th) {
+        showToast('Title is required', true);
+        return;
+      }
+      try {
+        await apiFetch('/missions', { method: 'POST', body: JSON.stringify(payload) });
+        showToast(t('saved'));
+        closeNewMissionModal();
+        loadDashboard();
+      } catch (e) { showToast(e.message, true); }
+    }
+
+    // --- Init ---
+
+    renderHeader('missions');
+
+    document.getElementById('btn-new-mission').addEventListener('click', openNewMissionModal);
+
+    function onLogin() {
+      loadDashboard();
+      // Check if navigated with ?action=new
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('action') === 'new') {
+        setTimeout(openNewMissionModal, 300);
+      }
+    }
+  </script>
+</body>
+</html>

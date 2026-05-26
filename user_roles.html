@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sunti — User Roles</title>
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="stylesheet" href="style.css">
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="_i18n.js"></script>
+<script src="_config.js"></script>
+<script src="_auth.js"></script>
+<script src="_header.js"></script>
+<style>
+  :root {
+    --ur-bg: #f5f7fa;
+    --ur-border: #e2e8f0;
+    --ur-text: #0f172a;
+    --ur-muted: #64748b;
+    --ur-primary: #1a73e8;
+    --ur-green: #10b981;
+    --ur-yellow: #f59e0b;
+  }
+  .ur-page { padding: 20px 28px; max-width: 1100px; margin: 0 auto; }
+  .ur-toolbar { display: flex; align-items: center; gap: 16px; margin-bottom: 20px; }
+  .ur-toolbar h2 { margin: 0; font-size: 1.4rem; font-weight: 700; color: var(--ur-text); }
+
+  .ur-table { width: 100%; border-collapse: separate; border-spacing: 0; background: #fff; border: 1px solid var(--ur-border); border-radius: 10px; overflow: hidden; }
+  .ur-table th {
+    background: #f8fafc; padding: 10px 14px; text-align: center; font-size: 0.78rem;
+    font-weight: 700; color: var(--ur-muted); border-bottom: 1px solid var(--ur-border);
+    text-transform: uppercase; letter-spacing: 0.5px;
+  }
+  .ur-table th:first-child { text-align: left; }
+  .ur-table td { padding: 10px 14px; border-bottom: 1px solid #f0f0f0; text-align: center; font-size: 0.88rem; }
+  .ur-table td:first-child { text-align: left; font-weight: 500; color: var(--ur-text); }
+  .ur-table tr:last-child td { border-bottom: none; }
+  .ur-table tr:hover td { background: #f8fafc; }
+
+  .ur-table input[type="checkbox"] { width: 18px; height: 18px; cursor: pointer; accent-color: var(--ur-primary); }
+
+  .star-btn {
+    background: none; border: none; cursor: pointer; font-size: 1.2rem;
+    color: #ccc; transition: color 0.15s;
+  }
+  .star-btn.active { color: var(--ur-yellow); }
+  .star-btn:hover { color: var(--ur-yellow); }
+
+  .empty-state { text-align: center; padding: 60px 20px; color: var(--ur-muted); }
+  .empty-state .icon { font-size: 3rem; margin-bottom: 12px; }
+
+  .saving-indicator {
+    display: inline-block; font-size: 0.78rem; color: var(--ur-green); font-weight: 600;
+    opacity: 0; transition: opacity 0.3s;
+  }
+  .saving-indicator.show { opacity: 1; }
+</style>
+</head>
+<body>
+  <div id="header"></div>
+
+  <div id="guest-view">
+    <h2 id="t-guest-title"></h2>
+    <p id="t-guest-sub"></p>
+  </div>
+
+  <div id="app-view" style="display:none">
+    <div class="ur-page">
+      <div class="ur-toolbar">
+        <h2 id="t-page-title">Roles</h2>
+        <span class="saving-indicator" id="saving-indicator">Saved ✓</span>
+      </div>
+      <div id="roles-content">
+        <div class="empty-state"><div class="icon">👥</div><div>Loading...</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    const ROLES = ['admin', 'project_manager', 'sales_manager', 'accountant', 'grand_user'];
+    const ROLE_LABELS = {
+      admin: 'Admin',
+      project_manager: 'Project Manager',
+      sales_manager: 'Sales Manager',
+      accountant: 'Accountant',
+      grand_user: 'Grand User'
+    };
+
+    let usersData = [];
+    let userRolesData = [];
+    // Map: { `${user_id}_${role}` : role_record }
+    let rolesMap = {};
+
+    function showToast(msg, isError) {
+      const el = document.getElementById('toast');
+      el.textContent = msg;
+      el.className = 'toast show' + (isError ? ' error' : '');
+      setTimeout(() => el.className = 'toast', 3000);
+    }
+
+    function escHtml(s) {
+      if (!s) return '';
+      return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    function flashSaved() {
+      const el = document.getElementById('saving-indicator');
+      el.classList.add('show');
+      setTimeout(() => el.classList.remove('show'), 1500);
+    }
+
+    async function loadData() {
+      try {
+        const [users, roles] = await Promise.all([
+          apiFetch('/users'),
+          apiFetch('/user_roles')
+        ]);
+        usersData = users.filter(u => u.is_active !== false);
+        userRolesData = roles;
+        buildRolesMap();
+        renderTable();
+      } catch (e) {
+        console.error('Failed to load:', e);
+        document.getElementById('roles-content').innerHTML = `<div class="empty-state"><div class="icon">⚠️</div><div>${e.message}</div></div>`;
+      }
+    }
+
+    function buildRolesMap() {
+      rolesMap = {};
+      userRolesData.forEach(r => {
+        rolesMap[`${r.user_id}_${r.role}`] = r;
+      });
+    }
+
+    function renderTable() {
+      const container = document.getElementById('roles-content');
+      if (!usersData.length) {
+        container.innerHTML = `<div class="empty-state"><div class="icon">👥</div><div>No users</div></div>`;
+        return;
+      }
+
+      let html = `<table class="ur-table">
+        <thead><tr>
+          <th>User</th>
+          ${ROLES.map(r => `<th>${ROLE_LABELS[r]}</th>`).join('')}
+          <th>Primary</th>
+        </tr></thead>
+        <tbody>`;
+
+      usersData.forEach(u => {
+        html += `<tr>
+          <td>${escHtml(u.name || u.email)}<div style="font-size:0.72rem;color:var(--ur-muted)">${escHtml(u.email)}</div></td>`;
+        ROLES.forEach(role => {
+          const key = `${u.id}_${role}`;
+          const has = !!rolesMap[key];
+          html += `<td><input type="checkbox" ${has ? 'checked' : ''} onchange="toggleRole('${u.id}','${role}',this.checked)"></td>`;
+        });
+        // Primary star
+        const isPrimary = userRolesData.some(r => r.user_id === u.id && r.is_primary);
+        html += `<td><button class="star-btn ${isPrimary ? 'active' : ''}" onclick="togglePrimary('${u.id}',this)">★</button></td>`;
+        html += `</tr>`;
+      });
+
+      html += `</tbody></table>`;
+      container.innerHTML = html;
+    }
+
+    async function toggleRole(userId, role, checked) {
+      try {
+        if (checked) {
+          const res = await apiFetch('/user_roles', {
+            method: 'POST',
+            body: JSON.stringify({ user_id: userId, role: role })
+          });
+          rolesMap[`${userId}_${role}`] = res;
+          userRolesData.push(res);
+        } else {
+          const key = `${userId}_${role}`;
+          const record = rolesMap[key];
+          if (record && record.id) {
+            await apiFetch(`/user_roles/${record.id}`, { method: 'DELETE' });
+          }
+          delete rolesMap[key];
+          userRolesData = userRolesData.filter(r => !(r.user_id === userId && r.role === role));
+        }
+        flashSaved();
+      } catch (e) {
+        showToast(e.message, true);
+        // Revert checkbox state
+        renderTable();
+      }
+    }
+
+    async function togglePrimary(userId, btn) {
+      const wasPrimary = btn.classList.contains('active');
+      const newVal = !wasPrimary;
+
+      // Find all role records for this user
+      const userRecords = userRolesData.filter(r => r.user_id === userId);
+      if (!userRecords.length) {
+        showToast('User has no roles assigned', true);
+        return;
+      }
+
+      try {
+        // Update all roles for this user to set/unset is_primary
+        for (const record of userRecords) {
+          await apiFetch(`/user_roles/${record.id}`, {
+            method: 'PATCH',
+            body: JSON.stringify({ is_primary: newVal })
+          });
+          record.is_primary = newVal;
+        }
+        btn.classList.toggle('active', newVal);
+        flashSaved();
+      } catch (e) {
+        showToast(e.message, true);
+        renderTable();
+      }
+    }
+
+    // --- Init ---
+
+    renderHeader('user_roles');
+
+    document.getElementById('t-page-title').textContent = t('navUserRoles');
+
+    function onLogin(user, admin) {
+      if (!admin) {
+        document.getElementById('app-view').innerHTML = `<div style="padding:40px;text-align:center"><h2>${t('adminOnly')}</h2></div>`;
+        return;
+      }
+      loadData();
+    }
+  </script>
+</body>
+</html>

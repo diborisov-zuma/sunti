@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sunti — Mission Templates</title>
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="stylesheet" href="style.css">
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="_i18n.js"></script>
+<script src="_config.js"></script>
+<script src="_auth.js"></script>
+<script src="_header.js"></script>
+<style>
+  :root {
+    --mt-bg: #f5f7fa;
+    --mt-border: #e2e8f0;
+    --mt-text: #0f172a;
+    --mt-muted: #64748b;
+    --mt-primary: #1a73e8;
+    --mt-red: #ef4444;
+    --mt-orange: #f59e0b;
+    --mt-blue: #3b82f6;
+    --mt-grey: #94a3b8;
+    --mt-green: #10b981;
+  }
+  .mt-page { padding: 20px 28px; max-width: 1100px; margin: 0 auto; }
+  .mt-toolbar { display: flex; align-items: center; gap: 16px; margin-bottom: 20px; }
+  .mt-toolbar h2 { margin: 0; font-size: 1.4rem; font-weight: 700; color: var(--mt-text); }
+
+  .mt-tabs { display: flex; gap: 4px; margin-bottom: 20px; }
+  .mt-tabs button {
+    padding: 7px 18px; border: 1px solid var(--mt-border); border-radius: 8px;
+    background: #fff; cursor: pointer; font-size: 0.85rem; font-weight: 600;
+    color: var(--mt-muted);
+  }
+  .mt-tabs button.active { background: var(--mt-primary); color: #fff; border-color: var(--mt-primary); }
+
+  .mt-card {
+    background: #fff; border: 1px solid var(--mt-border); border-radius: 10px;
+    padding: 16px 20px; margin-bottom: 12px; display: flex; align-items: flex-start; gap: 16px;
+  }
+  .mt-card-body { flex: 1; }
+  .mt-card-name { font-size: 1rem; font-weight: 700; color: var(--mt-text); margin-bottom: 4px; }
+  .mt-card-trigger { font-size: 0.82rem; color: var(--mt-muted); margin-bottom: 4px; }
+  .mt-card-code { font-size: 0.72rem; color: var(--mt-grey); font-family: monospace; background: #f1f5f9; padding: 2px 8px; border-radius: 4px; }
+  .mt-card-priority {
+    display: inline-block; padding: 2px 10px; border-radius: 10px; font-size: 0.72rem;
+    font-weight: 700; margin-left: 8px;
+  }
+  .mt-card-priority.urgent { background: #fee2e2; color: #991b1b; }
+  .mt-card-priority.high { background: #fef3c7; color: #92400e; }
+  .mt-card-priority.normal { background: #dbeafe; color: #1e40af; }
+  .mt-card-priority.low { background: #f1f5f9; color: #475569; }
+  .mt-card-actions { display: flex; gap: 6px; flex-shrink: 0; align-items: center; }
+  .mt-card-actions button {
+    padding: 5px 12px; border: 1px solid var(--mt-border); border-radius: 6px;
+    background: #fff; cursor: pointer; font-size: 0.78rem; font-weight: 600;
+  }
+  .mt-card-actions button:hover { background: #f8f8f8; }
+  .mt-card-actions .btn-test { color: var(--mt-primary); }
+  .mt-card-actions .btn-pause { color: var(--mt-orange); }
+  .mt-card-actions .btn-resume { color: var(--mt-green); }
+  .mt-card-actions .btn-archive { color: var(--mt-red); }
+
+  /* Modal */
+  .modal-overlay {
+    display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.35); z-index: 200; align-items: center; justify-content: center;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal-box {
+    background: #fff; border-radius: 12px; width: 620px; max-height: 90vh; overflow-y: auto;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.18); padding: 24px;
+  }
+  .modal-box h3 { margin: 0 0 16px; font-size: 1.1rem; }
+  .modal-field { margin-bottom: 12px; }
+  .modal-field label { display: block; font-size: 0.82rem; color: #666; margin-bottom: 4px; }
+  .modal-field input, .modal-field select, .modal-field textarea {
+    width: 100%; border: 1px solid #ddd; border-radius: 6px; padding: 8px 12px;
+    font-size: 0.9rem; outline: none; box-sizing: border-box; background: #fff;
+  }
+  .modal-field input:focus, .modal-field select:focus, .modal-field textarea:focus { border-color: var(--mt-primary); }
+  .modal-field textarea { min-height: 80px; resize: vertical; font-family: monospace; font-size: 0.82rem; }
+  .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 16px; }
+  .lang-tabs { display: flex; gap: 4px; margin-bottom: 6px; }
+  .lang-tabs button { padding: 3px 10px; border: 1px solid #ddd; border-radius: 4px; background: #f8f8f8; cursor: pointer; font-size: 0.75rem; }
+  .lang-tabs button.active { background: var(--mt-primary); color: #fff; border-color: var(--mt-primary); }
+  .translate-btn { background: none; border: none; cursor: pointer; font-size: 0.9rem; margin-left: 4px; }
+
+  .empty-state { text-align: center; padding: 60px 20px; color: var(--mt-muted); }
+  .empty-state .icon { font-size: 3rem; margin-bottom: 12px; }
+
+  /* Test results */
+  .test-result { background: #f8f8f8; border-radius: 8px; padding: 14px; font-size: 0.82rem; font-family: monospace; white-space: pre-wrap; max-height: 300px; overflow-y: auto; }
+</style>
+</head>
+<body>
+  <div id="header"></div>
+
+  <div id="guest-view">
+    <h2 id="t-guest-title"></h2>
+    <p id="t-guest-sub"></p>
+  </div>
+
+  <div id="app-view" style="display:none">
+    <div class="mt-page">
+      <div class="mt-toolbar">
+        <h2 id="t-page-title">Mission Templates</h2>
+      </div>
+
+      <div class="mt-tabs" id="mt-tabs">
+        <button class="active" data-tab="active" onclick="switchTab('active')">Active <span id="cnt-active">0</span></button>
+        <button data-tab="paused" onclick="switchTab('paused')">Paused <span id="cnt-paused">0</span></button>
+        <button data-tab="archived" onclick="switchTab('archived')">Archived <span id="cnt-archived">0</span></button>
+      </div>
+
+      <div id="templates-list">
+        <div class="empty-state"><div class="icon">📋</div><div>Loading...</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Edit Template modal -->
+  <div class="modal-overlay" id="modal-edit-template">
+    <div class="modal-box">
+      <h3 id="modal-edit-title">Edit Template</h3>
+
+      <div class="modal-field">
+        <label>Name</label>
+        <div style="display:flex;gap:6px;align-items:center;margin-bottom:4px">
+          <div class="lang-tabs" id="tpl-name-tabs">
+            <button class="active" data-lang="ru" onclick="switchTplNameLang('ru')">RU</button>
+            <button data-lang="en" onclick="switchTplNameLang('en')">EN</button>
+            <button data-lang="th" onclick="switchTplNameLang('th')">TH</button>
+          </div>
+          <button class="translate-btn" onclick="translateTplName()" title="Translate">🌐</button>
+        </div>
+        <input type="text" id="tpl-name-ru" placeholder="Название" style="display:block">
+        <input type="text" id="tpl-name-en" placeholder="Name" style="display:none">
+        <input type="text" id="tpl-name-th" placeholder="ชื่อ" style="display:none">
+      </div>
+
+      <div class="modal-field">
+        <label>Trigger description</label>
+        <div style="display:flex;gap:6px;align-items:center;margin-bottom:4px">
+          <div class="lang-tabs" id="tpl-trig-tabs">
+            <button class="active" data-lang="ru" onclick="switchTplTrigLang('ru')">RU</button>
+            <button data-lang="en" onclick="switchTplTrigLang('en')">EN</button>
+            <button data-lang="th" onclick="switchTplTrigLang('th')">TH</button>
+          </div>
+          <button class="translate-btn" onclick="translateTplTrig()" title="Translate">🌐</button>
+        </div>
+        <input type="text" id="tpl-trig-ru" placeholder="Описание триггера" style="display:block">
+        <input type="text" id="tpl-trig-en" placeholder="Trigger description" style="display:none">
+        <input type="text" id="tpl-trig-th" placeholder="คำอธิบายทริกเกอร์" style="display:none">
+      </div>
+
+      <div class="modal-field">
+        <label>Trigger type</label>
+        <select id="tpl-trigger-type">
+          <option value="event">Event</option>
+          <option value="schedule">Schedule</option>
+          <option value="manual">Manual</option>
+        </select>
+      </div>
+
+      <div class="modal-field">
+        <label>Trigger spec (JSON)</label>
+        <textarea id="tpl-trigger-spec" rows="4" placeholder='{"event":"invoice.created"}'></textarea>
+      </div>
+
+      <div class="modal-field">
+        <label>Mission spec (JSON)</label>
+        <textarea id="tpl-mission-spec" rows="4" placeholder='{"priority":"normal","assignee_role":"accountant"}'></textarea>
+      </div>
+
+      <div class="modal-field">
+        <label>Status</label>
+        <select id="tpl-status">
+          <option value="active">Active</option>
+          <option value="paused">Paused</option>
+          <option value="archived">Archived</option>
+        </select>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn btn-outline" onclick="closeEditModal()">Cancel</button>
+        <button class="btn btn-primary" onclick="saveTemplate()">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Test results modal -->
+  <div class="modal-overlay" id="modal-test-result">
+    <div class="modal-box">
+      <h3>Test Result</h3>
+      <div class="test-result" id="test-result-body"></div>
+      <div class="modal-actions">
+        <button class="btn btn-outline" onclick="document.getElementById('modal-test-result').classList.remove('open')">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    let allTemplates = [];
+    let currentTab = 'active';
+    let editingTemplate = null;
+    let currentTplNameLang = 'ru';
+    let currentTplTrigLang = 'ru';
+
+    function showToast(msg, isError) {
+      const el = document.getElementById('toast');
+      el.textContent = msg;
+      el.className = 'toast show' + (isError ? ' error' : '');
+      setTimeout(() => el.className = 'toast', 3000);
+    }
+
+    function escHtml(s) {
+      if (!s) return '';
+      return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    function getTplName(tpl) {
+      return tpl['name_' + currentLang] || tpl.name_en || tpl.name_ru || tpl.name_th || '(no name)';
+    }
+
+    function getTplTrigDesc(tpl) {
+      return tpl['trigger_description_' + currentLang] || tpl.trigger_description_en || tpl.trigger_description_ru || '';
+    }
+
+    // --- Data loading ---
+
+    async function loadTemplates() {
+      try {
+        allTemplates = await apiFetch('/mission_templates');
+        updateCounts();
+        renderTemplates();
+      } catch (e) {
+        console.error('Failed to load templates:', e);
+        document.getElementById('templates-list').innerHTML = `<div class="empty-state"><div class="icon">⚠️</div><div>${e.message}</div></div>`;
+      }
+    }
+
+    function updateCounts() {
+      document.getElementById('cnt-active').textContent = allTemplates.filter(t => t.status === 'active').length;
+      document.getElementById('cnt-paused').textContent = allTemplates.filter(t => t.status === 'paused').length;
+      document.getElementById('cnt-archived').textContent = allTemplates.filter(t => t.status === 'archived').length;
+    }
+
+    function switchTab(tab) {
+      currentTab = tab;
+      document.querySelectorAll('#mt-tabs button').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+      renderTemplates();
+    }
+
+    function renderTemplates() {
+      const filtered = allTemplates.filter(t => t.status === currentTab);
+      const container = document.getElementById('templates-list');
+
+      if (!filtered.length) {
+        container.innerHTML = `<div class="empty-state"><div class="icon">📋</div><div>No templates</div></div>`;
+        return;
+      }
+
+      container.innerHTML = filtered.map(tpl => {
+        const name = getTplName(tpl);
+        const trigDesc = getTplTrigDesc(tpl);
+        const priority = tpl.default_priority || tpl.priority || 'normal';
+        const code = tpl.code || '';
+        const isPaused = tpl.status === 'paused';
+        const isArchived = tpl.status === 'archived';
+
+        return `<div class="mt-card">
+          <div class="mt-card-body">
+            <div class="mt-card-name">
+              ${escHtml(name)}
+              <span class="mt-card-priority ${priority}">${priority}</span>
+            </div>
+            <div class="mt-card-trigger">${escHtml(trigDesc)}</div>
+            ${code ? `<span class="mt-card-code">${escHtml(code)}</span>` : ''}
+          </div>
+          <div class="mt-card-actions">
+            ${!isArchived ? (isPaused
+              ? `<button class="btn-resume" onclick="togglePause('${tpl.id}','active')">▶ Resume</button>`
+              : `<button class="btn-pause" onclick="togglePause('${tpl.id}','paused')">⏸ Pause</button>`)
+            : ''}
+            <button onclick="openEditModal('${tpl.id}')">✏ Edit</button>
+            <button class="btn-test" onclick="testTemplate('${tpl.id}')">▷ Test</button>
+            ${!isArchived ? `<button class="btn-archive" onclick="archiveTemplate('${tpl.id}')">🗃 Archive</button>` : ''}
+          </div>
+        </div>`;
+      }).join('');
+    }
+
+    async function togglePause(id, newStatus) {
+      try {
+        await apiFetch(`/mission_templates/${id}`, { method: 'PATCH', body: JSON.stringify({ status: newStatus }) });
+        showToast('Updated');
+        loadTemplates();
+      } catch (e) { showToast(e.message, true); }
+    }
+
+    async function archiveTemplate(id) {
+      if (!confirm('Archive this template?')) return;
+      try {
+        await apiFetch(`/mission_templates/${id}`, { method: 'PATCH', body: JSON.stringify({ status: 'archived' }) });
+        showToast('Archived');
+        loadTemplates();
+      } catch (e) { showToast(e.message, true); }
+    }
+
+    async function testTemplate(id) {
+      try {
+        const result = await apiFetch(`/mission_templates/${id}/test`, { method: 'POST' });
+        document.getElementById('test-result-body').textContent = JSON.stringify(result, null, 2);
+        document.getElementById('modal-test-result').classList.add('open');
+      } catch (e) { showToast(e.message, true); }
+    }
+
+    // --- Edit modal ---
+
+    function openEditModal(id) {
+      const tpl = allTemplates.find(t => t.id === id || t.id === parseInt(id));
+      editingTemplate = tpl || null;
+
+      document.getElementById('modal-edit-title').textContent = tpl ? 'Edit Template' : 'New Template';
+      document.getElementById('tpl-name-ru').value = tpl ? (tpl.name_ru || '') : '';
+      document.getElementById('tpl-name-en').value = tpl ? (tpl.name_en || '') : '';
+      document.getElementById('tpl-name-th').value = tpl ? (tpl.name_th || '') : '';
+      document.getElementById('tpl-trig-ru').value = tpl ? (tpl.trigger_description_ru || '') : '';
+      document.getElementById('tpl-trig-en').value = tpl ? (tpl.trigger_description_en || '') : '';
+      document.getElementById('tpl-trig-th').value = tpl ? (tpl.trigger_description_th || '') : '';
+      document.getElementById('tpl-trigger-type').value = tpl ? (tpl.trigger_type || 'event') : 'event';
+      document.getElementById('tpl-trigger-spec').value = tpl ? (typeof tpl.trigger_spec === 'object' ? JSON.stringify(tpl.trigger_spec, null, 2) : (tpl.trigger_spec || '')) : '';
+      document.getElementById('tpl-mission-spec').value = tpl ? (typeof tpl.mission_spec === 'object' ? JSON.stringify(tpl.mission_spec, null, 2) : (tpl.mission_spec || '')) : '';
+      document.getElementById('tpl-status').value = tpl ? (tpl.status || 'active') : 'active';
+
+      switchTplNameLang('ru');
+      switchTplTrigLang('ru');
+      document.getElementById('modal-edit-template').classList.add('open');
+    }
+
+    function closeEditModal() {
+      document.getElementById('modal-edit-template').classList.remove('open');
+      editingTemplate = null;
+    }
+
+    function switchTplNameLang(lang) {
+      currentTplNameLang = lang;
+      ['ru','en','th'].forEach(l => {
+        document.getElementById('tpl-name-' + l).style.display = l === lang ? 'block' : 'none';
+      });
+      document.querySelectorAll('#tpl-name-tabs button').forEach(b => b.classList.toggle('active', b.dataset.lang === lang));
+    }
+
+    function switchTplTrigLang(lang) {
+      currentTplTrigLang = lang;
+      ['ru','en','th'].forEach(l => {
+        document.getElementById('tpl-trig-' + l).style.display = l === lang ? 'block' : 'none';
+      });
+      document.querySelectorAll('#tpl-trig-tabs button').forEach(b => b.classList.toggle('active', b.dataset.lang === lang));
+    }
+
+    async function translateTplName() {
+      const ru = document.getElementById('tpl-name-ru').value;
+      const en = document.getElementById('tpl-name-en').value;
+      const source = ru || en;
+      if (!source) return;
+      try {
+        const res = await apiFetch('/translate', { method: 'POST', body: JSON.stringify({ text: source, source_lang: ru ? 'ru' : 'en' }) });
+        if (res.en) document.getElementById('tpl-name-en').value = res.en;
+        if (res.ru) document.getElementById('tpl-name-ru').value = res.ru;
+        if (res.th) document.getElementById('tpl-name-th').value = res.th;
+      } catch (e) { showToast('Translation failed', true); }
+    }
+
+    async function translateTplTrig() {
+      const ru = document.getElementById('tpl-trig-ru').value;
+      const en = document.getElementById('tpl-trig-en').value;
+      const source = ru || en;
+      if (!source) return;
+      try {
+        const res = await apiFetch('/translate', { method: 'POST', body: JSON.stringify({ text: source, source_lang: ru ? 'ru' : 'en' }) });
+        if (res.en) document.getElementById('tpl-trig-en').value = res.en;
+        if (res.ru) document.getElementById('tpl-trig-ru').value = res.ru;
+        if (res.th) document.getElementById('tpl-trig-th').value = res.th;
+      } catch (e) { showToast('Translation failed', true); }
+    }
+
+    async function saveTemplate() {
+      let triggerSpec, missionSpec;
+      try {
+        const tsVal = document.getElementById('tpl-trigger-spec').value.trim();
+        triggerSpec = tsVal ? JSON.parse(tsVal) : null;
+      } catch (e) { showToast('Invalid trigger spec JSON', true); return; }
+      try {
+        const msVal = document.getElementById('tpl-mission-spec').value.trim();
+        missionSpec = msVal ? JSON.parse(msVal) : null;
+      } catch (e) { showToast('Invalid mission spec JSON', true); return; }
+
+      const payload = {
+        name_ru: document.getElementById('tpl-name-ru').value,
+        name_en: document.getElementById('tpl-name-en').value,
+        name_th: document.getElementById('tpl-name-th').value,
+        trigger_description_ru: document.getElementById('tpl-trig-ru').value,
+        trigger_description_en: document.getElementById('tpl-trig-en').value,
+        trigger_description_th: document.getElementById('tpl-trig-th').value,
+        trigger_type: document.getElementById('tpl-trigger-type').value,
+        trigger_spec: triggerSpec,
+        mission_spec: missionSpec,
+        status: document.getElementById('tpl-status').value,
+      };
+
+      try {
+        if (editingTemplate) {
+          await apiFetch(`/mission_templates/${editingTemplate.id}`, { method: 'PATCH', body: JSON.stringify(payload) });
+        } else {
+          await apiFetch('/mission_templates', { method: 'POST', body: JSON.stringify(payload) });
+        }
+        showToast(t('saved'));
+        closeEditModal();
+        loadTemplates();
+      } catch (e) { showToast(e.message, true); }
+    }
+
+    // --- Init ---
+
+    renderHeader('mission_templates');
+
+    document.getElementById('t-page-title').textContent = t('navMissionTemplates');
+
+    function onLogin(user, admin) {
+      if (!admin) {
+        document.getElementById('app-view').innerHTML = `<div style="padding:40px;text-align:center"><h2>${t('adminOnly')}</h2></div>`;
+        return;
+      }
+      loadTemplates();
+    }
+  </script>
+</body>
+</html>
