@@ -353,6 +353,7 @@
       <div class="gantt-toolbar">
         <h2 id="t-page-title">Gantt</h2>
         <select class="filter-select" id="filter-folder"><option value="">--</option></select>
+        <select class="filter-select" id="filter-group" style="display:none"><option value="">— Gantt —</option></select>
         <div class="spacer"></div>
         <div class="legend">
           <span><span class="dot" style="background:var(--gantt-green)"></span>On track</span>
@@ -601,16 +602,50 @@
       });
     }
 
-    document.getElementById('filter-folder').addEventListener('change', e => {
+    let filterGroup = '';
+    let groupsCache = [];
+
+    document.getElementById('filter-folder').addEventListener('change', async e => {
       filterFolder = e.target.value;
+      filterGroup = '';
+      document.getElementById('filter-group').style.display = filterFolder ? '' : 'none';
       if (filterFolder) {
+        try { groupsCache = await portalFetch(`/tasks_groups?folder_id=${filterFolder}`); } catch(e) { groupsCache = []; }
+        fillGroupFilter();
+        document.getElementById('gantt-container').innerHTML = '<div class="empty-state">' + t('portalSelectProject') + '</div>';
+        document.getElementById('dash-widget').style.display = 'none';
+        document.getElementById('gantt-tabs').style.display = 'none';
+      } else {
+        groupsCache = [];
+        fillGroupFilter();
+        document.getElementById('gantt-container').innerHTML = '<div class="empty-state">' + t('portalSelectProject') + '</div>';
+        document.getElementById('dash-widget').style.display = 'none';
+        document.getElementById('gantt-tabs').style.display = 'none';
+      }
+    });
+
+    function fillGroupFilter() {
+      const sel = document.getElementById('filter-group');
+      sel.innerHTML = '<option value="">— Gantt —</option>';
+      groupsCache.forEach(g => {
+        const name = g['name_' + currentLang] || g.name || g.name_en || '—';
+        sel.innerHTML += `<option value="${g.id}">${name}</option>`;
+      });
+      if (groupsCache.length === 1) {
+        sel.value = groupsCache[0].id;
+        filterGroup = groupsCache[0].id;
+        loadGanttData();
+      }
+    }
+
+    document.getElementById('filter-group').addEventListener('change', e => {
+      filterGroup = e.target.value;
+      if (filterGroup) {
         loadGanttData();
       } else {
         document.getElementById('gantt-container').innerHTML = '<div class="empty-state">' + t('portalSelectProject') + '</div>';
         document.getElementById('dash-widget').style.display = 'none';
         document.getElementById('gantt-tabs').style.display = 'none';
-        document.getElementById('view-gantt').style.display = '';
-        document.getElementById('view-proc').style.display = 'none';
       }
     });
 
@@ -629,10 +664,11 @@
       const container = document.getElementById('gantt-container');
       container.innerHTML = '<div class="loading">' + t('loading') + '</div>';
       try {
+        const qParam = filterGroup ? `group_id=${filterGroup}` : `folder_id=${filterFolder}`;
         const [phases, tasks, deps, matReqs] = await Promise.all([
-          portalFetch(`/phases?folder_id=${filterFolder}`),
-          portalFetch(`/gantt_tasks?folder_id=${filterFolder}`),
-          portalFetch(`/task_dependencies?folder_id=${filterFolder}`),
+          portalFetch(`/phases?${qParam}`),
+          portalFetch(`/gantt_tasks?${qParam}`),
+          portalFetch(`/task_dependencies?${qParam}`),
           portalFetch(`/material_requirements?folder_id=${filterFolder}`).catch(() => []),
         ]);
         phasesData = phases;
