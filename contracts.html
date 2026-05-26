@@ -919,10 +919,13 @@
         files.forEach(f => {
           const size = f.file_size > 1048576 ? (f.file_size/1048576).toFixed(1)+' MB' : Math.round((f.file_size||0)/1024)+' KB';
           const isPdf = (f.file_name || '').toLowerCase().endsWith('.pdf');
+          const isImg = /\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i.test(f.file_name || '');
+          const canPreview = isPdf || isImg;
+          const previewAction = isPdf ? 'view-pdf' : 'view-image';
           html += `<div style="display:flex;align-items:center;gap:8px;padding:4px 0;font-size:0.82rem;margin-bottom:2px">
-            ${isPdf ? `<button style="background:none;border:none;cursor:pointer;font-size:1rem;padding:0" title="View PDF"
-              data-action="view-pdf" data-entity-type="${entityType}" data-file-id="${f.id}" data-file-name="${(f.file_name||'').replace(/"/g,'&quot;')}">👁</button>` : '<span style="width:1rem;display:inline-block"></span>'}
-            <span style="flex:1;color:#333">${isPdf ? '📄' : '📎'} ${f.file_name || '—'} <span style="color:#999">(${size})</span></span>
+            ${canPreview ? `<button style="background:none;border:none;cursor:pointer;font-size:1rem;padding:0" title="${isPdf ? 'View PDF' : 'View image'}"
+              data-action="${previewAction}" data-entity-type="${entityType}" data-file-id="${f.id}" data-file-name="${(f.file_name||'').replace(/"/g,'&quot;')}">👁</button>` : '<span style="width:1rem;display:inline-block"></span>'}
+            <span style="flex:1;color:#333">${isPdf ? '📄' : (isImg ? '🖼' : '📎')} ${f.file_name || '—'} <span style="color:#999">(${size})</span></span>
             <button class="btn btn-outline" style="padding:1px 6px;font-size:0.72rem"
               data-action="download-file" data-entity-type="${entityType}" data-file-id="${f.id}">${t('download')}</button>
             <button class="btn btn-outline" style="padding:1px 6px;font-size:0.72rem;color:#c5221f;border-color:#c5221f"
@@ -1051,10 +1054,13 @@
             txFiles.forEach(f => {
               const size = f.file_size > 1048576 ? (f.file_size/1048576).toFixed(1)+' MB' : Math.round((f.file_size||0)/1024)+' KB';
               const isPdf = (f.file_name || '').toLowerCase().endsWith('.pdf');
+              const isImg2 = /\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i.test(f.file_name || '');
+              const canPrev2 = isPdf || isImg2;
+              const prevAct2 = isPdf ? 'view-pdf' : 'view-image';
               html += `<div style="display:flex;align-items:center;gap:6px;font-size:0.78rem;padding:1px 0">
-                ${isPdf ? `<button style="background:none;border:none;cursor:pointer;font-size:0.85rem;padding:0" title="View PDF"
-                  data-action="view-pdf" data-entity-type="transaction" data-file-id="${f.id}" data-file-name="${(f.file_name||'').replace(/"/g,'&quot;')}">👁</button>` : '<span style="width:0.85rem;display:inline-block"></span>'}
-                <span style="flex:1;color:#333">${isPdf ? '📄' : '📎'} ${f.file_name || '—'} <span style="color:#999">(${size})</span></span>
+                ${canPrev2 ? `<button style="background:none;border:none;cursor:pointer;font-size:0.85rem;padding:0" title="${isPdf ? 'View PDF' : 'View image'}"
+                  data-action="${prevAct2}" data-entity-type="transaction" data-file-id="${f.id}" data-file-name="${(f.file_name||'').replace(/"/g,'&quot;')}">👁</button>` : '<span style="width:0.85rem;display:inline-block"></span>'}
+                <span style="flex:1;color:#333">${isPdf ? '📄' : (isImg2 ? '🖼' : '📎')} ${f.file_name || '—'} <span style="color:#999">(${size})</span></span>
                 <button class="btn btn-outline" style="padding:0px 5px;font-size:0.68rem"
                   data-action="download-file" data-entity-type="transaction" data-file-id="${f.id}">${t('download')}</button>
                 <button class="btn btn-outline" style="padding:0px 5px;font-size:0.68rem;color:#c5221f;border-color:#c5221f"
@@ -1512,6 +1518,28 @@
         try {
           const r = await apiFetch(`/${endpoint}/${fileId}/signed-download-url?view=true`);
           if (r.url) openPdfViewer(r.url, fileName);
+        } catch(err) { showToast(err.message, 'error'); }
+      }
+
+      if (action === 'view-image') {
+        const entityType = btn.dataset.entityType;
+        const fileId = btn.dataset.fileId;
+        const endpoint = entityType === 'contract' ? 'contract_files' : entityType === 'invoice' ? 'invoice_files' : 'transaction_files';
+        try {
+          const r = await apiFetch(`/${endpoint}/${fileId}/signed-download-url?view=true`);
+          if (r.url) {
+            let lb = document.getElementById('image-lightbox');
+            if (!lb) {
+              lb = document.createElement('div');
+              lb.id = 'image-lightbox';
+              lb.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.85);z-index:300;display:flex;align-items:center;justify-content:center;cursor:pointer';
+              lb.innerHTML = '<img style="max-width:90vw;max-height:90vh;border-radius:8px;box-shadow:0 4px 24px rgba(0,0,0,0.5)">';
+              lb.addEventListener('click', () => lb.style.display = 'none');
+              document.body.appendChild(lb);
+            }
+            lb.querySelector('img').src = r.url;
+            lb.style.display = 'flex';
+          }
         } catch(err) { showToast(err.message, 'error'); }
       }
 
