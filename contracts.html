@@ -109,6 +109,7 @@
           <input type="text" class="filter-select" id="filter-search" placeholder="" style="min-width:160px">
           <select class="filter-select" id="filter-contractor"><option value="">—</option></select>
           <select class="filter-select" id="filter-responsible"><option value="">—</option></select>
+          <button class="btn btn-outline" id="btn-snapshot" style="padding:6px 12px;font-size:0.82rem">📸 Snapshot</button>
           <button class="btn btn-outline" id="btn-print" onclick="printContracts()" style="padding:6px 12px;font-size:0.82rem">🖨</button>
           <button class="btn btn-primary" id="btn-create"></button>
         </div>
@@ -2142,6 +2143,17 @@
       win.document.close();
       setTimeout(() => win.print(), 300);
     }
+
+    // Snapshot
+    document.getElementById('btn-snapshot').addEventListener('click', () => {
+      if (!filterCompany || !filterFolder) { showToast(t('selectCompanyFirst'), 'error'); return; }
+      const name = prompt('Snapshot name:', new Date().toLocaleDateString('en-GB', { day:'2-digit', month:'long', year:'numeric' }));
+      if (!name) return;
+      apiFetch('/project_snapshots', {
+        method: 'POST',
+        body: JSON.stringify({ folder_id: filterFolder, snapshot_name: name }),
+      }).then(() => showToast(t('saved'), 'success')).catch(e => showToast(e.message, 'error'));
+    });
 
     renderHeader('contracts');
     updateTexts();

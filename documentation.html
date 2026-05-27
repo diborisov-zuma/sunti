@@ -7,6 +7,8 @@
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="stylesheet" href="style.css">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script src="_pdf_viewer.js"></script>
   <script src="_i18n.js"></script>
   <script src="_config.js"></script>
   <script src="_auth.js"></script>
@@ -420,8 +422,12 @@
           html += `<div style="padding:4px 0 4px 32px" id="ver-files-${v.id}">`;
           filesLoaded.forEach(f => {
             const size = f.file_size > 1048576 ? (f.file_size/1048576).toFixed(1)+' MB' : Math.round((f.file_size||0)/1024)+' KB';
+            const isPdf = (f.file_name || '').toLowerCase().endsWith('.pdf');
+            const isImg = /\.(jpg|jpeg|png|gif|webp|svg)$/i.test(f.file_name || '');
+            const fileIcon = isPdf ? '📄' : (isImg ? '🖼' : '📎');
             html += `<div style="display:flex;align-items:center;gap:8px;padding:3px 0;font-size:0.8rem">
-              <span style="flex:1;color:#333">📎 ${f.file_name || '—'} <span style="color:#999">(${size})</span></span>
+              ${isPdf || isImg ? `<button style="background:none;border:none;cursor:pointer;font-size:0.9rem;padding:0" data-action="preview-file" data-ver-id="${f.id}" data-file-name="${(f.file_name||'').replace(/"/g,'&quot;')}" data-is-pdf="${isPdf}">👁</button>` : ''}
+              <span style="flex:1;color:#333">${fileIcon} ${f.file_name || '—'} <span style="color:#999">(${size})</span></span>
               <button class="btn btn-outline" style="padding:1px 6px;font-size:0.7rem" data-action="download" data-ver-id="${f.id}">${t('download')}</button>
               ${accessLevel === 'editor' && !f.legacy ? `<button class="btn btn-outline" style="padding:1px 6px;font-size:0.7rem;color:#c5221f" data-action="delete-ver-file" data-file-id="${f.id}" data-ver-id="${v.id}" data-doc-id="${docId}">×</button>` : ''}
             </div>`;
@@ -445,6 +451,29 @@
         expandedDocs[docId] = !expandedDocs[docId];
         renderDocs();
         return;
+      }
+
+      if (action === 'preview-file') {
+        try {
+          const r = await apiFetch(`/project_docs/${btn.dataset.verId}/signed-download-url`);
+          if (r.url) {
+            if (btn.dataset.isPdf === 'true') {
+              openPdfViewer(r.url, btn.dataset.fileName || 'PDF');
+            } else {
+              let lb = document.getElementById('image-lightbox');
+              if (!lb) {
+                lb = document.createElement('div');
+                lb.id = 'image-lightbox';
+                lb.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.85);z-index:300;display:flex;align-items:center;justify-content:center;cursor:pointer';
+                lb.innerHTML = '<img style="max-width:90vw;max-height:90vh;border-radius:8px;box-shadow:0 4px 24px rgba(0,0,0,0.5)">';
+                lb.addEventListener('click', () => lb.style.display = 'none');
+                document.body.appendChild(lb);
+              }
+              lb.querySelector('img').src = r.url;
+              lb.style.display = 'flex';
+            }
+          }
+        } catch(err) { showToast(err.message, 'error'); }
       }
 
       if (action === 'download') {
