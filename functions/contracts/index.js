@@ -413,6 +413,20 @@ exports.contracts = async (req, res) => {
         return;
       }
 
+      // Check for linked material_requirements (Gantt tasks)
+      const mrTable = `\`${PROJECT}.${DATASET}.material_requirements\``;
+      const ciTable = `\`${PROJECT}.${DATASET}.contract_items\``;
+      const [linkedTasks] = await bigquery.query({
+        query: `SELECT COUNT(*) AS cnt FROM ${mrTable}
+                WHERE contract_id = @id
+                   OR line_item_id IN (SELECT id FROM ${ciTable} WHERE contract_id = @id)`,
+        params: { id },
+      });
+      if (parseInt(linkedTasks[0].cnt) > 0) {
+        res.status(400).json({ error: 'Cannot delete: contract is linked to Gantt tasks' });
+        return;
+      }
+
       await bigquery.query({
         query: `UPDATE ${table} SET status = 'deleted' WHERE id = @id`,
         params: { id },
