@@ -354,6 +354,7 @@
         <h2 id="t-page-title">Gantt</h2>
         <select class="filter-select" id="filter-folder"><option value="">--</option></select>
         <select class="filter-select" id="filter-group" style="display:none"><option value="">— Gantt —</option></select>
+        <button class="btn btn-outline" id="btn-print-gantt" style="display:none;font-size:0.82rem;padding:5px 12px" onclick="printGantt()">🖨 PDF</button>
         <div class="spacer"></div>
         <div class="legend">
           <span><span class="dot" style="background:var(--gantt-green)"></span>On track</span>
@@ -640,6 +641,7 @@
 
     document.getElementById('filter-group').addEventListener('change', e => {
       filterGroup = e.target.value;
+      document.getElementById('btn-print-gantt').style.display = filterGroup ? '' : 'none';
       if (filterGroup) {
         loadGanttData();
       } else {
@@ -1554,6 +1556,131 @@
       updateTexts();
       if (tasksData.length) renderGantt();
     };
+
+    // ─── Print / PDF ───
+
+    function printGantt() {
+      if (!tasksData.length && !phasesData.length) return;
+
+      const folder = portalFolders.find(f => f.id === filterFolder);
+      const projectName = folder ? folder.name : '';
+      const dayW = 5;
+      const rowH = 32;
+
+      let minDate = null, maxDate = null;
+      tasksData.forEach(t => {
+        const s = t.planned_start ? new Date(t.planned_start.value || t.planned_start) : null;
+        const endRaw = t.planned_end || t._computed_end;
+        const e = endRaw ? new Date(endRaw.value || endRaw) : null;
+        if (s && (!minDate || s < minDate)) minDate = s;
+        if (e && (!maxDate || e > maxDate)) maxDate = e;
+        if (s && !e && (!maxDate || s > maxDate)) maxDate = s;
+      });
+      if (!minDate) minDate = new Date();
+      if (!maxDate) maxDate = new Date();
+      const startDate = new Date(minDate); startDate.setDate(startDate.getDate() - 7);
+      const endDate = new Date(maxDate); endDate.setDate(endDate.getDate() + 7);
+      const totalDays = Math.ceil((endDate - startDate) / 86400000);
+      const totalW = totalDays * dayW;
+      const today = new Date(); today.setHours(0,0,0,0);
+      const pDayOffset = d => Math.round((new Date(d) - startDate) / 86400000);
+
+      const rows = [];
+      phasesData.forEach(phase => {
+        rows.push({ type: 'phase', data: phase });
+        tasksData.filter(t => t.phase_id === phase.id).forEach(task => {
+          rows.push({ type: 'task', data: task });
+        });
+      });
+
+      let monthsHTML = '';
+      let cursor = new Date(startDate);
+      const langLocale = currentLang === 'ru' ? 'ru-RU' : (currentLang === 'th' ? 'th-TH' : 'en-GB');
+      while (cursor < endDate) {
+        const next = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1);
+        const span = Math.min(Math.ceil((next - cursor) / 86400000), totalDays - pDayOffset(cursor));
+        if (span <= 0) break;
+        const label = cursor.toLocaleDateString(langLocale, { month: 'short', year: '2-digit' });
+        monthsHTML += `<div style="display:inline-block;width:${span * dayW}px;text-align:center;font-size:9px;font-weight:600;border-right:1px solid #ddd;line-height:20px">${label}</div>`;
+        cursor = next;
+      }
+
+      const todayOff = pDayOffset(today);
+      const todayLine = (todayOff >= 0 && todayOff <= totalDays)
+        ? `<div style="position:absolute;top:0;bottom:0;left:${todayOff * dayW}px;width:1.5px;background:#ef4444;z-index:5"></div>` : '';
+
+      let leftRows = '', rightRows = '';
+      rows.forEach(row => {
+        if (row.type === 'phase') {
+          const p = row.data;
+          const name = p['name_' + currentLang] || p.name || p.name_en || '—';
+          leftRows += `<div style="height:${rowH}px;padding:0 8px;display:flex;align-items:center;font-weight:700;font-size:9px;color:#555;text-transform:uppercase;letter-spacing:0.5px;background:#dee1fc;border-bottom:1px solid #d0d4f0">${name}</div>`;
+          rightRows += `<div style="height:${rowH}px;background:#dee1fc;border-bottom:1px solid #d0d4f0"></div>`;
+        } else {
+          const tk = row.data;
+          const name = tk['name_' + currentLang] || tk.name || tk.name_en || '—';
+          const s = tk.planned_start ? new Date(tk.planned_start.value || tk.planned_start) : null;
+          const endRaw = tk.planned_end || tk._computed_end;
+          const e = endRaw ? new Date(endRaw.value || endRaw) : null;
+          const dur = tk.duration_days || '';
+          const startStr = s ? fmtDateDMY(s) : '';
+
+          leftRows += `<div style="height:${rowH}px;padding:0 8px;display:flex;align-items:center;gap:6px;font-size:10px;border-bottom:1px solid #f0f0f0">
+            <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${name}</span>
+            <span style="color:#999;font-size:9px;white-space:nowrap">${startStr}${dur ? ' · ' + dur + 'd' : ''}</span>
+          </div>`;
+
+          let barHTML = '';
+          if (s) {
+            const barEnd = e || s;
+            const left = pDayOffset(s) * dayW;
+            const width = Math.max((pDayOffset(barEnd) - pDayOffset(s) + 1) * dayW, 3);
+            const critical = tk.is_critical ? 'box-shadow:0 0 0 1.5px #ef4444;' : '';
+            barHTML = `<div style="position:absolute;height:${rowH * 0.55}px;top:${rowH * 0.22}px;left:${left}px;width:${width}px;border-radius:3px;background:#10b981;${critical}">
+              <span style="position:absolute;left:4px;top:50%;transform:translateY(-50%);color:#fff;font-size:8px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:${width - 8}px">${name}</span>
+            </div>`;
+          }
+          rightRows += `<div style="height:${rowH}px;position:relative;border-bottom:1px solid #f0f0f0">${barHTML}</div>`;
+        }
+      });
+
+      const leftW = 240;
+      const printHTML = `<!DOCTYPE html><html><head><title>Gantt — ${projectName}</title>
+        <style>
+          @page { size: landscape; margin: 10mm; }
+          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; margin: 0; padding: 0; color: #333; }
+          .print-header { display: flex; justify-content: space-between; align-items: baseline; padding: 8px 0; border-bottom: 2px solid #0f4c81; margin-bottom: 12px; }
+          .print-title { font-size: 14px; font-weight: 700; color: #0f4c81; }
+          .print-sub { font-size: 10px; color: #888; }
+          .gantt-print { display: grid; grid-template-columns: ${leftW}px 1fr; border: 1px solid #ddd; border-radius: 4px; overflow: hidden; }
+          .gantt-print-left { border-right: 1px solid #ddd; }
+          .gantt-print-right { overflow: hidden; position: relative; }
+        </style>
+      </head><body>
+        <div class="print-header">
+          <div class="print-title">SUNTI — ${projectName}</div>
+          <div class="print-sub">${fmtDateDMY(today)}</div>
+        </div>
+        <div class="gantt-print">
+          <div class="gantt-print-left">
+            <div style="height:20px;background:#f8f8f8;border-bottom:1px solid #ddd;padding:0 8px;font-size:9px;font-weight:600;color:#888;line-height:20px;text-transform:uppercase">NAME</div>
+            ${leftRows}
+          </div>
+          <div class="gantt-print-right">
+            <div style="height:20px;background:#f8f8f8;border-bottom:1px solid #ddd;white-space:nowrap">${monthsHTML}</div>
+            <div style="position:relative;width:${totalW}px">
+              ${todayLine}
+              ${rightRows}
+            </div>
+          </div>
+        </div>
+        <script>setTimeout(() => window.print(), 300)<\/script>
+      </body></html>`;
+
+      const w = window.open('', '_blank');
+      w.document.write(printHTML);
+      w.document.close();
+    }
 
     // ─── Init ───
     updateTexts();
