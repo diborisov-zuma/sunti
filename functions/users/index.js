@@ -64,6 +64,17 @@ exports.users = async (req, res) => {
         salesCount = parseInt(sr[0]?.cnt) || 0;
       } catch(e) { /* column doesn't exist yet */ }
       user.has_sales_access = user.is_admin === true || salesCount > 0;
+      // gantt_level
+      let ganttCount = 0;
+      try {
+        const [gr] = await bigquery.query({
+          query: `SELECT COUNT(*) AS cnt FROM \`${PROJECT}.${DATASET}.users_folders\`
+                  WHERE user_email = @email AND gantt_level IN ('viewer_no_amounts','viewer','editor')`,
+          params: { email },
+        });
+        ganttCount = parseInt(gr[0]?.cnt) || 0;
+      } catch(e) { /* column doesn't exist yet */ }
+      user.has_gantt_access = user.is_admin === true || ganttCount > 0;
       res.json(user);
       return;
     }

@@ -167,7 +167,7 @@ function updateHeaderTexts() {
   if (ngantt) {
     ngantt.textContent = t('navGantt');
     const meG = typeof currentMe !== 'undefined' ? currentMe : null;
-    ngantt.style.display = (meG && (meG.is_admin === true || meG.has_contracts_access === true)) ? '' : 'none';
+    ngantt.style.display = (meG && (meG.is_admin === true || meG.has_gantt_access === true)) ? '' : 'none';
   }
   const nct = document.getElementById('t-nav-contracts');
   if (nct) {

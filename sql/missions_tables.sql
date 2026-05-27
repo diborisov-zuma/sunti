@@ -101,7 +101,11 @@ CREATE TABLE IF NOT EXISTS `project-9718e7d4-4cd7-4f52-8d6.sunti.user_roles` (
   is_primary BOOL
 );
 
--- 8. Alter existing tables
+-- 8. Add gantt_level to users_folders
+ALTER TABLE `project-9718e7d4-4cd7-4f52-8d6.sunti.users_folders`
+ADD COLUMN IF NOT EXISTS gantt_level STRING;
+
+-- 9. Alter existing tables
 ALTER TABLE `project-9718e7d4-4cd7-4f52-8d6.sunti.tasks_groups`
 ADD COLUMN IF NOT EXISTS responsible_user_id STRING;
 
