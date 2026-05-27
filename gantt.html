@@ -7,6 +7,7 @@
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <link rel="stylesheet" href="style.css">
 <script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 <script src="_i18n.js"></script>
 <script src="_config.js"></script>
 <script src="_auth.js"></script>
@@ -327,6 +328,7 @@
         <button class="btn btn-outline" id="btn-add-group" style="display:none;font-size:0.82rem;padding:5px 12px">+ Gantt</button>
         <button class="btn btn-primary" id="btn-add-phase" style="display:none;font-size:0.82rem;padding:5px 12px">+ Phase</button>
         <button class="btn btn-outline" id="btn-print-gantt" style="display:none;font-size:0.82rem;padding:5px 12px" onclick="printGantt()">🖨 PDF</button>
+        <button class="btn btn-outline" id="btn-excel-gantt" style="display:none;font-size:0.82rem;padding:5px 12px" onclick="exportExcel()">📊 Excel</button>
         <div class="spacer"></div>
         <div class="legend">
           <span><span class="dot" style="background:var(--gantt-green)"></span>On track</span>
@@ -784,6 +786,7 @@
     function onGroupSelected() {
       document.getElementById('btn-add-phase').style.display = filterGroup ? '' : 'none';
       document.getElementById('btn-print-gantt').style.display = filterGroup ? '' : 'none';
+      document.getElementById('btn-excel-gantt').style.display = filterGroup ? '' : 'none';
       if (filterGroup) {
         loadGanttData();
       } else {
@@ -2497,6 +2500,54 @@
     });
 
     // ─── Print / PDF ───
+
+    function exportExcel() {
+      if (!tasksData.length && !phasesData.length) return;
+      if (typeof XLSX === 'undefined') { showToast('XLSX not loaded', 'error'); return; }
+
+      const folder = foldersCache.find(f => f.id === filterFolder);
+      const projectName = folder ? folder.name : 'Gantt';
+
+      const header = ['Phase', 'Task', 'Start', 'End', 'Duration (d)', 'Critical', 'Dependencies', 'Materials'];
+      const rows = [header];
+
+      phasesData.forEach(phase => {
+        const phaseName = phase['name_' + currentLang] || phase.name || phase.name_en || '—';
+        const pTasks = tasksData.filter(t => t.phase_id === phase.id);
+        if (!pTasks.length) {
+          rows.push([phaseName, '', '', '', '', '', '', '']);
+          return;
+        }
+        pTasks.forEach((tk, i) => {
+          const tkName = tk['name_' + currentLang] || tk.name || tk.name_en || '—';
+          const ps = tk.planned_start ? (tk.planned_start.value || tk.planned_start).substring(0,10) : '';
+          const endRaw = tk.planned_end || tk._computed_end;
+          const pe = endRaw ? (endRaw.value || endRaw).substring(0,10) : '';
+          const deps = depsData.filter(d => d.successor_id === tk.id);
+          const depNames = deps.map(d => {
+            const pred = tasksData.find(t => t.id === d.predecessor_id);
+            return pred ? (pred['name_' + currentLang] || pred.name || '?') : '?';
+          }).join(', ');
+          const mats = allMaterialReqs.filter(m => m.task_id === tk.id);
+          const matNames = mats.map(m => m.contract_item_name || m.contract_name || m.category || '—').join(', ');
+          rows.push([
+            i === 0 ? phaseName : '',
+            tkName,
+            ps, pe,
+            tk.duration_days || '',
+            tk.is_critical ? 'Yes' : '',
+            depNames,
+            matNames
+          ]);
+        });
+      });
+
+      const ws = XLSX.utils.aoa_to_sheet(rows);
+      ws['!cols'] = [{ wch: 20 }, { wch: 30 }, { wch: 12 }, { wch: 12 }, { wch: 10 }, { wch: 8 }, { wch: 30 }, { wch: 40 }];
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Gantt');
+      XLSX.writeFile(wb, `${projectName} — Gantt.xlsx`);
+    }
 
     function printGantt() {
       if (!tasksData.length && !phasesData.length) return;
