@@ -328,7 +328,6 @@
         <button class="btn btn-outline" id="btn-add-group" style="display:none;font-size:0.82rem;padding:5px 12px">+ Gantt</button>
         <button class="btn btn-primary" id="btn-add-phase" style="display:none;font-size:0.82rem;padding:5px 12px">+ Phase</button>
         <button class="btn btn-outline" id="btn-print-gantt" style="display:none;font-size:0.82rem;padding:5px 12px" onclick="printGantt()">🖨 PDF</button>
-        <button class="btn btn-outline" id="btn-excel-gantt" style="display:none;font-size:0.82rem;padding:5px 12px" onclick="exportExcel()">📊 Excel</button>
         <div class="spacer"></div>
         <div class="legend">
           <span><span class="dot" style="background:var(--gantt-green)"></span>On track</span>
@@ -786,7 +785,6 @@
     function onGroupSelected() {
       document.getElementById('btn-add-phase').style.display = filterGroup ? '' : 'none';
       document.getElementById('btn-print-gantt').style.display = filterGroup ? '' : 'none';
-      document.getElementById('btn-excel-gantt').style.display = filterGroup ? '' : 'none';
       if (filterGroup) {
         loadGanttData();
       } else {
