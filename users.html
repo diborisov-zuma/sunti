@@ -64,12 +64,12 @@
     .folder-access-list { display:flex;flex-direction:column;gap:6px;margin-top:4px; }
     .folder-access-header { display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr;align-items:center;gap:10px;padding-bottom:4px;border-bottom:1px solid #f0f0f0;margin-bottom:4px; }
     .folder-access-header span { font-size:0.72rem;font-weight:600;color:#888;text-transform:uppercase; }
-    .folder-access-row { display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr;align-items:center;gap:10px;padding:8px 10px;border-radius:6px; }
+    .folder-access-row { display:grid;grid-template-columns:140px repeat(5, 1fr);align-items:center;gap:6px;padding:8px 10px;border-radius:6px; }
     .folder-access-row:nth-child(odd) { background:#f8f9fa; }
     .folder-access-row:nth-child(even) { background:#fff; }
     .folder-access-row:hover { background:#e8f0fe; }
     .folder-access-row .folder-name { font-size:0.85rem;color:#333;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
-    .folder-access-row select { padding:6px 10px;border:1px solid #ddd;border-radius:6px;font-size:0.85rem;outline:none; }
+    .folder-access-row select { padding:4px 6px;border:1px solid #ddd;border-radius:6px;font-size:0.78rem;outline:none;width:100%; }
     .folder-access-row select:focus { border-color:#1a73e8; }
     .folders-loading { color:#bbb;font-size:0.85rem;padding:8px 0; }
   </style>
@@ -372,10 +372,10 @@
             <div class="folder-access-row" data-folder-id="${f.id}">
               <span class="folder-name" title="${f.name}">${f.name}</span>
               <select class="folder-gantt-select" title="Construction">
-                <option value="none"   ${ganttLvl === 'none'   ? 'selected' : ''}>🏗 —</option>
-                <option value="viewer_no_amounts" ${ganttLvl === 'viewer_no_amounts' ? 'selected' : ''}>🏗 👁 no $</option>
-                <option value="viewer" ${ganttLvl === 'viewer' ? 'selected' : ''}>🏗 👁</option>
-                <option value="editor" ${ganttLvl === 'editor' ? 'selected' : ''}>🏗 ✎</option>
+                <option value="none"   ${ganttLvl === 'none'   ? 'selected' : ''}>Construction: No access</option>
+                <option value="viewer_no_amounts" ${ganttLvl === 'viewer_no_amounts' ? 'selected' : ''}>Construction: View (no amounts)</option>
+                <option value="viewer" ${ganttLvl === 'viewer' ? 'selected' : ''}>Construction: View</option>
+                <option value="editor" ${ganttLvl === 'editor' ? 'selected' : ''}>Construction: Full access</option>
               </select>
               <select class="folder-access-select" title="${t('sectionDocAccess')}">
                 <option value="none"   ${current === 'none'   ? 'selected' : ''}>${t('accessNone')}</option>
