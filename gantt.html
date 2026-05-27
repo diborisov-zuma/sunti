@@ -363,6 +363,22 @@
     </div>
   </div>
 
+  <!-- Modal: group -->
+  <div class="modal-overlay" id="modal-group">
+    <div class="modal" style="width:500px;max-width:95vw">
+      <h3 id="t-modal-group-title">Gantt</h3>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
+        <div class="field-group"><label>RU <button class="translate-btn" data-src="ru" data-fields="g-gr-name" data-targets="g-gr-name-en:en,g-gr-name-th:th" title="Translate to EN + TH">🌐</button></label><input type="text" id="g-gr-name"></div>
+        <div class="field-group"><label>EN <button class="translate-btn" data-src="en" data-fields="g-gr-name-en" data-targets="g-gr-name:ru,g-gr-name-th:th" title="Translate to RU + TH">🌐</button></label><input type="text" id="g-gr-name-en"></div>
+        <div class="field-group"><label>TH <button class="translate-btn" data-src="th" data-fields="g-gr-name-th" data-targets="g-gr-name:ru,g-gr-name-en:en" title="Translate to RU + EN">🌐</button></label><input type="text" id="g-gr-name-th"></div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-outline" id="btn-ggr-cancel"></button>
+        <button class="btn btn-primary" id="btn-ggr-save"></button>
+      </div>
+    </div>
+  </div>
+
   <!-- Modal: phase -->
   <div class="modal-overlay" id="modal-phase">
     <div class="modal" style="width:500px;max-width:95vw">
@@ -641,6 +657,8 @@
       setText('t-guest-sub', t('guestSub'));
       setText('t-page-title', 'Gantt');
       setText('gantt-empty', t('ganttSelectCompanyProject'));
+      setText('btn-ggr-cancel', t('cancel'));
+      setText('btn-ggr-save', t('save'));
       setText('btn-gph-cancel', t('cancel'));
       setText('btn-gph-save', t('save'));
       setText('btn-gtk-cancel', t('cancel'));
@@ -795,11 +813,23 @@
     }
 
     // Add new group
-    document.getElementById('btn-add-group').addEventListener('click', async () => {
-      const name = prompt('Gantt name:');
-      if (!name) return;
+    document.getElementById('btn-add-group').addEventListener('click', () => {
+      document.getElementById('g-gr-name').value = '';
+      document.getElementById('g-gr-name-en').value = '';
+      document.getElementById('g-gr-name-th').value = '';
+      openModal('modal-group');
+      updateTranslateButtons();
+    });
+
+    document.getElementById('btn-ggr-cancel').addEventListener('click', () => closeModal('modal-group'));
+    document.getElementById('btn-ggr-save').addEventListener('click', async () => {
+      const name = document.getElementById('g-gr-name').value.trim();
+      const name_en = document.getElementById('g-gr-name-en').value.trim();
+      const name_th = document.getElementById('g-gr-name-th').value.trim();
+      if (!name && !name_en && !name_th) { showToast(t('fillAllFields'), 'error'); return; }
+      closeModal('modal-group');
       try {
-        await apiFetch('/tasks_groups', { method: 'POST', body: JSON.stringify({ folder_id: filterFolder, name }) });
+        await apiFetch('/tasks_groups', { method: 'POST', body: JSON.stringify({ folder_id: filterFolder, name: name || name_en, name_en, name_th }) });
         groupsCache = await apiFetch(`/tasks_groups?folder_id=${filterFolder}`);
         fillGroupFilter();
         showToast(t('saved'), 'success');
@@ -1301,7 +1331,7 @@
 
     // Listen for input on all translatable fields
     document.addEventListener('input', e => {
-      if (e.target.closest('#modal-task') || e.target.closest('#modal-phase')) updateTranslateButtons();
+      if (e.target.closest('#modal-task') || e.target.closest('#modal-phase') || e.target.closest('#modal-group')) updateTranslateButtons();
     });
 
     document.addEventListener('click', async e => {
@@ -2494,7 +2524,7 @@
 
     // Escape
     document.addEventListener('keydown', e => {
-      if (e.key === 'Escape') { closeSidePanel(); closeModal('modal-phase'); closeModal('modal-task'); closeModal('modal-mat-contract'); closeModal('modal-mat-slot'); closeModal('modal-dep'); closeModal('modal-delivery'); }
+      if (e.key === 'Escape') { closeSidePanel(); closeModal('modal-group'); closeModal('modal-phase'); closeModal('modal-task'); closeModal('modal-mat-contract'); closeModal('modal-mat-slot'); closeModal('modal-dep'); closeModal('modal-delivery'); }
     });
 
     // ─── Print / PDF ───
