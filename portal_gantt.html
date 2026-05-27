@@ -637,6 +637,8 @@
       if (groupsCache.length === 1) {
         sel.value = groupsCache[0].id;
         filterGroup = groupsCache[0].id;
+        document.getElementById('btn-print-gantt').style.display = '';
+        document.getElementById('btn-excel-gantt').style.display = '';
         loadGanttData();
       }
     }
