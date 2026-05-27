@@ -62,9 +62,9 @@
     .checkbox-row label { font-size:0.9rem;color:#333;cursor:pointer;flex:1; }
 
     .folder-access-list { display:flex;flex-direction:column;gap:6px;margin-top:4px; }
-    .folder-access-header { display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr;align-items:center;gap:10px;padding-bottom:4px;border-bottom:1px solid #f0f0f0;margin-bottom:4px; }
+    .folder-access-header { display:grid;grid-template-columns:140px repeat(6, 1fr);align-items:center;gap:6px;padding-bottom:4px;border-bottom:1px solid #f0f0f0;margin-bottom:4px; }
     .folder-access-header span { font-size:0.72rem;font-weight:600;color:#888;text-transform:uppercase; }
-    .folder-access-row { display:grid;grid-template-columns:140px repeat(5, 1fr);align-items:center;gap:6px;padding:8px 10px;border-radius:6px; }
+    .folder-access-row { display:grid;grid-template-columns:140px repeat(6, 1fr);align-items:center;gap:6px;padding:8px 10px;border-radius:6px; }
     .folder-access-row:nth-child(odd) { background:#f8f9fa; }
     .folder-access-row:nth-child(even) { background:#fff; }
     .folder-access-row:hover { background:#e8f0fe; }
@@ -372,10 +372,10 @@
             <div class="folder-access-row" data-folder-id="${f.id}">
               <span class="folder-name" title="${f.name}">${f.name}</span>
               <select class="folder-gantt-select" title="Construction">
-                <option value="none"   ${ganttLvl === 'none'   ? 'selected' : ''}>Construction: No access</option>
-                <option value="viewer_no_amounts" ${ganttLvl === 'viewer_no_amounts' ? 'selected' : ''}>Construction: View (no amounts)</option>
-                <option value="viewer" ${ganttLvl === 'viewer' ? 'selected' : ''}>Construction: View</option>
-                <option value="editor" ${ganttLvl === 'editor' ? 'selected' : ''}>Construction: Full access</option>
+                <option value="none"   ${ganttLvl === 'none'   ? 'selected' : ''}>No access</option>
+                <option value="viewer_no_amounts" ${ganttLvl === 'viewer_no_amounts' ? 'selected' : ''}>View (no amounts)</option>
+                <option value="viewer" ${ganttLvl === 'viewer' ? 'selected' : ''}>View</option>
+                <option value="editor" ${ganttLvl === 'editor' ? 'selected' : ''}>Full access</option>
               </select>
               <select class="folder-access-select" title="${t('sectionDocAccess')}">
                 <option value="none"   ${current === 'none'   ? 'selected' : ''}>${t('accessNone')}</option>
@@ -403,6 +403,7 @@
 
         const header = `<div class="folder-access-header">
           <span>${t('navFolders')}</span>
+          <span>CONSTRUCTION</span>
           <span>${t('sectionDocAccess')}</span>
           <span>${t('docsAccess')}</span>
           <span>${t('materialsAccess')}</span>
