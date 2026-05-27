@@ -98,8 +98,8 @@
       <div class="page-toolbar">
         <h2 id="t-page-title"></h2>
         <div class="toolbar-right">
-          <select class="filter-select" id="filter-company"><option value="">—</option></select>
-          <select class="filter-select" id="filter-folder"><option value="">—</option></select>
+          <select class="filter-select" id="filter-company" style="border-color:#c5221f"><option value="">— Company * —</option></select>
+          <select class="filter-select" id="filter-folder" style="border-color:#c5221f"><option value="">— Project * —</option></select>
           <button class="btn btn-primary" id="btn-add-sale" style="display:none"></button>
         </div>
       </div>
@@ -498,13 +498,13 @@
 
     function fillCompanyFilter() {
       const sel = document.getElementById('filter-company');
-      sel.innerHTML = `<option value="">${t('allCompanies')}</option>`;
+      sel.innerHTML = `<option value="">— ${t('selectCompanyFirst')} * —</option>`;
       companiesCache.forEach(c => { sel.innerHTML += `<option value="${c.id}">${c.name}</option>`; });
     }
 
     function fillFolderFilter() {
       const sel = document.getElementById('filter-folder');
-      sel.innerHTML = `<option value="">${t('allFolders')}</option>`;
+      sel.innerHTML = `<option value="">— ${t('folder')} * —</option>`;
       foldersCache.filter(f => f.status !== 'archive' && (!filterCompany || f.company_id === filterCompany))
         .forEach(f => { sel.innerHTML += `<option value="${f.id}">${f.name}</option>`; });
     }
@@ -513,16 +513,26 @@
       filterCompany = e.target.value;
       filterFolder = '';
       fillFolderFilter();
-      loadSales();
+      const tbody = document.getElementById('sales-tbody');
+      if (tbody) tbody.innerHTML = '';
     });
     document.getElementById('filter-folder').addEventListener('change', e => {
       filterFolder = e.target.value;
-      loadSales();
+      if (filterCompany && filterFolder) {
+        loadSales();
+      } else {
+        const tbody = document.getElementById('sales-tbody');
+        if (tbody) tbody.innerHTML = '';
+      }
     });
 
     // ─── Load sales ───
     async function loadSales() {
       const tbody = document.getElementById('sales-tbody');
+      if (!filterCompany || !filterFolder) {
+        tbody.innerHTML = `<tr><td colspan="8" class="empty-state">${t('selectCompanyFirst')}</td></tr>`;
+        return;
+      }
       tbody.innerHTML = `<tr><td colspan="8" class="loading">${t('loading')}</td></tr>`;
       try {
         let url = '/sales?';
