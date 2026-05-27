@@ -600,9 +600,9 @@
     let foldersCache       = [];
     let companiesCache     = [];
     let accountsCache      = [];
-    let filterCompany      = 'all';
+    let filterCompany      = '';
     let filterAccount      = 'all';
-    let filterFolder       = 'all';
+    let filterFolder       = '';
 
     // Chat state
     let chatDocId    = null;
@@ -1020,15 +1020,16 @@
     function updateFolderFilter() {
       const sel = document.getElementById('filter-folder');
       if (!sel) return;
-      const list = filterCompany === 'all' ? [] : foldersCache.filter(f => f.company_id === filterCompany);
-      sel.innerHTML = `<option value="all">${t('allFolders')}</option>` + list.map(f => `<option value="${f.id}">${f.name}</option>`).join('');
-      if (![...sel.options].some(o => o.value === filterFolder)) filterFolder = 'all';
+      const list = !filterCompany ? [] : foldersCache.filter(f => f.company_id === filterCompany);
+      sel.innerHTML = `<option value="">— ${t('folder')} * —</option>` + list.map(f => `<option value="${f.id}">${f.name}</option>`).join('');
+      if (![...sel.options].some(o => o.value === filterFolder)) filterFolder = '';
       sel.value = filterFolder;
+      sel.disabled = !filterCompany;
     }
 
     function updateFilterLockState() {
-      const locked = filterCompany === 'all';
-      ['filter-search','filter-date-from','filter-date-to','filter-folder','filter-status','filter-direction','filter-category-input','page-size-select','btn-create-inv']
+      const locked = !filterCompany || !filterFolder;
+      ['filter-search','filter-date-from','filter-date-to','filter-account','filter-status','filter-direction','filter-category-input','page-size-select','btn-create-inv']
         .forEach(id => { const el = document.getElementById(id); if (el) el.disabled = locked; });
       const ce = document.getElementById('filter-company');
       if (ce) ce.classList.toggle('invalid', locked);
@@ -1041,7 +1042,7 @@
       sel.innerHTML = `<option value="all">${t('allAccounts')}</option>` +
         list.map(a => `<option value="${a.id}">${a.name}</option>`).join('');
       sel.value = filterAccount;
-      sel.disabled = filterCompany === 'all';
+      sel.disabled = !filterCompany;
       sel.onchange = e => { filterAccount = e.target.value; currentPage = 1; loadInvoices(); };
     }
 
@@ -1057,21 +1058,20 @@
             <input type="date" class="filter-date" id="filter-date-to"   title="${t('dateTo')}">
           </div>
           <div class="toolbar-row">
-            <select class="filter-select" id="filter-company">
-              <option value="all">${t('allCompanies')}</option>
+            <select class="filter-select" id="filter-company" style="border-color:#c5221f">
+              <option value="">— ${t('selectCompanyFirst')} * —</option>
               ${companiesCache.map(c => `<option value="${c.id}">${c.name}</option>`).join('')}
             </select>
-            <select class="filter-select" id="filter-account" disabled>
-              <option value="all">${t('allAccounts')}</option>
-            </select>
-            <select class="filter-select" id="filter-folder">
-              <option value="all">${t('allFolders')}</option>
-              ${foldersCache.map(f => `<option value="${f.id}">${f.name}</option>`).join('')}
+            <select class="filter-select" id="filter-folder" disabled style="border-color:#c5221f">
+              <option value="">— ${t('folder')} * —</option>
             </select>
             <span style="flex:1"></span>
             <button class="btn btn-primary" id="btn-create-inv">${t('createInvoice')}</button>
           </div>
           <div class="toolbar-row">
+            <select class="filter-select" id="filter-account" disabled>
+              <option value="all">${t('allAccounts')}</option>
+            </select>
             <select class="filter-select" id="filter-status">
               <option value="all">${t('allStatuses')}</option>
               <option value="active">${t('filterStatusActive')}</option>
@@ -1168,16 +1168,27 @@
 
       document.getElementById('filter-company').value = filterCompany;
       document.getElementById('filter-company').addEventListener('change', e => {
-        filterCompany = e.target.value; filterAccount = 'all'; filterFolder = 'all';
+        filterCompany = e.target.value; filterAccount = 'all'; filterFolder = '';
         updateAccountFilter();
         updateFolderFilter();
         updateFilterLockState();
-        loadContracts();
-        currentPage = 1; expandedInv = {}; loadInvoices();
+        const folderSel = document.getElementById('filter-folder');
+        folderSel.disabled = !filterCompany;
+        folderSel.style.borderColor = '#c5221f';
+        // Clear data until folder selected
+        document.getElementById('inv-tbody').innerHTML = '';
+        document.getElementById('totals-row').innerHTML = '';
       });
-      document.getElementById('filter-folder').value = filterFolder;
       document.getElementById('filter-folder').addEventListener('change', e => {
-        filterFolder = e.target.value; currentPage = 1; expandedInv = {}; loadInvoices();
+        filterFolder = e.target.value;
+        document.getElementById('filter-folder').style.borderColor = filterFolder ? '#ddd' : '#c5221f';
+        if (filterCompany && filterFolder) {
+          loadContracts();
+          currentPage = 1; expandedInv = {}; loadInvoices();
+        } else {
+          document.getElementById('inv-tbody').innerHTML = '';
+          document.getElementById('totals-row').innerHTML = '';
+        }
       });
       updateAccountFilter();
       updateFolderFilter();
@@ -1216,7 +1227,7 @@
     async function loadInvoices() {
       const tbody = document.getElementById('inv-tbody');
       if (!tbody) return;
-      if (filterCompany === 'all') {
+      if (!filterCompany || !filterFolder) {
         tbody.innerHTML = `<tr><td colspan="8" class="empty-state">${t('selectCompanyFirst')}</td></tr>`;
         return;
       }
