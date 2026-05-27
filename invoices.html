@@ -1029,7 +1029,7 @@
 
     function updateFilterLockState() {
       const locked = !filterCompany || !filterFolder;
-      ['filter-search','filter-date-from','filter-date-to','filter-account','filter-status','filter-direction','filter-category-input','page-size-select','btn-create-inv']
+      ['filter-search','filter-account','filter-status','filter-direction','filter-category-input','page-size-select','btn-create-inv']
         .forEach(id => { const el = document.getElementById(id); if (el) el.disabled = locked; });
       const ce = document.getElementById('filter-company');
       if (ce) ce.classList.toggle('invalid', locked);
