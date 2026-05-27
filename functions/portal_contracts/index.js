@@ -31,7 +31,7 @@ async function verifyToken(req) {
  */
 async function getPortalUser(email) {
   const [rows] = await bigquery.query({
-    query: `SELECT id, email, name, is_active FROM \`${PROJECT}.${DATASET}.portal_users\` WHERE email = @email`,
+    query: `SELECT id, email, name, is_active FROM \`${PROJECT}.${DATASET}.portal_users\` WHERE LOWER(email) = LOWER(@email)`,
     params: { email },
   });
   return rows[0] || null;
