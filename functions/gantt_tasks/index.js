@@ -8,7 +8,7 @@ const TABLE    = 'tasks';
 
 function setCors(res) {
   res.set('Access-Control-Allow-Origin', '*');
-  res.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.set('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
   res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 }
 
@@ -160,6 +160,24 @@ exports.gantt_tasks = async (req, res) => {
           notes_th:      b.notes_th || '',
           sort_order:    b.sort_order != null ? b.sort_order : 0,
         },
+      });
+      res.json({ success: true });
+      return;
+    }
+
+    // PATCH /gantt_tasks/reorder — batch update sort_order
+    if (req.method === 'PATCH' && path.includes('/reorder')) {
+      if (!(await isAdmin(email))) { res.status(403).json({ error: 'Forbidden' }); return; }
+      const items = req.body?.items;
+      if (!Array.isArray(items) || !items.length) { res.status(400).json({ error: 'items[] required' }); return; }
+
+      const ids = items.map(i => i.id);
+      const cases = items.map(i => `WHEN '${i.id.replace(/'/g, '')}' THEN ${parseInt(i.sort_order) || 0}`).join(' ');
+      await bigquery.query({
+        query: `UPDATE ${table}
+                SET sort_order = CASE id ${cases} END
+                WHERE id IN UNNEST(@ids)`,
+        params: { ids },
       });
       res.json({ success: true });
       return;

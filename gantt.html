@@ -108,6 +108,14 @@
   .task-row .badge.red { background: #fee2e2; color: #991b1b; }
   .task-row .badge.yellow { background: #fef3c7; color: #92400e; }
   .task-row .badge.empty { background: #ede9fe; color: #6d28d9; border: 1px dashed var(--gantt-purple); }
+  .task-row .drag-handle {
+    cursor: grab; color: #ccc; font-size: 14px; user-select: none; flex-shrink: 0;
+    padding: 0 2px; line-height: 1;
+  }
+  .task-row .drag-handle:hover { color: #888; }
+  .task-row.dragging { opacity: 0.4; }
+  .task-row.drag-over-top { box-shadow: inset 0 2px 0 0 #1a73e8; }
+  .task-row.drag-over-bottom { box-shadow: inset 0 -2px 0 0 #1a73e8; }
   .task-row.phase {
     background: #dee1fc; font-weight: 700; text-transform: uppercase;
     font-size: 11px; color: var(--gantt-muted); letter-spacing: 0.5px;
@@ -1121,7 +1129,8 @@
             const tkDepLabel = tkDeps.map(d => { const p = tasksData.find(x => x.id === d.predecessor_id); return p ? (p['name_'+currentLang]||p.name||'?') : '?'; }).join(', ');
             const listRisk = getTaskRisk(tk.id);
             const listRiskBadge = listRisk ? `<span class="badge ${listRisk.color}" title="${listRisk.label}">●</span>` : '';
-            listHTML += `<div class="task-row" data-action="edit-task" data-id="${tk.id}" data-phase-id="${tk.phase_id}">
+            listHTML += `<div class="task-row" draggable="true" data-action="edit-task" data-id="${tk.id}" data-phase-id="${tk.phase_id}">
+              <span class="drag-handle" title="Drag to reorder">⠿</span>
               <span class="name">${name}</span>
               ${listRiskBadge}
               <button class="dep-btn" data-action="open-dep" data-task-id="${tk.id}" title="${tkDepLabel ? 'Depends on: '+tkDepLabel : t('ganttDependency')}" style="color:${getDepIconColor(tk.id)};opacity:${tkDeps.length ? '1' : '0.4'}">${tkDeps.length ? '⛓' + tkDeps.length : '⛓'}</button>
@@ -1188,7 +1197,8 @@
           const tkDeps = depsData.filter(d => d.successor_id === tk.id);
           const ganttRisk = getTaskRisk(tk.id);
           const ganttRiskBadge = ganttRisk ? `<span class="badge ${ganttRisk.color}" title="${ganttRisk.label}">●</span>` : '';
-          leftHTML += `<div class="task-row" data-row-idx="${ri}" data-task-id="${tk.id}" data-action="edit-task" data-id="${tk.id}" data-phase-id="${tk.phase_id}">
+          leftHTML += `<div class="task-row" draggable="true" data-row-idx="${ri}" data-task-id="${tk.id}" data-action="edit-task" data-id="${tk.id}" data-phase-id="${tk.phase_id}">
+            <span class="drag-handle" title="Drag to reorder">⠿</span>
             <span class="name">${name}</span>
             ${ganttRiskBadge}
             <button class="dep-btn" data-action="open-dep" data-task-id="${tk.id}" title="${t('ganttDependency')}" style="color:${getDepIconColor(tk.id)};opacity:${tkDeps.length ? '1' : '0.4'}">${tkDeps.length ? '⛓' + tkDeps.length : '⛓'}</button>
@@ -1308,6 +1318,105 @@
       });
       container.addEventListener('mouseleave', () => {
         container.querySelectorAll('.hovered').forEach(el => el.classList.remove('hovered'));
+      });
+      // ─── Drag & drop reorder ───
+      initTaskDragDrop(container);
+    }
+
+    // ─── Drag & drop reorder tasks within phase ───
+
+    function initTaskDragDrop(container) {
+      let dragTaskId = null;
+      let dragPhaseId = null;
+      let dragAllowed = false;
+
+      // Only allow drag when starting from the handle
+      container.addEventListener('mousedown', e => {
+        const handle = e.target.closest('.drag-handle');
+        dragAllowed = !!handle;
+      });
+
+      container.addEventListener('dragstart', e => {
+        const row = e.target.closest('.task-row:not(.phase)');
+        if (!dragAllowed || !row) { e.preventDefault(); return; }
+        dragTaskId = row.dataset.id;
+        dragPhaseId = row.dataset.phaseId;
+        row.classList.add('dragging');
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', dragTaskId);
+      });
+
+      container.addEventListener('dragend', e => {
+        dragTaskId = null;
+        dragPhaseId = null;
+        container.querySelectorAll('.dragging,.drag-over-top,.drag-over-bottom').forEach(el => {
+          el.classList.remove('dragging', 'drag-over-top', 'drag-over-bottom');
+        });
+      });
+
+      container.addEventListener('dragover', e => {
+        const row = e.target.closest('.task-row:not(.phase)');
+        if (!row || !dragTaskId) return;
+        if (row.dataset.phaseId !== dragPhaseId) return;
+        if (row.dataset.id === dragTaskId) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        container.querySelectorAll('.drag-over-top,.drag-over-bottom').forEach(el => {
+          el.classList.remove('drag-over-top', 'drag-over-bottom');
+        });
+        const rect = row.getBoundingClientRect();
+        const mid = rect.top + rect.height / 2;
+        row.classList.add(e.clientY < mid ? 'drag-over-top' : 'drag-over-bottom');
+      });
+
+      container.addEventListener('dragleave', e => {
+        const row = e.target.closest('.task-row:not(.phase)');
+        if (row) row.classList.remove('drag-over-top', 'drag-over-bottom');
+      });
+
+      container.addEventListener('drop', async e => {
+        e.preventDefault();
+        const targetRow = e.target.closest('.task-row:not(.phase)');
+        if (!targetRow || !dragTaskId) return;
+        if (targetRow.dataset.phaseId !== dragPhaseId) return;
+        const targetId = targetRow.dataset.id;
+        if (targetId === dragTaskId) return;
+
+        // Get current visual order of tasks in this phase (from DOM)
+        const phaseRows = [...container.querySelectorAll(`.task-row[data-phase-id="${dragPhaseId}"]:not(.phase)`)];
+        const ids = phaseRows.map(r => r.dataset.id);
+
+        // Remove dragged from its position
+        const fromIdx = ids.indexOf(dragTaskId);
+        if (fromIdx >= 0) ids.splice(fromIdx, 1);
+
+        // Insert at target position
+        const toIdx = ids.indexOf(targetId);
+        const rect = targetRow.getBoundingClientRect();
+        const insertBefore = e.clientY < rect.top + rect.height / 2;
+        ids.splice(insertBefore ? toIdx : toIdx + 1, 0, dragTaskId);
+
+        // Assign sort_order DESC: first in list = highest value
+        const items = ids.map((id, i) => ({ id, sort_order: (ids.length - i) * 1000 }));
+
+        // Update local data immediately for responsive feel
+        items.forEach(item => {
+          const tk = tasksData.find(t => t.id === item.id);
+          if (tk) tk.sort_order = item.sort_order;
+        });
+        renderGantt();
+
+        // Save to server
+        try {
+          await apiFetch('/gantt_tasks/reorder', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ items }),
+          });
+        } catch(err) {
+          showToast(err.message, 'error');
+          await loadGanttData();
+        }
       });
     }
 
@@ -1669,6 +1778,7 @@
     // ─── Actions ───
 
     document.addEventListener('click', async e => {
+      if (e.target.closest('.drag-handle')) return; // don't open modal when clicking drag handle
       const btn = e.target.closest('[data-action]');
       if (!btn) return;
       const action = btn.dataset.action;
