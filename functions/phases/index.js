@@ -63,7 +63,7 @@ exports.phases = async (req, res) => {
         query: `SELECT id, folder_id, group_id, name, name_en, name_th, sort_order
                 FROM ${table}
                 WHERE ${where}
-                ORDER BY sort_order`,
+                ORDER BY sort_order DESC`,
         params,
       });
       res.json(rows);

@@ -68,7 +68,7 @@ exports.gantt_tasks = async (req, res) => {
                 FROM ${table} t
                 JOIN ${phasesTbl} p ON t.phase_id = p.id
                 WHERE ${where}
-                ORDER BY p.sort_order, t.sort_order DESC`,
+                ORDER BY p.sort_order DESC, t.sort_order DESC`,
         params,
       });
       res.json(rows);
