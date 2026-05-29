@@ -1080,15 +1080,16 @@
         return;
       }
 
-      // Build rows: interleave phases and their tasks
+      // Build rows: interleave phases and their tasks (sort_order DESC = higher value on top)
       const rows = [];
       phasesData.forEach(phase => {
         rows.push({ type: 'phase', data: phase });
-        tasksData.filter(t => t.phase_id === phase.id).forEach(task => {
-          rows.push({ type: 'task', data: task });
-        });
+        tasksData.filter(t => t.phase_id === phase.id)
+          .sort((a, b) => (b.sort_order || 0) - (a.sort_order || 0))
+          .forEach(task => { rows.push({ type: 'task', data: task }); });
       });
-      const orphanTasks = tasksData.filter(t => !phasesData.some(p => p.id === t.phase_id));
+      const orphanTasks = tasksData.filter(t => !phasesData.some(p => p.id === t.phase_id))
+        .sort((a, b) => (b.sort_order || 0) - (a.sort_order || 0));
       orphanTasks.forEach(task => rows.push({ type: 'task', data: task }));
 
       // Compute planned_end from start + duration if missing
@@ -2651,7 +2652,7 @@
 
       phasesData.forEach(phase => {
         const phaseName = phase['name_' + currentLang] || phase.name || phase.name_en || '—';
-        const pTasks = tasksData.filter(t => t.phase_id === phase.id);
+        const pTasks = tasksData.filter(t => t.phase_id === phase.id).sort((a, b) => (b.sort_order || 0) - (a.sort_order || 0));
         if (!pTasks.length) {
           rows.push([phaseName, '', '', '', '', '', '', '']);
           return;
@@ -2720,9 +2721,9 @@
       const rows = [];
       phasesData.forEach(phase => {
         rows.push({ type: 'phase', data: phase });
-        tasksData.filter(t => t.phase_id === phase.id).forEach(task => {
-          rows.push({ type: 'task', data: task });
-        });
+        tasksData.filter(t => t.phase_id === phase.id)
+          .sort((a, b) => (b.sort_order || 0) - (a.sort_order || 0))
+          .forEach(task => { rows.push({ type: 'task', data: task }); });
       });
 
       // Month headers
