@@ -20,9 +20,11 @@ async function verifyToken(req) {
   const auth = req.headers.authorization;
   if (!auth || !auth.startsWith('Bearer ')) return null;
   const token = auth.split(' ')[1];
-  const r = await fetch(`https://www.googleapis.com/oauth2/v3/tokeninfo?access_token=${token}`);
-  if (!r.ok) return null;
-  return (await r.json()).email || null;
+  const r1 = await fetch(`https://www.googleapis.com/oauth2/v3/tokeninfo?access_token=${token}`);
+  if (r1.ok) { const info = await r1.json(); return info.email || null; }
+  const r2 = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${token}`);
+  if (r2.ok) { const info = await r2.json(); return info.email || null; }
+  return null;
 }
 
 async function getMaterialsLevel(email, folderId) {
