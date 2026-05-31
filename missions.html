@@ -574,7 +574,7 @@
         const el = document.getElementById('sp-comments');
         if (!comments.length) { el.innerHTML = '<div style="color:var(--m-muted);font-size:0.82rem">No comments</div>'; return; }
         el.innerHTML = comments.map(c => `<div class="comment-item">
-          <span class="comment-author">${escHtml(getUserName(c.user_id))}</span>
+          <span class="comment-author">${escHtml(getUserName(c.author_id))}</span>
           <span class="comment-date">${fmtDateDMY(c.created_at)}</span>
           <div class="comment-body">${escHtml(c.body || c.text || '')}</div>
         </div>`).join('');

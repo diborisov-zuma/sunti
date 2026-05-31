@@ -88,7 +88,7 @@ exports.missions = async (req, res) => {
       // GET /missions?view=dashboard&user_id=X
       if (view === 'dashboard' && user_id) {
         const [rows] = await bigquery.query({
-          query: `SELECT m.*,
+          query: `SELECT m.*, m.assignee_id AS assignee_user_id,
                     CASE
                       WHEN m.status IN ('open','in_progress','blocked') AND m.due_at < CURRENT_TIMESTAMP() THEN 'overdue'
                       WHEN DATE(m.due_at) = CURRENT_DATE() THEN 'today'
@@ -165,20 +165,29 @@ exports.missions = async (req, res) => {
       if (!user) { res.status(403).json({ error: 'User not found' }); return; }
 
       const id = crypto.randomUUID();
+      const title = b.title_ru || b.title || '';
+      const assignee = b.assignee_user_id || b.assignee_id || '';
       await bigquery.query({
         query: `INSERT INTO ${table}
-                  (id, title, description, status, priority, assignee_id, author_id, entity_type, entity_id,
+                  (id, title, title_en, title_th, description, description_en, description_th,
+                   status, priority, assignee_id, author_id, entity_type, entity_id,
                    due_at, needs_triage, template_id, parent_mission_id, closed_at, closed_by, created_at, updated_at)
                 VALUES
-                  (@id, @title, @description, @status, @priority, NULLIF(@assignee_id,''), @author_id, NULLIF(@entity_type,''), NULLIF(@entity_id,''),
+                  (@id, @title, NULLIF(@title_en,''), NULLIF(@title_th,''),
+                   @description, NULLIF(@description_en,''), NULLIF(@description_th,''),
+                   @status, @priority, NULLIF(@assignee_id,''), @author_id, NULLIF(@entity_type,''), NULLIF(@entity_id,''),
                    @due_at, @needs_triage, NULLIF(@template_id,''), NULLIF(@parent_mission_id,''), NULL, NULL, CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP())`,
         params: {
           id,
-          title: b.title || '',
-          description: b.description || '',
+          title,
+          title_en: b.title_en || '',
+          title_th: b.title_th || '',
+          description: b.description_ru || b.description || '',
+          description_en: b.description_en || '',
+          description_th: b.description_th || '',
           status: b.status || 'open',
           priority: b.priority || 'medium',
-          assignee_id: b.assignee_id || '',
+          assignee_id: assignee,
           author_id: b.author_id || user.id,
           entity_type: b.entity_type || '',
           entity_id: b.entity_id || '',
@@ -188,7 +197,17 @@ exports.missions = async (req, res) => {
           parent_mission_id: b.parent_mission_id || '',
         },
       });
-      await logEvent(id, 'created', { title: b.title }, user.id);
+
+      // Create watchers
+      const watcherIds = b.watcher_user_ids || [];
+      for (const wid of watcherIds) {
+        await bigquery.query({
+          query: `INSERT INTO ${watchersTbl} (id, mission_id, user_id, added_at, added_by) VALUES (@id, @mid, @uid, CURRENT_TIMESTAMP(), @by)`,
+          params: { id: crypto.randomUUID(), mid: id, uid: wid, by: user.id },
+        });
+      }
+
+      await logEvent(id, 'created', { title }, user.id);
       res.json({ success: true, id });
       return;
     }
@@ -212,10 +231,15 @@ exports.missions = async (req, res) => {
       const sets = ['updated_at = CURRENT_TIMESTAMP()'];
       const params = { id };
 
-      if (b.title !== undefined) { sets.push('title = @title'); params.title = b.title; }
-      if (b.description !== undefined) { sets.push('description = @description'); params.description = b.description; }
+      if (b.title !== undefined || b.title_ru !== undefined) { sets.push('title = @title'); params.title = b.title_ru || b.title || ''; }
+      if (b.title_en !== undefined) { sets.push('title_en = NULLIF(@title_en,\'\')'); params.title_en = b.title_en || ''; }
+      if (b.title_th !== undefined) { sets.push('title_th = NULLIF(@title_th,\'\')'); params.title_th = b.title_th || ''; }
+      if (b.description !== undefined || b.description_ru !== undefined) { sets.push('description = @description'); params.description = b.description_ru || b.description || ''; }
+      if (b.description_en !== undefined) { sets.push('description_en = NULLIF(@description_en,\'\')'); params.description_en = b.description_en || ''; }
+      if (b.description_th !== undefined) { sets.push('description_th = NULLIF(@description_th,\'\')'); params.description_th = b.description_th || ''; }
       if (b.priority !== undefined) { sets.push('priority = @priority'); params.priority = b.priority; }
-      if (b.assignee_id !== undefined) { sets.push('assignee_id = NULLIF(@assignee_id,\'\')'); params.assignee_id = b.assignee_id || ''; }
+      const patchAssignee = b.assignee_user_id !== undefined ? b.assignee_user_id : b.assignee_id;
+      if (patchAssignee !== undefined) { sets.push('assignee_id = NULLIF(@assignee_id,\'\')'); params.assignee_id = patchAssignee || ''; }
       if (b.entity_type !== undefined) { sets.push('entity_type = NULLIF(@entity_type,\'\')'); params.entity_type = b.entity_type || ''; }
       if (b.entity_id !== undefined) { sets.push('entity_id = NULLIF(@entity_id,\'\')'); params.entity_id = b.entity_id || ''; }
       if (b.needs_triage !== undefined) { sets.push('needs_triage = @needs_triage'); params.needs_triage = b.needs_triage === true; }

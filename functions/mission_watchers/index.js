@@ -78,9 +78,9 @@ exports.mission_watchers = async (req, res) => {
 
       const id = crypto.randomUUID();
       await bigquery.query({
-        query: `INSERT INTO ${table} (id, mission_id, user_id, created_at)
-                VALUES (@id, @mission_id, @user_id, CURRENT_TIMESTAMP())`,
-        params: { id, mission_id: b.mission_id, user_id: b.user_id },
+        query: `INSERT INTO ${table} (id, mission_id, user_id, added_at, added_by)
+                VALUES (@id, @mission_id, @user_id, CURRENT_TIMESTAMP(), @added_by)`,
+        params: { id, mission_id: b.mission_id, user_id: b.user_id, added_by: user.id },
       });
 
       // Log event
