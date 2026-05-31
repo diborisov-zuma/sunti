@@ -83,7 +83,6 @@ exports.contract_files = async (req, res) => {
       };
       if (!isView) signOpts.responseDisposition = `attachment; filename="${encodeURIComponent(rows[0].file_name || 'file')}"`;
       const [url] = await storage.bucket(parsed.bucket).file(parsed.key).getSignedUrl(signOpts);
-      });
       res.json({ url });
       return;
     }
