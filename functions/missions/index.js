@@ -168,10 +168,10 @@ exports.missions = async (req, res) => {
       await bigquery.query({
         query: `INSERT INTO ${table}
                   (id, title, description, status, priority, assignee_id, author_id, entity_type, entity_id,
-                   due_at, needs_triage, source, template_id, parent_id, closed_at, closed_by, created_at, updated_at)
+                   due_at, needs_triage, template_id, parent_mission_id, closed_at, closed_by, created_at, updated_at)
                 VALUES
                   (@id, @title, @description, @status, @priority, NULLIF(@assignee_id,''), @author_id, NULLIF(@entity_type,''), NULLIF(@entity_id,''),
-                   @due_at, @needs_triage, NULLIF(@source,''), NULLIF(@template_id,''), NULLIF(@parent_id,''), NULL, NULL, CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP())`,
+                   @due_at, @needs_triage, NULLIF(@template_id,''), NULLIF(@parent_mission_id,''), NULL, NULL, CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP())`,
         params: {
           id,
           title: b.title || '',
@@ -184,9 +184,8 @@ exports.missions = async (req, res) => {
           entity_id: b.entity_id || '',
           due_at: b.due_at ? bigquery.timestamp(new Date(b.due_at)) : null,
           needs_triage: b.needs_triage === true,
-          source: b.source || '',
           template_id: b.template_id || '',
-          parent_id: b.parent_id || '',
+          parent_mission_id: b.parent_mission_id || '',
         },
       });
       await logEvent(id, 'created', { title: b.title }, user.id);
@@ -220,9 +219,8 @@ exports.missions = async (req, res) => {
       if (b.entity_type !== undefined) { sets.push('entity_type = NULLIF(@entity_type,\'\')'); params.entity_type = b.entity_type || ''; }
       if (b.entity_id !== undefined) { sets.push('entity_id = NULLIF(@entity_id,\'\')'); params.entity_id = b.entity_id || ''; }
       if (b.needs_triage !== undefined) { sets.push('needs_triage = @needs_triage'); params.needs_triage = b.needs_triage === true; }
-      if (b.source !== undefined) { sets.push('source = NULLIF(@source,\'\')'); params.source = b.source || ''; }
       if (b.template_id !== undefined) { sets.push('template_id = NULLIF(@template_id,\'\')'); params.template_id = b.template_id || ''; }
-      if (b.parent_id !== undefined) { sets.push('parent_id = NULLIF(@parent_id,\'\')'); params.parent_id = b.parent_id || ''; }
+      if (b.parent_mission_id !== undefined) { sets.push('parent_mission_id = NULLIF(@parent_mission_id,\'\')'); params.parent_mission_id = b.parent_mission_id || ''; }
 
       if (b.due_at !== undefined) {
         sets.push('due_at = @due_at');
