@@ -167,10 +167,10 @@ exports.missions = async (req, res) => {
       const id = crypto.randomUUID();
       await bigquery.query({
         query: `INSERT INTO ${table}
-                  (id, title, description, status, priority, assignee_id, creator_id, entity_type, entity_id,
+                  (id, title, description, status, priority, assignee_id, author_id, entity_type, entity_id,
                    due_at, needs_triage, source, template_id, parent_id, closed_at, closed_by, created_at, updated_at)
                 VALUES
-                  (@id, @title, @description, @status, @priority, NULLIF(@assignee_id,''), @creator_id, NULLIF(@entity_type,''), NULLIF(@entity_id,''),
+                  (@id, @title, @description, @status, @priority, NULLIF(@assignee_id,''), @author_id, NULLIF(@entity_type,''), NULLIF(@entity_id,''),
                    @due_at, @needs_triage, NULLIF(@source,''), NULLIF(@template_id,''), NULLIF(@parent_id,''), NULL, NULL, CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP())`,
         params: {
           id,
@@ -179,7 +179,7 @@ exports.missions = async (req, res) => {
           status: b.status || 'open',
           priority: b.priority || 'medium',
           assignee_id: b.assignee_id || '',
-          creator_id: b.creator_id || user.id,
+          author_id: b.author_id || user.id,
           entity_type: b.entity_type || '',
           entity_id: b.entity_id || '',
           due_at: b.due_at ? bigquery.timestamp(new Date(b.due_at)) : null,
