@@ -1,15 +1,21 @@
 const { BigQuery } = require('@google-cloud/bigquery');
 const crypto = require('crypto');
+const Anthropic = require('@anthropic-ai/sdk');
 
 const bigquery = new BigQuery();
 const PROJECT  = 'project-9718e7d4-4cd7-4f52-8d6';
 const DATASET  = 'sunti';
 const TABLE    = 'missions';
+const TELEGRAM_TOKEN = process.env.TELEGRAM_TOKEN || '8766299522:AAGfJ9mdsOWv2f_HgNsRH0sjC3XweStQWRQ';
+
+// Fixed enums — single source of truth, exposed via GET /missions/meta
+const PRIORITIES = ['low', 'normal', 'high', 'urgent'];
+const STATUSES   = ['open', 'in_progress', 'blocked', 'done', 'cancelled'];
 
 function setCors(res) {
   res.set('Access-Control-Allow-Origin', '*');
   res.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
-  res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Api-Key');
 }
 
 async function verifyToken(req) {
@@ -46,11 +52,79 @@ async function logEvent(missionId, eventType, payload, actorId) {
   });
 }
 
+// Resolve an assignee by email → users.id (case-insensitive). Null if not found.
+async function resolveAssigneeId(email) {
+  const [rows] = await bigquery.query({
+    query: `SELECT id FROM \`${PROJECT}.${DATASET}.users\` WHERE LOWER(email) = LOWER(@email) LIMIT 1`,
+    params: { email },
+  });
+  return rows[0]?.id || null;
+}
+
+// Translate ru title/description → en + th via Haiku. Never throws — returns blanks on failure.
+async function translateFields(title, description) {
+  const out = { title_en: '', title_th: '', description_en: '', description_th: '' };
+  if (!process.env.ANTHROPIC_API_KEY) return out;
+  const parts = [];
+  if (title)       parts.push(`TITLE: ${title}`);
+  if (description) parts.push(`DESCRIPTION: ${description}`);
+  if (!parts.length) return out;
+  try {
+    const client = new Anthropic();
+    const msg = await client.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 1024,
+      messages: [{
+        role: 'user',
+        content: `Translate the following task fields from Russian to English and Thai.\n` +
+          `Return ONLY a JSON object with keys title_en, title_th, description_en, description_th. ` +
+          `Use empty string for any field not provided. No explanation.\n\n${parts.join('\n')}`,
+      }],
+    });
+    const content = msg.content[0]?.text || '{}';
+    const m = content.match(/\{[\s\S]*\}/);
+    const j = m ? JSON.parse(m[0]) : {};
+    return {
+      title_en: j.title_en || '',
+      title_th: j.title_th || '',
+      description_en: j.description_en || '',
+      description_th: j.description_th || '',
+    };
+  } catch (e) {
+    console.error('translateFields failed:', e.message);
+    return out;
+  }
+}
+
+// Push a Telegram message to the assignee if they linked their chat. Never throws.
+async function notifyAssigneeTg(assigneeId, mission) {
+  try {
+    const [rows] = await bigquery.query({
+      query: `SELECT telegram_chat_id FROM \`${PROJECT}.${DATASET}.users\` WHERE id = @id LIMIT 1`,
+      params: { id: assigneeId },
+    });
+    const chatId = rows[0]?.telegram_chat_id;
+    if (!chatId) return;
+    let text = `📋 <b>Новая задача</b>\n${mission.title || ''}`;
+    if (mission.due_at) text += `\n🗓 Срок: ${String(mission.due_at).slice(0, 10)}`;
+    await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: chatId, text, parse_mode: 'HTML' }),
+    });
+  } catch (e) {
+    console.error('notifyAssigneeTg failed:', e.message);
+  }
+}
+
 exports.missions = async (req, res) => {
   setCors(res);
   if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
 
-  const email = await verifyToken(req);
+  // Auth: either a Google OAuth token (browser) or a machine API key (bot).
+  const apiKey = req.headers['x-api-key'];
+  const isBot  = !!apiKey && !!process.env.BOT_API_KEY && apiKey === process.env.BOT_API_KEY;
+  const email  = isBot ? (process.env.BOT_USER_EMAIL || 'di.borisov@gmail.com') : await verifyToken(req);
   if (!email) { res.status(401).json({ error: 'Unauthorized' }); return; }
 
   const table       = `\`${PROJECT}.${DATASET}.${TABLE}\``;
@@ -64,6 +138,15 @@ exports.missions = async (req, res) => {
     // GET requests
     if (req.method === 'GET') {
       const { assignee_id, entity_type, entity_id, needs_triage, view, user_id } = req.query;
+
+      // GET /missions/meta — enums + active user roster (for the bot to build a valid payload)
+      if (segments[0] === 'meta') {
+        const [users] = await bigquery.query({
+          query: `SELECT id, name, email FROM ${usersTbl} WHERE is_active IS NOT FALSE ORDER BY name`,
+        });
+        res.json({ priorities: PRIORITIES, statuses: STATUSES, users });
+        return;
+      }
 
       // GET /missions/:id — single mission
       if (segments.length >= 1 && segments[0] !== '' && !assignee_id && !entity_type && !needs_triage && !view) {
@@ -166,7 +249,26 @@ exports.missions = async (req, res) => {
 
       const id = crypto.randomUUID();
       const title = b.title_ru || b.title || '';
-      const assignee = b.assignee_user_id || b.assignee_id || '';
+      const description = b.description_ru || b.description || '';
+
+      // Resolve assignee: explicit id wins, else by email; bot defaults to author (self).
+      let assignee = b.assignee_user_id || b.assignee_id || '';
+      if (!assignee && b.assignee_email) {
+        const aid = await resolveAssigneeId(b.assignee_email);
+        if (!aid) { res.status(400).json({ error: `Assignee not found: ${b.assignee_email}` }); return; }
+        assignee = aid;
+      }
+      if (!assignee && isBot) assignee = user.id;
+
+      // Server-side ru→en/th translation for bot-created missions when not supplied.
+      let titleEn = b.title_en || '', titleTh = b.title_th || '';
+      let descEn  = b.description_en || '', descTh = b.description_th || '';
+      if (isBot && (!titleEn || !titleTh || (description && (!descEn || !descTh)))) {
+        const tr = await translateFields(title, description);
+        titleEn = titleEn || tr.title_en; titleTh = titleTh || tr.title_th;
+        descEn  = descEn  || tr.description_en; descTh = descTh || tr.description_th;
+      }
+
       await bigquery.query({
         query: `INSERT INTO ${table}
                   (id, title, title_en, title_th, description, description_en, description_th,
@@ -180,13 +282,13 @@ exports.missions = async (req, res) => {
         params: {
           id,
           title,
-          title_en: b.title_en || '',
-          title_th: b.title_th || '',
-          description: b.description_ru || b.description || '',
-          description_en: b.description_en || '',
-          description_th: b.description_th || '',
+          title_en: titleEn,
+          title_th: titleTh,
+          description,
+          description_en: descEn,
+          description_th: descTh,
           status: b.status || 'open',
-          priority: b.priority || 'medium',
+          priority: b.priority || 'normal',
           assignee_id: assignee,
           author_id: b.author_id || user.id,
           entity_type: b.entity_type || '',
@@ -208,6 +310,11 @@ exports.missions = async (req, res) => {
       }
 
       await logEvent(id, 'created', { title }, user.id);
+
+      if (b.notify_tg === true && assignee) {
+        await notifyAssigneeTg(assignee, { title, due_at: b.due_at });
+      }
+
       res.json({ success: true, id });
       return;
     }
