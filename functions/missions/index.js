@@ -298,6 +298,7 @@ exports.missions = async (req, res) => {
           template_id: b.template_id || '',
           parent_mission_id: b.parent_mission_id || '',
         },
+        types: { due_at: 'TIMESTAMP' },
       });
 
       // Create watchers
@@ -371,6 +372,7 @@ exports.missions = async (req, res) => {
       await bigquery.query({
         query: `UPDATE ${table} SET ${sets.join(', ')} WHERE id = @id`,
         params,
+        ...(('due_at' in params) ? { types: { due_at: 'TIMESTAMP' } } : {}),
       });
 
       // Track changes and create events
