@@ -378,7 +378,7 @@
         if (m.status === 'done' || m.status === 'completed') { groups.done.push(m); return; }
         if (m.is_watching && m.assignee_user_id !== currentMe.id) { groups.watching.push(m); return; }
         if (!m.due_at) { groups.nodate.push(m); return; }
-        const due = m.due_at.slice(0, 10);
+        const due = (m.due_at.value || m.due_at).slice(0, 10);
         if (due < todayStr) { groups.overdue.push(m); return; }
         if (due === todayStr) { groups.today.push(m); return; }
         if (due <= endOfWeekStr) { groups.week.push(m); return; }
@@ -490,7 +490,7 @@
       // Due date
       html += `<div class="sp-field">
         <label>${t('missionDueDate')}</label>
-        <input type="date" id="sp-due" value="${m.due_at ? m.due_at.slice(0,10) : ''}" lang="en-GB" onchange="changeDue(this.value)">
+        <input type="date" id="sp-due" value="${m.due_at ? (m.due_at.value || m.due_at).slice(0,10) : ''}" lang="en-GB" onchange="changeDue(this.value)">
       </div>`;
 
       // Assignee
