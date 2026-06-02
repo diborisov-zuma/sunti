@@ -1474,7 +1474,10 @@
         document.getElementById('t-modal-trx-title').textContent = t('addTransaction');
         document.getElementById('tx-date').value = new Date().toISOString().split('T')[0];
         document.getElementById('tx-direction').value = contract?.direction || 'expense';
-        document.getElementById('tx-amount').value = '';
+        // Default to the full outstanding amount of the contract (total minus already paid).
+        const cRemaining = numVal(contract?.total_amount) - numVal(contract?.paid_amount);
+        const cDefault = cRemaining > 0 ? cRemaining : numVal(contract?.total_amount);
+        document.getElementById('tx-amount').value = cDefault > 0 ? cDefault.toFixed(2) : '';
         document.getElementById('tx-desc').value = contract?.name ? `Payment: ${contract.name}` : '';
         fillAccountSelect(contract?.folder_id);
         fillCategorySelect('tx-category', '');
@@ -1492,7 +1495,11 @@
         document.getElementById('t-modal-trx-title').textContent = t('addTransaction');
         document.getElementById('tx-date').value = new Date().toISOString().split('T')[0];
         document.getElementById('tx-direction').value = inv?.direction || 'expense';
-        document.getElementById('tx-amount').value = '';
+        // Default to the full outstanding amount of the invoice (payable minus already paid).
+        const invPayable = numVal(inv?.total_amount) - numVal(inv?.wht_amount);
+        const invRemaining = invPayable - numVal(inv?.paid_amount);
+        const invDefault = invRemaining > 0 ? invRemaining : (invPayable > 0 ? invPayable : 0);
+        document.getElementById('tx-amount').value = invDefault > 0 ? invDefault.toFixed(2) : '';
         document.getElementById('tx-desc').value = '';
         fillAccountSelect(contract?.folder_id);
         fillCategorySelect('tx-category', '');
