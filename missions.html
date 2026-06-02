@@ -223,7 +223,7 @@
       </div>
 
       <div class="modal-field">
-        <label>Description</label>
+        <label id="t-lbl-desc">Description</label>
         <div style="display:flex;gap:6px;align-items:center;margin-bottom:4px">
           <div class="lang-tabs" id="desc-lang-tabs">
             <button class="active" data-lang="ru" onclick="switchDescLang('ru')">RU</button>
@@ -280,8 +280,8 @@
       </div>
 
       <div class="modal-actions">
-        <button class="btn btn-outline" onclick="closeNewMissionModal()">Cancel</button>
-        <button class="btn btn-primary" onclick="saveMission()">Save</button>
+        <button class="btn btn-outline" id="t-btn-cancel" onclick="closeNewMissionModal()">Cancel</button>
+        <button class="btn btn-primary" id="t-btn-save" onclick="saveMission()">Save</button>
       </div>
     </div>
   </div>
@@ -316,8 +316,9 @@
 
     function getMissionTitle(m) {
       if (!m) return '';
-      if (m['title_' + currentLang]) return m['title_' + currentLang];
-      return m.title_en || m.title_ru || m.title_th || '';
+      // Russian is stored in the base `title` column (no `title_ru` field exists).
+      if (currentLang === 'ru') return m.title || m.title_en || m.title_th || '';
+      return m['title_' + currentLang] || m.title || m.title_en || m.title_th || '';
     }
 
     function getUserName(userId) {
@@ -875,14 +876,35 @@
       } catch (e) { showToast(e.message, true); }
     }
 
+    function updateTexts() {
+      updateHeaderTexts();
+      document.getElementById('t-guest-title').textContent  = t('guestTitle');
+      document.getElementById('t-guest-sub').textContent    = t('guestSub');
+      document.getElementById('t-modal-title').textContent  = t('missionNew');
+      document.getElementById('t-lbl-title').textContent    = t('name');
+      document.getElementById('t-lbl-desc').textContent     = t('description');
+      document.getElementById('t-lbl-priority').textContent = t('missionPriority');
+      document.getElementById('t-lbl-due').textContent      = t('missionDueDate');
+      document.getElementById('t-lbl-entity').textContent   = t('missionLinkedTo');
+      document.getElementById('t-lbl-assignee').textContent = t('missionAssignee');
+      document.getElementById('t-lbl-watchers').textContent = t('missionWatchers');
+      document.getElementById('t-btn-cancel').textContent   = t('cancel');
+      document.getElementById('t-btn-save').textContent     = t('save');
+      if (missionsData.length) renderMissions();
+    }
+
+    window.onLangChange = () => updateTexts();
+
     // --- Init ---
 
     renderHeader('missions');
+    updateTexts();
 
     document.getElementById('btn-new-mission').addEventListener('click', openNewMissionModal);
 
     function onLogin() {
       loadDashboard();
+      updateTexts();
       // Check if navigated with ?action=new
       const params = new URLSearchParams(window.location.search);
       if (params.get('action') === 'new') {

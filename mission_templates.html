@@ -426,11 +426,19 @@
       } catch (e) { showToast(e.message, true); }
     }
 
+    function updateTexts() {
+      updateHeaderTexts();
+      document.getElementById('t-guest-title').textContent = t('guestTitle');
+      document.getElementById('t-guest-sub').textContent   = t('guestSub');
+      document.getElementById('t-page-title').textContent  = t('navMissionTemplates');
+    }
+
+    window.onLangChange = () => updateTexts();
+
     // --- Init ---
 
     renderHeader('mission_templates');
-
-    document.getElementById('t-page-title').textContent = t('navMissionTemplates');
+    updateTexts();
 
     function onLogin(user, admin) {
       if (!admin) {

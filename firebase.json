@@ -22,7 +22,13 @@
         "**/.*",
         "**/node_modules/**",
         "portal.html",
-        "portal_test.html"
+        "portal_test.html",
+        "CLAUDE/**",
+        "HELPS/**",
+        "json/**",
+        "**/*.sql",
+        "_gen_import.js",
+        "mission-system-spec.md"
       ]
     },
     {
