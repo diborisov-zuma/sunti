@@ -41,7 +41,7 @@ exports.users = async (req, res) => {
         query: `SELECT u.id, u.email, u.name, u.telegram_chat_id, u.telegram_username,
                        u.is_admin, u.can_see_salary, u.is_active,
                        (SELECT COUNT(*) FROM \`${PROJECT}.${DATASET}.users_folders\`
-                        WHERE user_email = u.email AND docs_access = 'editor') AS editor_folder_count,
+                        WHERE user_email = u.email AND docs_access != 'none') AS contracts_folder_count,
                        (SELECT COUNT(*) FROM \`${PROJECT}.${DATASET}.users_folders\`
                         WHERE user_email = u.email AND docs_level IN ('viewer','editor')) AS docs_folder_count,
                        (SELECT COUNT(*) FROM \`${PROJECT}.${DATASET}.users_folders\`
@@ -51,7 +51,10 @@ exports.users = async (req, res) => {
       });
       if (!rows.length) { res.status(404).json({ error: 'User not found' }); return; }
       const user = rows[0];
-      user.has_contracts_access = user.is_admin === true || parseInt(user.editor_folder_count) > 0;
+      // Contracts/Finance/CTC visible to anyone with at least viewer docs_access
+      // (consistent with the /folders endpoint, which surfaces docs_access != 'none').
+      // Editing remains gated by editor at the page/API level.
+      user.has_contracts_access = user.is_admin === true || parseInt(user.contracts_folder_count) > 0;
       user.has_docs_access = user.is_admin === true || parseInt(user.docs_folder_count) > 0;
       user.has_materials_access = user.is_admin === true || parseInt(user.materials_folder_count) > 0;
       // sales_level may not exist yet — query separately, fallback to 0

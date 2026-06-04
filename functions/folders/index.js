@@ -55,6 +55,16 @@ exports.folders = async (req, res) => {
         });
         res.json(rows);
       } else {
+        // Each section gates folder visibility by its OWN access dimension.
+        // ?access=docs|materials|sales|gantt selects the matching column;
+        // default (contracts/finance/invoices) keeps the docs_access gate.
+        const dimCol = {
+          docs:      'docs_level',
+          materials: 'materials_level',
+          sales:     'sales_level',
+          gantt:     'gantt_level',
+          contracts: 'docs_access',
+        }[String(req.query.access || '')] || 'docs_access';
         const [rows] = await bigquery.query({
           query: `SELECT f.id, f.name, f.\`order\`, f.status, f.company_id, co.name AS company_name, uf.docs_access, IFNULL(f.is_template, FALSE) AS is_template
                   FROM ${table} f
@@ -62,7 +72,7 @@ exports.folders = async (req, res) => {
                     ON uf.folder_id = f.id
                   LEFT JOIN ${coTable} co ON co.id = f.company_id
                   WHERE uf.user_email = @email
-                    AND uf.docs_access != 'none'
+                    AND uf.${dimCol} != 'none'
                   ORDER BY f.\`order\` ASC`,
           params: { email },
         });

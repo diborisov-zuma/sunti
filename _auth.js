@@ -34,15 +34,24 @@ async function applyLogin(idToken, accessToken) {
       headers: { 'Authorization': `Bearer ${accessToken}` },
     });
     if (!meRes.ok) {
-      // Пользователь не найден в БД — не пускаем
-      console.warn('User not registered in system');
+      // Различаем «нет такого пользователя» (404) и «ошибка сервера» (5xx),
+      // чтобы временный сбой не выглядел как «вы не зарегистрированы».
+      const isServerErr = meRes.status >= 500;
+      console.warn('users/me failed:', meRes.status, isServerErr ? '(server error)' : '(not registered)');
       const guestView = document.getElementById('guest-view');
       if (guestView) {
-        guestView.innerHTML = `<div style="text-align:center;padding:100px 24px">
-          <h2 style="color:#c5221f;margin-bottom:12px">Доступ запрещён</h2>
-          <p style="color:#666;margin-bottom:24px">Ваш аккаунт не зарегистрирован в системе.<br>Обратитесь к администратору.</p>
-          <button class="btn btn-outline" onclick="logout()">Выйти</button>
-        </div>`;
+        guestView.innerHTML = isServerErr
+          ? `<div style="text-align:center;padding:100px 24px">
+              <h2 style="color:#c5221f;margin-bottom:12px">Сервис временно недоступен</h2>
+              <p style="color:#666;margin-bottom:24px">Не удалось загрузить ваш профиль (ошибка ${meRes.status}).<br>Повторите попытку позже или обратитесь к администратору.</p>
+              <button class="btn btn-outline" onclick="location.reload()">Повторить</button>
+              <button class="btn btn-outline" onclick="logout()">Выйти</button>
+            </div>`
+          : `<div style="text-align:center;padding:100px 24px">
+              <h2 style="color:#c5221f;margin-bottom:12px">Доступ запрещён</h2>
+              <p style="color:#666;margin-bottom:24px">Ваш аккаунт не зарегистрирован в системе.<br>Обратитесь к администратору.</p>
+              <button class="btn btn-outline" onclick="logout()">Выйти</button>
+            </div>`;
         guestView.style.display = 'block';
       }
       document.getElementById('signin-btn').style.display = 'none';

@@ -181,7 +181,7 @@
     }
 
     async function loadRefs() {
-      try { foldersCache = await apiFetch('/folders'); } catch(e) { foldersCache = []; }
+      try { foldersCache = await apiFetch('/folders?access=materials'); } catch(e) { foldersCache = []; }
       const sel = document.getElementById('filter-folder');
       sel.innerHTML = `<option value="">${t('portalSelectProject')}</option>`;
       foldersCache.forEach(f => {

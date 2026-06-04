@@ -745,7 +745,7 @@
     async function loadRefs() {
       const [companies, folders] = await Promise.all([
         apiFetch('/companies').catch(() => []),
-        apiFetch('/folders').catch(() => []),
+        apiFetch('/folders?access=gantt').catch(() => []),
       ]);
       companiesCache = companies;
       foldersCache = folders;

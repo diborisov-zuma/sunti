@@ -490,7 +490,7 @@
       [buyersCache, companiesCache, foldersCache, accountsCache] = await Promise.all([
         apiFetch('/buyers?active=true').catch(() => []),
         apiFetch('/companies').catch(() => []),
-        apiFetch('/folders').catch(() => []),
+        apiFetch('/folders?access=sales').catch(() => []),
         apiFetch('/company_accounts').catch(() => []),
       ]);
       fillCompanyFilter();

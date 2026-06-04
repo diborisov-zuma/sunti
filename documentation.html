@@ -212,7 +212,7 @@
     }
 
     async function loadRefs() {
-      try { foldersCache = await apiFetch('/folders'); } catch(e) { foldersCache = []; }
+      try { foldersCache = await apiFetch('/folders?access=docs'); } catch(e) { foldersCache = []; }
       fillFolderSelect();
     }
 
