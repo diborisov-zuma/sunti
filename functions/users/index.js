@@ -29,7 +29,6 @@ exports.users = async (req, res) => {
 
   const email = await verifyToken(req);
   if (!email) { res.status(401).json({ error: 'Unauthorized' }); return; }
-  console.log('users endpoint: resolved email =', JSON.stringify(email), 'method=', req.method, 'url=', req.url);
 
   const table = `\`${PROJECT}.${DATASET}.${TABLE}\``;
 
