@@ -29,6 +29,7 @@ exports.users = async (req, res) => {
 
   const email = await verifyToken(req);
   if (!email) { res.status(401).json({ error: 'Unauthorized' }); return; }
+  console.log('users endpoint: resolved email =', JSON.stringify(email), 'method=', req.method, 'url=', req.url);
 
   const table = `\`${PROJECT}.${DATASET}.${TABLE}\``;
 
@@ -49,7 +50,11 @@ exports.users = async (req, res) => {
                 FROM ${table} u WHERE u.email = @email`,
         params: { email },
       });
-      if (!rows.length) { res.status(404).json({ error: 'User not found' }); return; }
+      if (!rows.length) {
+        console.warn('users/me: no row for email =', JSON.stringify(email));
+        res.status(404).json({ error: 'User not found', resolved_email: email });
+        return;
+      }
       const user = rows[0];
       // Contracts/Finance/CTC visible to anyone with at least viewer docs_access
       // (consistent with the /folders endpoint, which surfaces docs_access != 'none').

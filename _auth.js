@@ -7,6 +7,40 @@ let currentMe    = null; // данные из таблицы users
 let isAdmin      = false;
 let _accessToken = null;
 let _tokenClient = null;
+let _authRetried = false;
+
+// Тихо запрашивает свежий access token через token client.
+// Возвращает токен или null, если обновить без интерактива нельзя.
+function refreshAccessToken() {
+  return new Promise((resolve) => {
+    if (!_tokenClient || typeof google === 'undefined' || !google.accounts?.oauth2) {
+      resolve(null);
+      return;
+    }
+    let done = false;
+    const finish = (val) => { if (!done) { done = true; resolve(val); } };
+    // Подменяем callback на одноразовый, затем восстанавливаем штатное поведение.
+    _tokenClient.callback = (resp) => {
+      if (resp && resp.access_token && !resp.error) {
+        _accessToken = resp.access_token;
+        window._accessToken = _accessToken;
+        localStorage.setItem('google_access_token', _accessToken);
+        finish(_accessToken);
+      } else {
+        finish(null);
+      }
+    };
+    try {
+      const hint = currentUser?.email;
+      _tokenClient.requestAccessToken(hint ? { prompt: '', login_hint: hint } : { prompt: '' });
+    } catch (e) {
+      console.warn('refreshAccessToken failed:', e);
+      finish(null);
+    }
+    // Защита от зависания: если callback не сработал за 8 сек.
+    setTimeout(() => finish(null), 8000);
+  });
+}
 
 function parseJwt(token) {
   const base64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
@@ -34,6 +68,25 @@ async function applyLogin(idToken, accessToken) {
       headers: { 'Authorization': `Bearer ${accessToken}` },
     });
     if (!meRes.ok) {
+      // Если токен протух (401/403) — пробуем тихо обновить access token и повторить,
+      // прежде чем показывать пугающее «не зарегистрирован».
+      if ((meRes.status === 401 || meRes.status === 403) && !_authRetried) {
+        _authRetried = true;
+        const refreshed = await refreshAccessToken();
+        if (refreshed) return applyLogin(idToken, refreshed);
+        // Тихое обновление не удалось — нужен повторный вход через Google.
+        const guestView = document.getElementById('guest-view');
+        if (guestView) {
+          guestView.innerHTML = `<div style="text-align:center;padding:100px 24px">
+              <h2 style="color:#c5221f;margin-bottom:12px">Сессия истекла</h2>
+              <p style="color:#666;margin-bottom:24px">Войдите снова, чтобы продолжить работу.</p>
+              <button class="btn btn-outline" onclick="logout()">Войти заново</button>
+            </div>`;
+          guestView.style.display = 'block';
+        }
+        document.getElementById('signin-btn').style.display = 'none';
+        return;
+      }
       // Различаем «нет такого пользователя» (404) и «ошибка сервера» (5xx),
       // чтобы временный сбой не выглядел как «вы не зарегистрированы».
       const isServerErr = meRes.status >= 500;
@@ -57,6 +110,7 @@ async function applyLogin(idToken, accessToken) {
       document.getElementById('signin-btn').style.display = 'none';
       return;
     }
+    _authRetried = false;
     currentMe = await meRes.json();
     isAdmin   = currentMe && currentMe.is_admin === true;
     window._currentMe = currentMe;
