@@ -1177,7 +1177,6 @@
         folderSel.style.borderColor = '#c5221f';
         // Clear data until folder selected
         document.getElementById('inv-tbody').innerHTML = '';
-        document.getElementById('totals-row').innerHTML = '';
       });
       document.getElementById('filter-folder').addEventListener('change', e => {
         filterFolder = e.target.value;
@@ -1187,7 +1186,6 @@
           currentPage = 1; expandedInv = {}; loadInvoices();
         } else {
           document.getElementById('inv-tbody').innerHTML = '';
-          document.getElementById('totals-row').innerHTML = '';
         }
       });
       updateAccountFilter();
