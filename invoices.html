@@ -1181,6 +1181,7 @@
       document.getElementById('filter-folder').addEventListener('change', e => {
         filterFolder = e.target.value;
         document.getElementById('filter-folder').style.borderColor = filterFolder ? '#ddd' : '#c5221f';
+        updateFilterLockState();
         if (filterCompany && filterFolder) {
           loadContracts();
           currentPage = 1; expandedInv = {}; loadInvoices();
