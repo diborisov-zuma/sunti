@@ -148,6 +148,21 @@ exports.missions = async (req, res) => {
         return;
       }
 
+      // GET /missions/:id/events — change history (events) for a single mission
+      if (segments.length === 2 && segments[1] === 'events') {
+        const mid = segments[0];
+        const [rows] = await bigquery.query({
+          query: `SELECT e.id, e.mission_id, e.event_type, e.payload, e.actor_id, e.created_at,
+                         u.name AS actor_name
+                  FROM ${eventsTbl} e LEFT JOIN ${usersTbl} u ON u.id = e.actor_id
+                  WHERE e.mission_id = @mid
+                  ORDER BY e.created_at DESC`,
+          params: { mid },
+        });
+        res.json(rows);
+        return;
+      }
+
       // GET /missions/:id — single mission
       if (segments.length >= 1 && segments[0] !== '' && !assignee_id && !entity_type && !needs_triage && !view) {
         const id = segments[0];
@@ -336,6 +351,20 @@ exports.missions = async (req, res) => {
       const old = existing[0];
       const b = req.body || {};
 
+      // Editing the mission's content (title/description) is restricted to the
+      // mission author or an admin. Inline status/priority/due/assignee tweaks
+      // keep their existing (unrestricted) behaviour so assignees can progress work.
+      const editsContent = ['title','title_ru','title_en','title_th',
+                            'description','description_ru','description_en','description_th']
+                            .some(k => b[k] !== undefined);
+      if (editsContent && !isBot) {
+        const admin = await isAdmin(email);
+        if (!admin && old.author_id !== user.id) {
+          res.status(403).json({ error: 'Only the mission author or an admin can edit it' });
+          return;
+        }
+      }
+
       const sets = ['updated_at = CURRENT_TIMESTAMP()'];
       const params = { id };
 
@@ -391,6 +420,20 @@ exports.missions = async (req, res) => {
       }
       if (b.priority !== undefined && b.priority !== old.priority) {
         await logEvent(id, 'priority_changed', { from: old.priority, to: b.priority }, user.id);
+      }
+
+      // Log content edits (title/description, per language) so they show in history
+      const editedFields = [];
+      const newTitle = (b.title_ru !== undefined || b.title !== undefined) ? (b.title_ru || b.title || '') : undefined;
+      if (newTitle !== undefined && newTitle !== (old.title || '')) editedFields.push('title');
+      const newDesc = (b.description_ru !== undefined || b.description !== undefined) ? (b.description_ru || b.description || '') : undefined;
+      if (newDesc !== undefined && newDesc !== (old.description || '')) editedFields.push('description');
+      if (b.title_en !== undefined && (b.title_en || '') !== (old.title_en || '')) editedFields.push('title_en');
+      if (b.title_th !== undefined && (b.title_th || '') !== (old.title_th || '')) editedFields.push('title_th');
+      if (b.description_en !== undefined && (b.description_en || '') !== (old.description_en || '')) editedFields.push('description_en');
+      if (b.description_th !== undefined && (b.description_th || '') !== (old.description_th || '')) editedFields.push('description_th');
+      if (editedFields.length) {
+        await logEvent(id, 'edited', { fields: editedFields }, user.id);
       }
 
       res.json({ success: true });

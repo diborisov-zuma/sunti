@@ -264,13 +264,13 @@
         <select id="m-assignee"><option value="">—</option></select>
       </div>
 
-      <div class="modal-field">
+      <div class="modal-field" id="mf-watchers">
         <label id="t-lbl-watchers">Watchers</label>
         <select id="m-watcher-add"><option value="">+ Add watcher</option></select>
         <div id="m-watchers-list" style="margin-top:4px"></div>
       </div>
 
-      <div class="modal-field" style="display:flex;gap:16px">
+      <div class="modal-field" id="mf-notify" style="display:flex;gap:16px">
         <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
           <input type="checkbox" id="m-notify-tg-assignee"> Notify assignee TG
         </label>
@@ -294,7 +294,24 @@
     let missionsData = [];
     let usersCache = {};
     let selectedMission = null;
+    let editingMissionId = null;
     let newMissionPriority = 'normal';
+
+    // Self-contained labels for the history panel (avoids touching _i18n.js)
+    const HIST_LABELS = {
+      ru: { created:'Создано', status:'Статус', assigned:'Исполнитель', due:'Срок', priority:'Приоритет', reopened:'Переоткрыто', edited:'Изменено', edit:'Редактировать', title:'заголовок', description:'описание', title_en:'заголовок (EN)', title_th:'заголовок (TH)', description_en:'описание (EN)', description_th:'описание (TH)' },
+      en: { created:'Created', status:'Status', assigned:'Assignee', due:'Due date', priority:'Priority', reopened:'Reopened', edited:'Edited', edit:'Edit', title:'title', description:'description', title_en:'title (EN)', title_th:'title (TH)', description_en:'description (EN)', description_th:'description (TH)' },
+      th: { created:'สร้าง', status:'สถานะ', assigned:'ผู้รับผิดชอบ', due:'กำหนดส่ง', priority:'ความสำคัญ', reopened:'เปิดใหม่', edited:'แก้ไข', edit:'แก้ไข', title:'หัวข้อ', description:'คำอธิบาย', title_en:'หัวข้อ (EN)', title_th:'หัวข้อ (TH)', description_en:'คำอธิบาย (EN)', description_th:'คำอธิบาย (TH)' },
+    };
+    function histT(key) {
+      const d = HIST_LABELS[currentLang] || HIST_LABELS.ru;
+      return d[key] || HIST_LABELS.ru[key] || key;
+    }
+
+    function canEditMission(m) {
+      if (!m || typeof currentMe === 'undefined' || !currentMe) return false;
+      return currentMe.is_admin === true || m.author_id === currentMe.id;
+    }
     let newMissionEntity = null;
     let newMissionWatchers = [];
     let currentTitleLang = 'ru';
@@ -574,6 +591,9 @@
       } else {
         actHtml += `<button class="btn-reopen" onclick="setMissionStatus('open')">↺ ${t('missionReopen')}</button>`;
       }
+      if (canEditMission(m)) {
+        actHtml += `<button onclick="openEditMissionModal()" style="background:#eef1f8;border:1px solid #c9d2e3;color:#2b3a55;border-radius:6px;padding:7px 12px;cursor:pointer;font-size:0.85rem">✎ ${histT('edit')}</button>`;
+      }
       actions.innerHTML = actHtml;
 
       document.getElementById('sp-overlay').style.display = 'block';
@@ -582,6 +602,7 @@
       // Load comments and history
       loadComments(m.id);
       loadSubMissions(m.id);
+      loadHistory(m.id);
     }
 
     function closeSidePanel() {
@@ -617,6 +638,36 @@
         </div>`).join('');
       } catch (e) {
         document.getElementById('sp-sub-missions').innerHTML = '—';
+      }
+    }
+
+    function eventLabel(ev) {
+      let p = {};
+      try { p = typeof ev.payload === 'string' ? JSON.parse(ev.payload || '{}') : (ev.payload || {}); } catch (e) {}
+      const dpart = s => (s ? String(s).slice(0, 10) : '—');
+      switch (ev.event_type) {
+        case 'created':          return histT('created');
+        case 'status_changed':   return `${histT('status')}: ${p.from || '—'} → ${p.to || '—'}`;
+        case 'assigned':         return `${histT('assigned')}: ${getUserName(p.to) || '—'}`;
+        case 'due_changed':      return `${histT('due')}: ${dpart(p.from)} → ${dpart(p.to)}`;
+        case 'priority_changed': return `${histT('priority')}: ${p.from || '—'} → ${p.to || '—'}`;
+        case 'reopened':         return histT('reopened');
+        case 'edited':           return `${histT('edited')}: ${(p.fields || []).map(f => histT(f)).join(', ')}`;
+        default:                 return ev.event_type;
+      }
+    }
+
+    async function loadHistory(missionId) {
+      const el = document.getElementById('sp-history');
+      try {
+        const events = await apiFetch(`/missions/${missionId}/events`);
+        if (!events.length) { el.innerHTML = '<div style="color:var(--m-muted);font-size:0.82rem">—</div>'; return; }
+        el.innerHTML = events.map(ev => `<div style="padding:6px 0;border-bottom:1px solid #eee;font-size:0.82rem">
+          <div>${escHtml(eventLabel(ev))}</div>
+          <div style="color:var(--m-muted);font-size:0.74rem">${escHtml(ev.actor_name || '')} · ${fmtDateDMY(ev.created_at)}</div>
+        </div>`).join('');
+      } catch (e) {
+        el.innerHTML = `<div style="color:var(--m-red);font-size:0.82rem">${escHtml(e.message)}</div>`;
       }
     }
 
@@ -704,8 +755,12 @@
     // --- Create Mission modal ---
 
     function openNewMissionModal() {
+      editingMissionId = null;
       document.getElementById('modal-new-mission').classList.add('open');
       document.getElementById('t-modal-title').textContent = t('missionNew');
+      // Watchers + TG-notify only apply when creating a new mission
+      document.getElementById('mf-watchers').style.display = '';
+      document.getElementById('mf-notify').style.display = 'flex';
       // Reset form
       ['m-title-ru','m-title-en','m-title-th','m-desc-ru','m-desc-en','m-desc-th','m-due-date','m-entity-search'].forEach(id => {
         const el = document.getElementById(id);
@@ -729,7 +784,43 @@
 
     window._openMissionModal = openNewMissionModal;
 
+    function openEditMissionModal() {
+      const m = selectedMission;
+      if (!m) return;
+      if (!canEditMission(m)) { showToast(t('accessDenied') || 'Forbidden', true); return; }
+      editingMissionId = m.id;
+      document.getElementById('modal-new-mission').classList.add('open');
+      document.getElementById('t-modal-title').textContent = histT('edit');
+      // Pre-fill fields from the mission
+      document.getElementById('m-title-ru').value = m.title || '';
+      document.getElementById('m-title-en').value = m.title_en || '';
+      document.getElementById('m-title-th').value = m.title_th || '';
+      document.getElementById('m-desc-ru').value  = m.description || '';
+      document.getElementById('m-desc-en').value  = m.description_en || '';
+      document.getElementById('m-desc-th').value  = m.description_th || '';
+      newMissionPriority = m.priority || 'normal';
+      updatePriorityButtons();
+      const dueEl = document.getElementById('m-due-date');
+      dueEl.value = m.due_at ? (m.due_at.value || m.due_at).slice(0, 10) : '';
+      document.getElementById('m-assignee').value = m.assignee_user_id || m.assignee_id || '';
+      if (m.entity_type && m.entity_id) {
+        newMissionEntity = { entity_type: m.entity_type, entity_id: m.entity_id };
+        document.getElementById('m-entity-selected').innerHTML =
+          `<span style="font-size:0.84rem">${getEntityIcon(m.entity_type)} ${escHtml(m.entity_name || (m.entity_type + ' #' + m.entity_id))} <span style="cursor:pointer;color:var(--m-red)" onclick="clearEntity()">✕</span></span>`;
+      } else {
+        newMissionEntity = null;
+        document.getElementById('m-entity-selected').innerHTML = '';
+      }
+      document.getElementById('m-entity-results').style.display = 'none';
+      // Watchers + TG-notify are not editable via PATCH — hide in edit mode
+      document.getElementById('mf-watchers').style.display = 'none';
+      document.getElementById('mf-notify').style.display = 'none';
+      switchTitleLang('ru');
+      switchDescLang('ru');
+    }
+
     function closeNewMissionModal() {
+      editingMissionId = null;
       document.getElementById('modal-new-mission').classList.remove('open');
     }
 
@@ -891,6 +982,30 @@
         return;
       }
       try {
+        if (editingMissionId) {
+          // Edit mode → PATCH only the editable content fields
+          const patch = {
+            title_ru: payload.title_ru, title_en: payload.title_en, title_th: payload.title_th,
+            description_ru: payload.description_ru, description_en: payload.description_en, description_th: payload.description_th,
+            priority: payload.priority,
+            due_at: payload.due_at,
+            assignee_user_id: payload.assignee_user_id,
+          };
+          if (newMissionEntity) {
+            patch.entity_type = newMissionEntity.entity_type;
+            patch.entity_id = newMissionEntity.entity_id;
+          } else {
+            patch.entity_type = '';
+            patch.entity_id = '';
+          }
+          const editedId = editingMissionId;
+          await apiFetch(`/missions/${editedId}`, { method: 'PATCH', body: JSON.stringify(patch) });
+          showToast(t('saved'));
+          closeNewMissionModal();
+          await loadDashboard();
+          if (missionsData.find(x => x.id === editedId)) openMission(editedId);
+          return;
+        }
         await apiFetch('/missions', { method: 'POST', body: JSON.stringify(payload) });
         showToast(t('saved'));
         closeNewMissionModal();
