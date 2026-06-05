@@ -321,6 +321,13 @@
       return m['title_' + currentLang] || m.title || m.title_en || m.title_th || '';
     }
 
+    function getMissionDescription(m) {
+      if (!m) return '';
+      // Russian is stored in the base `description` column (no `description_ru` field exists).
+      if (currentLang === 'ru') return m.description || m.description_en || m.description_th || '';
+      return m['description_' + currentLang] || m.description || m.description_en || m.description_th || '';
+    }
+
     function getUserName(userId) {
       const u = usersCache[userId];
       if (!u) return '—';
@@ -471,6 +478,14 @@
 
       const body = document.getElementById('sp-body');
       let html = '';
+
+      // Description (main text) — right after the title
+      const desc = getMissionDescription(m);
+      if (desc) {
+        html += `<div class="sp-field sp-description">
+          <div style="white-space:pre-wrap;word-break:break-word;font-size:0.9rem;line-height:1.45">${escHtml(desc)}</div>
+        </div>`;
+      }
 
       // Status
       html += `<div class="sp-field">
