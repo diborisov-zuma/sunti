@@ -7,6 +7,12 @@ const PROJECT  = 'project-9718e7d4-4cd7-4f52-8d6';
 const DATASET  = 'sunti';
 const SIGN_TTL_MS = 10 * 60 * 1000;
 
+// Project-documentation tables (read-only access from the portal)
+const docTable = `\`${PROJECT}.${DATASET}.project_docs\``;
+const verTable = `\`${PROJECT}.${DATASET}.project_doc_versions\``;
+const catTable = `\`${PROJECT}.${DATASET}.project_doc_categories\``;
+const vfTable  = `\`${PROJECT}.${DATASET}.project_doc_version_files\``;
+
 function setCors(res) {
   res.set('Access-Control-Allow-Origin', '*');
   res.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
@@ -103,11 +109,7 @@ exports.portal_contracts = async (req, res) => {
   if (!portalUser || !portalUser.is_active) { res.status(403).json({ error: 'No portal access' }); return; }
 
   const sections = await getPortalSections(portalUser.id);
-  if (!sections.contracts) { res.status(403).json({ error: 'No access to contracts section' }); return; }
-
-  const accessLevel = sections.contracts; // 'full' or 'no_amounts'
   const folderIds = await getPortalFolders(portalUser.id);
-  if (!folderIds.length) { res.json([]); return; }
 
   const cTable   = `\`${PROJECT}.${DATASET}.contracts\``;
   const invTable = `\`${PROJECT}.${DATASET}.invoices\``;
@@ -129,6 +131,132 @@ exports.portal_contracts = async (req, res) => {
       res.json({ user: { id: portalUser.id, email: portalUser.email, name: portalUser.name }, sections, folders });
       return;
     }
+
+    // ─────────────────────────────────────────────────────────────
+    // Project documentation — READ-ONLY for the portal.
+    // Gated by the `documentation` section; restricted to the buyer's
+    // own folders. No create/edit/upload/delete is exposed here.
+    // ─────────────────────────────────────────────────────────────
+    if (path === '/docs' || path.startsWith('/docs/')) {
+      if (!sections.documentation) { res.status(403).json({ error: 'No access to documentation section' }); return; }
+      const parts = path.split('/').filter(Boolean); // ['docs', ...]
+
+      // GET /docs/files/:fileId/download — signed download URL for a file
+      if (parts[1] === 'files' && parts[3] === 'download') {
+        const fileId = parts[2];
+        let fileUrl, fileName, folderId;
+        const [vf] = await bigquery.query({
+          query: `SELECT vf.file_url, vf.file_name, d.folder_id
+                  FROM ${vfTable} vf JOIN ${docTable} d ON d.id = vf.document_id
+                  WHERE vf.id = @id`,
+          params: { id: fileId },
+        });
+        if (vf.length) {
+          fileUrl = vf[0].file_url; fileName = vf[0].file_name; folderId = vf[0].folder_id;
+        } else {
+          // legacy: file stored directly on the version row
+          const [lg] = await bigquery.query({
+            query: `SELECT v.file_url, v.file_name, d.folder_id
+                    FROM ${verTable} v JOIN ${docTable} d ON d.id = v.document_id
+                    WHERE v.id = @id`,
+            params: { id: fileId },
+          });
+          if (!lg.length) { res.status(404).json({ error: 'Not found' }); return; }
+          fileUrl = lg[0].file_url; fileName = lg[0].file_name; folderId = lg[0].folder_id;
+        }
+        if (!folderIds.includes(folderId)) { res.status(403).json({ error: 'Forbidden' }); return; }
+        const parsed = parseKey(fileUrl);
+        if (!parsed) { res.status(500).json({ error: 'Bad file URL' }); return; }
+        const isView = req.query.view === 'true';
+        const disposition = isView
+          ? `inline; filename="${encodeURIComponent(fileName || 'file')}"`
+          : `attachment; filename="${encodeURIComponent(fileName || 'file')}"`;
+        const [url] = await storage.bucket(parsed.bucket).file(parsed.key).getSignedUrl({
+          version: 'v4', action: 'read',
+          expires: Date.now() + SIGN_TTL_MS,
+          responseDisposition: disposition,
+        });
+        res.json({ url });
+        return;
+      }
+
+      // GET /docs/versions/:verId/files — files within a version
+      if (parts[1] === 'versions' && parts[3] === 'files') {
+        const verId = parts[2];
+        const [vrow] = await bigquery.query({
+          query: `SELECT d.folder_id FROM ${verTable} v JOIN ${docTable} d ON d.id = v.document_id WHERE v.id = @id`,
+          params: { id: verId },
+        });
+        if (!vrow.length || !folderIds.includes(vrow[0].folder_id)) { res.status(403).json({ error: 'Forbidden' }); return; }
+        const [files] = await bigquery.query({
+          query: `SELECT id, file_url, file_name, file_size, uploaded_at
+                  FROM ${vfTable} WHERE version_id = @verId ORDER BY uploaded_at ASC`,
+          params: { verId },
+        });
+        const [verRows] = await bigquery.query({
+          query: `SELECT id, file_name, file_size FROM ${verTable}
+                  WHERE id = @id AND file_url IS NOT NULL AND file_url != ''`,
+          params: { id: verId },
+        });
+        const legacyFiles = verRows.map(v => ({ id: v.id, file_name: v.file_name, file_size: v.file_size, legacy: true }));
+        res.json([...legacyFiles, ...files]);
+        return;
+      }
+
+      // GET /docs/:docId/versions — version history for a document
+      if (parts.length === 3 && parts[2] === 'versions') {
+        const docId = parts[1];
+        const [drow] = await bigquery.query({
+          query: `SELECT folder_id FROM ${docTable} WHERE id = @id`,
+          params: { id: docId },
+        });
+        if (!drow.length || !folderIds.includes(drow[0].folder_id)) { res.status(403).json({ error: 'Forbidden' }); return; }
+        const [rows] = await bigquery.query({
+          query: `SELECT v.id, v.document_id, v.version_number, v.file_name, v.file_size, v.notes, v.uploaded_at,
+                         (SELECT COUNT(*) FROM ${vfTable} vf WHERE vf.version_id = v.id) AS files_count
+                  FROM ${verTable} v WHERE v.document_id = @docId ORDER BY v.version_number DESC`,
+          params: { docId },
+        });
+        res.json(rows);
+        return;
+      }
+
+      // GET /docs?folder_id=X — categories + documents for a folder
+      if (parts.length === 1) {
+        const folderId = req.query.folder_id;
+        if (!folderId) { res.status(400).json({ error: 'folder_id required' }); return; }
+        if (!folderIds.includes(folderId)) { res.status(403).json({ error: 'Forbidden' }); return; }
+        const [cats] = await bigquery.query({
+          query: `SELECT * FROM ${catTable} WHERE folder_id = @fid ORDER BY sort_order ASC`,
+          params: { fid: folderId },
+        });
+        const [rows] = await bigquery.query({
+          query: `SELECT d.id, d.folder_id, d.category_id, d.name, d.description,
+                         d.current_version, d.sort_order, d.status,
+                         c.name AS category_name, c.name_en AS category_name_en,
+                         v.file_name AS latest_file_name, v.file_size AS latest_file_size,
+                         v.notes AS latest_notes, v.uploaded_at AS latest_uploaded_at,
+                         v.id AS latest_version_id,
+                         (SELECT COUNT(*) FROM ${vfTable} vf WHERE vf.version_id = v.id) AS latest_files_count
+                  FROM ${docTable} d
+                  LEFT JOIN ${catTable} c ON d.category_id = c.id
+                  LEFT JOIN ${verTable} v ON v.document_id = d.id AND v.version_number = d.current_version
+                  WHERE d.folder_id = @fid AND IFNULL(d.status, 'active') != 'archived'
+                  ORDER BY c.sort_order ASC, d.sort_order ASC, d.name ASC`,
+          params: { fid: folderId },
+        });
+        res.json({ rows, categories: cats, access_level: 'viewer' });
+        return;
+      }
+
+      res.status(404).json({ error: 'Not found' });
+      return;
+    }
+
+    // ─── Everything below requires the contracts section ───
+    if (!sections.contracts) { res.status(403).json({ error: 'No access to contracts section' }); return; }
+    const accessLevel = sections.contracts; // 'full' or 'no_amounts'
+    if (!folderIds.length) { res.json([]); return; }
 
     // GET /portal_contracts/files/:id/download — signed download URL
     if (path.includes('/files/') && path.endsWith('/download')) {

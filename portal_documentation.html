@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sunti — Documentation</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="stylesheet" href="style.css">
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script src="_pdf_viewer.js"></script>
+  <script src="_i18n.js"></script>
+  <script src="_config.js"></script>
+  <style>
+    /* Portal header (shared look with portal_gantt.html) */
+    .portal-header { background:#fff;border-bottom:1px solid #e8e8e8;padding:0 24px;height:56px;display:flex;align-items:center;gap:16px;position:sticky;top:0;z-index:100; }
+    .portal-header .logo { font-size:1.1rem;font-weight:600;color:#222;text-decoration:none; }
+    .portal-header .nav { display:flex;align-items:center;gap:4px;flex:1;padding-left:24px; }
+    .portal-header .nav-link { padding:6px 14px;border-radius:6px;font-size:0.88rem;color:#555;text-decoration:none;cursor:pointer; }
+    .portal-header .nav-link.active { background:#e8f0fe;color:#1a73e8;font-weight:500; }
+    .portal-header .header-right { display:flex;align-items:center;gap:12px; }
+    .lang-switcher .lang-btn { background:none;border:1px solid #ddd;border-radius:6px;padding:3px 8px;font-size:0.75rem;color:#666;cursor:pointer; }
+    .lang-switcher .lang-btn.active { background:#1a73e8;color:#fff;border-color:#1a73e8; }
+
+    #guest-view { text-align:center;padding:80px 24px; }
+    #guest-view h2 { color:#222;margin-bottom:8px; }
+    #guest-view p { color:#888;margin-bottom:24px; }
+    #portal-signin { display:flex;justify-content:center; }
+
+    .sidebar { width:286px; }
+
+    .cat-item {
+      display:flex;align-items:center;gap:6px;
+      padding:6px 12px;cursor:pointer;font-size:0.88rem;color:#333;
+      border-radius:6px;margin:1px 6px;transition:background 0.1s;
+    }
+    .cat-item:hover { background:#f4f4f4; }
+    .cat-item.active { background:#e8f0fe; }
+    .cat-item.active .cat-name { color:#1a73e8;font-weight:500; }
+    .cat-name { flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
+
+    select.filter-select {
+      border:1px solid #ddd;border-radius:6px;padding:6px 10px;font-size:0.85rem;color:#333;outline:none;background:#fff;cursor:pointer;
+    }
+    select.filter-select:focus { border-color:#1a73e8; }
+
+    .doc-card { background:#fff;border:1px solid #e8e8e8;border-radius:10px;padding:14px 18px;margin-bottom:10px;transition:border-color 0.15s; }
+    .doc-card:hover { border-color:#1a73e8; }
+    .doc-card-header { display:flex;justify-content:space-between;align-items:center;gap:12px; }
+    .doc-card-name { font-size:0.95rem;font-weight:500;color:#222;flex:1; }
+    .doc-card-version { font-size:0.78rem;color:#1a73e8;font-weight:600; }
+    .doc-card-meta { font-size:0.78rem;color:#999;margin-top:4px; }
+    .doc-card-desc { font-size:0.84rem;color:#666;margin-top:6px; }
+
+    .version-list { margin-top:10px;padding-top:8px;border-top:1px solid #f0f0f0; }
+    .version-row { display:flex;align-items:center;gap:10px;padding:4px 0;font-size:0.82rem; }
+    .version-row .v-num { font-weight:600;color:#1a73e8;min-width:28px; }
+    .version-row .v-date { color:#888;min-width:80px; }
+    .version-row .v-file { color:#333;flex:1; }
+    .version-row .v-notes { color:#666;font-style:italic;flex:2; }
+
+    .empty-state { text-align:center;padding:64px 24px;color:#bbb; }
+    .loading { text-align:center;padding:48px;color:#bbb; }
+    .badge-current { background:#e6f4ea;color:#1e8e3e;padding:1px 6px;border-radius:8px;font-size:0.68rem;font-weight:600; }
+  </style>
+</head>
+<body>
+
+  <!-- Portal header -->
+  <div class="portal-header" id="portal-header" style="display:none">
+    <a class="logo" href="portal.html">Sunti</a>
+    <div class="nav">
+      <a class="nav-link" id="portal-nav-contracts" href="portal.html"></a>
+      <a class="nav-link" id="portal-nav-materials" href="portal.html#materials" style="display:none"></a>
+      <a class="nav-link" id="portal-nav-gantt" href="portal_gantt.html" style="display:none"></a>
+      <a class="nav-link active" id="portal-nav-docs" href="portal_documentation.html"></a>
+    </div>
+    <div class="header-right">
+      <div class="lang-switcher">
+        <button class="lang-btn" data-lang="ru" onclick="setLang('ru')">RU</button>
+        <button class="lang-btn" data-lang="en" onclick="setLang('en')">EN</button>
+        <button class="lang-btn" data-lang="th" onclick="setLang('th')">TH</button>
+      </div>
+      <div id="portal-user-info" style="display:flex;align-items:center;gap:8px">
+        <span id="portal-user-name" style="font-size:0.85rem;color:#333"></span>
+        <button class="btn btn-outline" onclick="portalLogout()" id="portal-logout-btn"></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Guest / sign-in -->
+  <div id="guest-view">
+    <h2 id="t-portal-welcome"></h2>
+    <p id="t-portal-login-hint"></p>
+    <div id="portal-signin">
+      <div id="g_id_onload"
+        data-client_id="6445860840-9bfshkstrc2vra49qi847ie9od38614t.apps.googleusercontent.com"
+        data-callback="handlePortalCredential"
+        data-auto_prompt="false"
+        data-itp_support="true">
+      </div>
+      <div class="g_id_signin"
+        data-type="standard" data-size="large" data-theme="outline"
+        data-text="signin_with" data-shape="rectangular">
+      </div>
+    </div>
+    <div id="auth-error-display" style="display:none;margin-top:24px;padding:12px 16px;background:#fce8e6;border-radius:8px;color:#c5221f;font-size:0.85rem;max-width:400px;margin-left:auto;margin-right:auto;text-align:left"></div>
+  </div>
+
+  <!-- App -->
+  <div id="app-view" style="display:none">
+    <div class="layout">
+      <div class="sidebar">
+        <div class="sidebar-header">
+          <span class="sidebar-title" id="t-categories-title"></span>
+        </div>
+        <div style="padding:8px">
+          <select class="filter-select" id="filter-folder" style="width:100%">
+            <option value="">—</option>
+          </select>
+        </div>
+        <div id="cat-list" style="flex:1;overflow-y:auto;padding:4px 0"></div>
+      </div>
+      <div class="main-area" id="doc-main">
+        <div class="empty-state" id="t-select-project"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    // ─── Portal Auth (same model as portal.html / portal_gantt.html) ───
+
+    let portalUser = null;
+    let portalSections = {};
+    let portalFolders = [];
+    let _portalAccessToken = null;
+    let _portalLoginHint = null;
+    let _tokenRefreshTimer = null;
+
+    // ─── Documentation state ───
+    let allDocs = [];
+    let categories = [];
+    let selectedFolder = '';
+    let selectedCategory = '';
+    let expandedDocs = {};
+    let docVersions = {};
+    let versionFilesCache = {}; // verId → [files]
+
+    function showToast(msg, type) {
+      const el = document.getElementById('toast');
+      el.textContent = msg; el.className = 'toast show' + (type ? ' ' + type : '');
+      clearTimeout(el._t); el._t = setTimeout(() => el.className = 'toast', 3000);
+    }
+
+    function showAuthError(email, error, step) {
+      const el = document.getElementById('auth-error-display');
+      if (el) {
+        el.style.display = 'block';
+        el.innerHTML = `<strong>Login error:</strong> ${error}<br><small>Step: ${step} | Account: ${email || '?'}</small>`;
+      }
+    }
+
+    function logAuthError(email, error, step) {
+      try {
+        fetch(`${API_URL}/portal_contracts/log-error`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: email || 'unknown', error: String(error), step }),
+        }).catch(() => {});
+      } catch(_) {}
+    }
+
+    async function handlePortalCredential(response) {
+      const credential = response.credential;
+      if (!credential) { showAuthError('', 'No credential in response', 'callback_empty'); return; }
+      const payload = JSON.parse(atob(credential.split('.')[1]));
+      const loginHint = payload.email;
+
+      _portalAccessToken = credential;
+      _portalLoginHint = loginHint;
+      sessionStorage.setItem('portal_token', credential);
+      sessionStorage.setItem('portal_hint', loginHint);
+
+      try {
+        await initApp();
+        upgradeToAccessToken(loginHint);
+      } catch(e) {
+        logAuthError(loginHint, e.message, 'initApp_idtoken');
+        showAuthError(loginHint, e.message, 'initApp_idtoken');
+      }
+    }
+
+    function upgradeToAccessToken(loginHint) {
+      try {
+        const tokenClient = google.accounts.oauth2.initTokenClient({
+          client_id: '6445860840-9bfshkstrc2vra49qi847ie9od38614t.apps.googleusercontent.com',
+          scope: 'email profile',
+          hint: loginHint,
+          callback: (tokenResponse) => {
+            if (!tokenResponse.error) {
+              _portalAccessToken = tokenResponse.access_token;
+              sessionStorage.setItem('portal_token', tokenResponse.access_token);
+              scheduleTokenRefresh();
+            }
+          },
+        });
+        tokenClient.requestAccessToken();
+      } catch(_) {}
+    }
+
+    function scheduleTokenRefresh() {
+      if (_tokenRefreshTimer) clearTimeout(_tokenRefreshTimer);
+      _tokenRefreshTimer = setTimeout(() => {
+        if (_portalLoginHint) upgradeToAccessToken(_portalLoginHint);
+      }, 50 * 60 * 1000);
+    }
+
+    async function portalFetch(path, options = {}) {
+      const res = await fetch(`${API_URL}${path}`, {
+        ...options,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${_portalAccessToken}`,
+          ...(options.headers || {}),
+        },
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: res.statusText }));
+        throw new Error(err.error || res.statusText);
+      }
+      return res.json();
+    }
+
+    async function initApp() {
+      try {
+        const me = await portalFetch('/portal_contracts/me');
+        portalUser = me.user;
+        portalSections = me.sections;
+        portalFolders = me.folders;
+
+        document.getElementById('guest-view').style.display = 'none';
+        document.getElementById('app-view').style.display = 'block';
+        document.getElementById('portal-header').style.display = 'flex';
+        document.getElementById('portal-user-name').textContent = portalUser.name || portalUser.email;
+
+        // Nav links visibility
+        const navContracts = document.getElementById('portal-nav-contracts');
+        const navMaterials = document.getElementById('portal-nav-materials');
+        const navGantt = document.getElementById('portal-nav-gantt');
+        const navDocs = document.getElementById('portal-nav-docs');
+        if (navContracts) navContracts.style.display = portalSections.contracts ? '' : 'none';
+        if (navMaterials) navMaterials.style.display = portalSections.materials ? '' : 'none';
+        if (navGantt) navGantt.style.display = portalSections.gantt ? '' : 'none';
+        if (navDocs) navDocs.style.display = portalSections.documentation ? '' : 'none';
+
+        // Documentation access gate
+        if (!portalSections.documentation) {
+          document.getElementById('app-view').innerHTML =
+            '<div style="text-align:center;padding:80px 24px;color:#999">Access denied</div>';
+          return;
+        }
+
+        fillFolderSelect();
+        updateTexts();
+      } catch(e) {
+        console.error('Portal initApp error:', e);
+        logAuthError(_portalLoginHint, e.message, 'initApp');
+        sessionStorage.removeItem('portal_token');
+        sessionStorage.removeItem('portal_hint');
+        _portalAccessToken = null;
+        document.getElementById('guest-view').style.display = 'block';
+        document.getElementById('app-view').style.display = 'none';
+        document.getElementById('portal-header').style.display = 'none';
+        showAuthError(_portalLoginHint, e.message, 'initApp');
+      }
+    }
+
+    async function tryRestoreSession() {
+      const savedToken = sessionStorage.getItem('portal_token');
+      const savedHint = sessionStorage.getItem('portal_hint');
+      if (savedToken) {
+        _portalAccessToken = savedToken;
+        _portalLoginHint = savedHint;
+        scheduleTokenRefresh();
+        await initApp();
+      }
+    }
+
+    function portalLogout() {
+      _portalAccessToken = null;
+      _portalLoginHint = null;
+      if (_tokenRefreshTimer) clearTimeout(_tokenRefreshTimer);
+      sessionStorage.removeItem('portal_token');
+      sessionStorage.removeItem('portal_hint');
+      portalUser = null;
+      document.getElementById('guest-view').style.display = 'block';
+      document.getElementById('app-view').style.display = 'none';
+      document.getElementById('portal-header').style.display = 'none';
+    }
+
+    // ─── Texts ───
+
+    function updateTexts() {
+      document.getElementById('t-portal-welcome').textContent = t('portalWelcome');
+      document.getElementById('t-portal-login-hint').textContent = t('guestSub');
+      document.getElementById('portal-nav-contracts').textContent = t('portalContracts');
+      document.getElementById('portal-nav-materials').textContent = t('navMaterials');
+      document.getElementById('portal-nav-gantt').textContent = 'Gantt';
+      document.getElementById('portal-nav-docs').textContent = t('navDocs');
+      document.getElementById('portal-logout-btn').textContent = t('logout');
+      document.getElementById('t-categories-title').textContent = t('docCategories');
+      const selProj = document.getElementById('t-select-project');
+      if (selProj) selProj.textContent = t('portalSelectProject');
+      document.querySelectorAll('.lang-btn').forEach(b => b.classList.toggle('active', b.dataset.lang === currentLang));
+    }
+
+    // ─── Helpers ───
+
+    function formatDate(val) {
+      if (!val) return '—';
+      const d = new Date(val.value || val);
+      if (isNaN(d)) return '—';
+      return `${String(d.getUTCDate()).padStart(2,'0')}.${String(d.getUTCMonth()+1).padStart(2,'0')}.${d.getUTCFullYear()}`;
+    }
+    function catLabel(c) { return c['name_' + currentLang] || c.name || c.name_en || '—'; }
+
+    // ─── Folder filter ───
+
+    function fillFolderSelect() {
+      const sel = document.getElementById('filter-folder');
+      sel.innerHTML = `<option value="">${t('portalSelectProject')}</option>`;
+      portalFolders.forEach(f => {
+        if (f.status === 'archive') return;
+        const opt = document.createElement('option');
+        opt.value = f.id; opt.textContent = f.name;
+        sel.appendChild(opt);
+      });
+    }
+
+    document.getElementById('filter-folder').addEventListener('change', e => {
+      selectedFolder = e.target.value;
+      selectedCategory = '';
+      if (selectedFolder) loadDocs();
+      else document.getElementById('doc-main').innerHTML = `<div class="empty-state">${t('portalSelectProject')}</div>`;
+    });
+
+    async function loadDocs() {
+      const main = document.getElementById('doc-main');
+      main.innerHTML = `<div class="loading">${t('loading')}</div>`;
+      try {
+        const data = await portalFetch(`/portal_contracts/docs?folder_id=${selectedFolder}`);
+        allDocs = data.rows || [];
+        categories = data.categories || [];
+        expandedDocs = {};
+        docVersions = {};
+        versionFilesCache = {};
+        renderCategories();
+        renderDocs();
+      } catch(e) { main.innerHTML = `<div class="empty-state">${e.message}</div>`; }
+    }
+
+    function renderCategories() {
+      const list = document.getElementById('cat-list');
+      list.innerHTML = `<div class="cat-item ${!selectedCategory ? 'active' : ''}" data-cat-id=""><span class="cat-name">${t('allCategories')}</span></div>`;
+      categories.forEach(c => {
+        list.innerHTML += `<div class="cat-item ${selectedCategory === c.id ? 'active' : ''}" data-cat-id="${c.id}"><span class="cat-name">${catLabel(c)}</span></div>`;
+      });
+    }
+
+    document.getElementById('cat-list').addEventListener('click', e => {
+      const item = e.target.closest('.cat-item');
+      if (!item) return;
+      selectedCategory = item.dataset.catId;
+      renderCategories();
+      renderDocs();
+    });
+
+    function renderDocs() {
+      const main = document.getElementById('doc-main');
+      let filtered = allDocs;
+      if (selectedCategory) filtered = filtered.filter(d => d.category_id === selectedCategory);
+
+      if (!filtered.length) {
+        main.innerHTML = `<div class="empty-state">${t('noDocuments')}</div>`;
+        return;
+      }
+
+      let html = '';
+      filtered.forEach(d => {
+        const isExp = expandedDocs[d.id];
+        const catName = d.category_name_en || d.category_name || '';
+        html += `<div class="doc-card" data-doc-id="${d.id}">
+          <div class="doc-card-header">
+            <div class="doc-card-name">${d.name || '—'}</div>
+            <div style="display:flex;gap:6px;align-items:center">
+              <span class="doc-card-version">v${d.current_version || 0}</span>
+              ${d.latest_version_id && d.latest_file_name ? `<button class="btn btn-outline" style="padding:2px 8px;font-size:0.75rem" data-action="download" data-ver-id="${d.latest_version_id}">${t('download')}</button>` : ''}
+            </div>
+          </div>
+          ${catName ? `<div class="doc-card-meta">${catName}</div>` : ''}
+          ${d.description ? `<div class="doc-card-desc">${d.description}</div>` : ''}
+          ${d.latest_files_count > 0 || d.latest_file_name ? `<div class="doc-card-meta">${d.latest_files_count > 0 ? d.latest_files_count + ' ' + t('filesCount') : (d.latest_file_name || '')} · ${formatDate(d.latest_uploaded_at)}${d.latest_notes ? ' · ' + d.latest_notes : ''}</div>` : ''}
+          <div style="margin-top:6px">
+            <button style="background:none;border:none;cursor:pointer;font-size:0.78rem;color:#1a73e8" data-action="toggle-versions" data-doc-id="${d.id}">${isExp ? '▾' : '▸'} ${t('versionHistory')} ${d.current_version ? '('+d.current_version+')' : ''}</button>
+          </div>
+          ${isExp ? `<div class="version-list" id="versions-${d.id}">${docVersions[d.id] ? renderVersions(d.id) : '<div class="loading" style="padding:8px">'+t('loading')+'</div>'}</div>` : ''}
+        </div>`;
+      });
+
+      main.innerHTML = html;
+
+      filtered.forEach(d => {
+        if (expandedDocs[d.id] && !docVersions[d.id]) loadVersions(d.id);
+      });
+    }
+
+    async function loadVersions(docId) {
+      try {
+        const rows = await portalFetch(`/portal_contracts/docs/${docId}/versions`);
+        docVersions[docId] = rows;
+        const el = document.getElementById(`versions-${docId}`);
+        if (el) el.innerHTML = renderVersions(docId);
+      } catch(e) { console.error(e); }
+    }
+
+    function renderVersions(docId) {
+      const versions = docVersions[docId] || [];
+      if (!versions.length) return `<div style="color:#bbb;font-size:0.82rem">—</div>`;
+      return versions.map((v, i) => {
+        const fc = parseInt(v.files_count) || 0;
+        const hasLegacyFile = v.file_name && v.file_url;
+        const totalFiles = fc + (hasLegacyFile ? 1 : 0);
+        const filesLoaded = versionFilesCache[v.id];
+        const isFilesOpen = filesLoaded && filesLoaded.length > 0;
+        let html = `<div style="border-bottom:1px solid #f0f0f0;padding:6px 0">
+          <div class="version-row">
+            <span class="v-num">v${v.version_number}</span>
+            ${i === 0 ? `<span class="badge-current">${t('currentVersion')}</span>` : ''}
+            <span class="v-date">${formatDate(v.uploaded_at)}</span>
+            <span class="v-file">${totalFiles} ${t('filesCount')}</span>
+            <span class="v-notes">${v.notes || ''}</span>
+            <button class="btn btn-outline" style="padding:1px 6px;font-size:0.72rem" data-action="show-ver-files" data-ver-id="${v.id}" data-doc-id="${docId}">${isFilesOpen ? '▾' : '▸'} ${t('file')}</button>
+          </div>`;
+        if (isFilesOpen) {
+          html += `<div style="padding:4px 0 4px 32px" id="ver-files-${v.id}">`;
+          filesLoaded.forEach(f => {
+            const size = f.file_size > 1048576 ? (f.file_size/1048576).toFixed(1)+' MB' : Math.round((f.file_size||0)/1024)+' KB';
+            const isPdf = (f.file_name || '').toLowerCase().endsWith('.pdf');
+            const isImg = /\.(jpg|jpeg|png|gif|webp|svg)$/i.test(f.file_name || '');
+            const fileIcon = isPdf ? '📄' : (isImg ? '🖼' : '📎');
+            html += `<div style="display:flex;align-items:center;gap:8px;padding:3px 0;font-size:0.8rem">
+              ${isPdf || isImg ? `<button style="background:none;border:none;cursor:pointer;font-size:0.9rem;padding:0" data-action="preview-file" data-ver-id="${f.id}" data-file-name="${(f.file_name||'').replace(/"/g,'&quot;')}" data-is-pdf="${isPdf}">👁</button>` : ''}
+              <span style="flex:1;color:#333">${fileIcon} ${f.file_name || '—'} <span style="color:#999">(${size})</span></span>
+              <button class="btn btn-outline" style="padding:1px 6px;font-size:0.7rem" data-action="download" data-ver-id="${f.id}">${t('download')}</button>
+            </div>`;
+          });
+          html += `</div>`;
+        }
+        html += `</div>`;
+        return html;
+      }).join('');
+    }
+
+    // ─── Actions (read-only) ───
+
+    document.addEventListener('click', async e => {
+      const btn = e.target.closest('[data-action]');
+      if (!btn) return;
+      const action = btn.dataset.action;
+
+      if (action === 'toggle-versions') {
+        const docId = btn.dataset.docId;
+        expandedDocs[docId] = !expandedDocs[docId];
+        renderDocs();
+        return;
+      }
+
+      if (action === 'show-ver-files') {
+        const verId = btn.dataset.verId;
+        const docId = btn.dataset.docId;
+        if (versionFilesCache[verId]) {
+          delete versionFilesCache[verId];
+          const el = document.getElementById(`versions-${docId}`);
+          if (el) el.innerHTML = renderVersions(docId);
+        } else {
+          try {
+            const files = await portalFetch(`/portal_contracts/docs/versions/${verId}/files`);
+            versionFilesCache[verId] = files;
+            const el = document.getElementById(`versions-${docId}`);
+            if (el) el.innerHTML = renderVersions(docId);
+          } catch(err) { showToast(err.message, 'error'); }
+        }
+        return;
+      }
+
+      if (action === 'preview-file') {
+        try {
+          const r = await portalFetch(`/portal_contracts/docs/files/${btn.dataset.verId}/download?view=true`);
+          if (r.url) {
+            if (btn.dataset.isPdf === 'true') {
+              openPdfViewer(r.url, btn.dataset.fileName || 'PDF');
+            } else {
+              let lb = document.getElementById('image-lightbox');
+              if (!lb) {
+                lb = document.createElement('div');
+                lb.id = 'image-lightbox';
+                lb.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.85);z-index:300;display:flex;align-items:center;justify-content:center;cursor:pointer';
+                lb.innerHTML = '<img style="max-width:90vw;max-height:90vh;border-radius:8px;box-shadow:0 4px 24px rgba(0,0,0,0.5)">';
+                lb.addEventListener('click', () => lb.style.display = 'none');
+                document.body.appendChild(lb);
+              }
+              lb.querySelector('img').src = r.url;
+              lb.style.display = 'flex';
+            }
+          }
+        } catch(err) { showToast(err.message, 'error'); }
+        return;
+      }
+
+      if (action === 'download') {
+        try {
+          const r = await portalFetch(`/portal_contracts/docs/files/${btn.dataset.verId}/download`);
+          if (r.url) window.open(r.url, '_blank');
+        } catch(err) { showToast(err.message, 'error'); }
+        return;
+      }
+    });
+
+    // ─── Lang change ───
+    window.onLangChange = () => {
+      updateTexts();
+      if (allDocs.length) { renderCategories(); renderDocs(); }
+    };
+
+    // ─── Init ───
+    updateTexts();
+    tryRestoreSession();
+  </script>
+</body>
+</html>
