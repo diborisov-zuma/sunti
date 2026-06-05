@@ -402,9 +402,16 @@
         { key: 'done', icon: '✅', label: t('missionDoneToday'), cls: 'done', collapsed: true },
       ];
 
+      const createdTs = (m) => {
+        const v = m && m.created_at ? (m.created_at.value || m.created_at) : '';
+        return v || '';
+      };
+
       let html = '';
       groupDefs.forEach(gd => {
         const items = groups[gd.key] || [];
+        // Sort within each group by creation date (date of entry), oldest first
+        items.sort((a, b) => createdTs(a).localeCompare(createdTs(b)));
         html += `<div class="mission-group">
           <div class="mission-group-header ${gd.cls}" onclick="toggleGroup(this)">
             <span class="group-icon">${gd.icon}</span>
