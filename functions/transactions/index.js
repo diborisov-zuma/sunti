@@ -227,7 +227,7 @@ exports.transactions = async (req, res) => {
     // PUT — редактировать транзакцию
     if (req.method === 'PUT') {
       const id = req.url.split('/').filter(Boolean).pop().split('?')[0];
-      const { date, amount, direction, account_id, counterparty_id, category_id, folder_id, invoice_id, contractor_id, description } = req.body;
+      const { date, amount, direction, account_id, counterparty_id, category_id, folder_id, invoice_id, contractor_id, contract_id, description } = req.body;
       if (!id || !date || !amount) { res.status(400).json({ error: 'id, date and amount are required' }); return; }
       if (parseFloat(amount) < 0) { res.status(400).json({ error: 'amount must be non-negative' }); return; }
       if (invoice_id) {
@@ -270,10 +270,16 @@ exports.transactions = async (req, res) => {
       }
       if (auditEntries.length) await logAudit(auditEntries);
 
+      // Preserve the contract link unless the caller explicitly changes it.
+      // (The generic transaction-edit form doesn't send contract_id; without this
+      //  the re-INSERT dropped contract_id, so direct contract payments vanished
+      //  from the contract and its paid_amount was never recalculated.)
+      const newContract = (contract_id !== undefined ? (contract_id || '') : (cur.contract_id || ''));
+
       await bigquery.query({ query: `DELETE FROM ${table} WHERE id = @id`, params: { id } });
       await bigquery.query({
-        query: `INSERT INTO ${table} (id, date, amount, direction, account_id, counterparty_id, category_id, invoice_id, folder_id, contractor_id, description, created_at)
-                VALUES (@id, @date, CAST(@amount AS NUMERIC), @direction, NULLIF(@account_id,''), NULLIF(@counterparty_id,''), NULLIF(@category_id,''), NULLIF(@invoice_id,''), NULLIF(@folder_id,''), NULLIF(@contractor_id,''), @description, TIMESTAMP(@created_at))`,
+        query: `INSERT INTO ${table} (id, date, amount, direction, account_id, counterparty_id, category_id, invoice_id, folder_id, contractor_id, contract_id, description, created_at)
+                VALUES (@id, @date, CAST(@amount AS NUMERIC), @direction, NULLIF(@account_id,''), NULLIF(@counterparty_id,''), NULLIF(@category_id,''), NULLIF(@invoice_id,''), NULLIF(@folder_id,''), NULLIF(@contractor_id,''), NULLIF(@contract_id,''), @description, TIMESTAMP(@created_at))`,
         params: {
           id,
           date,
@@ -285,6 +291,7 @@ exports.transactions = async (req, res) => {
           invoice_id:      (invoice_id !== undefined ? (invoice_id || '') : (cur.invoice_id || '')),
           folder_id:       folder_id       || cur.folder_id || '',
           contractor_id:   (contractor_id !== undefined ? (contractor_id || '') : (cur.contractor_id || '')),
+          contract_id:     newContract,
           description:     description     || '',
           created_at:      cur.created_at,
         },
@@ -293,6 +300,10 @@ exports.transactions = async (req, res) => {
       const newInv = (invoice_id !== undefined ? (invoice_id || '') : oldInv);
       if (oldInv) await recalcInvoicePaid(oldInv);
       if (newInv && newInv !== oldInv) await recalcInvoicePaid(newInv);
+      // Recalc direct-payment contract totals (both old and new contract if changed).
+      const oldContract = cur.contract_id || '';
+      if (oldContract) await recalcContractPaid(oldContract);
+      if (newContract && newContract !== oldContract) await recalcContractPaid(newContract);
       res.json({ success: true });
       return;
     }
@@ -317,7 +328,7 @@ exports.transactions = async (req, res) => {
         // Мягкое удаление — обновляем статус через DELETE+INSERT
         const [rows] = await bigquery.query({
           query: `SELECT date, amount, direction, account_id, counterparty_id, category_id,
-                         invoice_id, folder_id, contractor_id, description,
+                         invoice_id, folder_id, contractor_id, contract_id, description,
                          FORMAT_TIMESTAMP('%Y-%m-%dT%H:%M:%S', created_at) as created_at
                   FROM ${table} WHERE id = @id`,
           params: { id },
@@ -327,8 +338,8 @@ exports.transactions = async (req, res) => {
 
         await bigquery.query({ query: `DELETE FROM ${table} WHERE id = @id`, params: { id } });
         await bigquery.query({
-          query: `INSERT INTO ${table} (id, date, amount, direction, account_id, counterparty_id, category_id, invoice_id, folder_id, contractor_id, description, status, created_at)
-                  VALUES (@id, @date, CAST(@amount AS NUMERIC), @direction, NULLIF(@account_id,''), NULLIF(@counterparty_id,''), NULLIF(@category_id,''), NULLIF(@invoice_id,''), NULLIF(@folder_id,''), NULLIF(@contractor_id,''), @description, 'deleted', TIMESTAMP(@created_at))`,
+          query: `INSERT INTO ${table} (id, date, amount, direction, account_id, counterparty_id, category_id, invoice_id, folder_id, contractor_id, contract_id, description, status, created_at)
+                  VALUES (@id, @date, CAST(@amount AS NUMERIC), @direction, NULLIF(@account_id,''), NULLIF(@counterparty_id,''), NULLIF(@category_id,''), NULLIF(@invoice_id,''), NULLIF(@folder_id,''), NULLIF(@contractor_id,''), NULLIF(@contract_id,''), @description, 'deleted', TIMESTAMP(@created_at))`,
           params: {
             id,
             date:            cur.date,
@@ -340,12 +351,16 @@ exports.transactions = async (req, res) => {
             invoice_id:      cur.invoice_id      || '',
             folder_id:       cur.folder_id       || '',
             contractor_id:   cur.contractor_id   || '',
+            contract_id:     cur.contract_id     || '',
             description:     cur.description     || '',
             created_at:      cur.created_at,
           },
         });
       }
       if (linkedInv) await recalcInvoicePaid(linkedInv);
+      // Recalc the contract's paid_amount for direct (non-invoice) payments too.
+      const linkedContract = preRows[0]?.contract_id || '';
+      if (linkedContract) await recalcContractPaid(linkedContract);
 
       // Audit: log delete
       const delAuditCid = preRows[0]?.contract_id || (linkedInv ? await getContractIdForInvoice(linkedInv) : '');

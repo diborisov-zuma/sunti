@@ -954,6 +954,7 @@
       }
       // Edit/Delete buttons — top right
       html += `<div style="display:flex;justify-content:flex-end;gap:6px;margin-bottom:8px">
+        ${isAdmin ? `<button class="btn btn-outline" style="padding:4px 10px;font-size:0.78rem" data-action="recalc-contract" data-contract-id="${contractId}" title="${t('recalcContractHint')}">🔄 ${t('recalcContract')}</button>` : ''}
         <button class="btn btn-outline" style="padding:4px 10px;font-size:0.78rem" data-action="show-history" data-contract-id="${contractId}">🕐</button>
         <button class="btn btn-outline" style="padding:2px 8px;font-size:0.75rem" data-action="edit-contract" data-id="${contractId}">${t('edit')}</button>
         <button class="icon-btn" data-action="delete-contract" data-id="${contractId}" title="${t('delete')}">${ICON_TRASH}</button>
@@ -1271,6 +1272,19 @@
         try {
           await apiFetch(`/contracts/${btn.dataset.id}`, { method: 'DELETE' });
           showToast(t('deleted'), 'success'); loadContracts();
+        } catch(err) { showToast(err.message, 'error'); btn.disabled = false; }
+      }
+
+      if (action === 'recalc-contract') {
+        const cid = btn.dataset.contractId;
+        btn.disabled = true;
+        try {
+          const r = await apiFetch(`/contracts/${cid}/recalc`, { method: 'POST' });
+          // Update the cached contract so the list + footer reflect the fresh totals
+          const c = allContracts.find(x => x.id === cid);
+          if (c && r) { c.paid_amount = r.paid_amount; c.total_amount = r.total_amount; }
+          showToast(t('recalcDone'), 'success');
+          renderContracts(); // re-renders table + footer and reloads the expanded detail
         } catch(err) { showToast(err.message, 'error'); btn.disabled = false; }
       }
 

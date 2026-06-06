@@ -99,6 +99,36 @@ exports.contracts = async (req, res) => {
   if (!user) { res.status(403).json({ error: 'Forbidden' }); return; }
 
   try {
+    // POST /contracts/:id/recalc — admin-only: rebuild invoice + contract paid totals.
+    // Repair tool for when a payment edit/delete left stale sums.
+    if (req.method === 'POST' && path.endsWith('/recalc')) {
+      if (user.is_admin !== true) { res.status(403).json({ error: 'Admin only' }); return; }
+      const id = path.split('/').filter(Boolean)[0];
+      if (!id) { res.status(400).json({ error: 'id is required' }); return; }
+      const trxTable = `\`${PROJECT}.${DATASET}.transactions\``;
+      // 1) Recompute each linked invoice's paid_amount from its (non-deleted) transactions.
+      await bigquery.query({
+        query: `UPDATE ${invTable} AS i
+                SET paid_amount = IFNULL((
+                  SELECT SUM(CASE WHEN t.direction = i.direction THEN t.amount ELSE -t.amount END)
+                  FROM ${trxTable} AS t
+                  WHERE t.invoice_id = i.id AND IFNULL(t.status, 'active') != 'deleted'
+                ), 0)
+                WHERE i.contract_id = @id AND IFNULL(i.status, 'active') != 'deleted'`,
+        params: { id },
+      });
+      // 2) Recompute the contract's paid_amount (invoice paids + direct payments).
+      await recalcContractPaid(id);
+      const [rows] = await bigquery.query({
+        query: `SELECT total_amount, paid_amount FROM ${table} WHERE id = @id`,
+        params: { id },
+      });
+      if (!rows.length) { res.status(404).json({ error: 'Not found' }); return; }
+      await logAudit([{ entity_type: 'contract', entity_id: id, action: 'recalc', changed_by: email }]);
+      res.json({ success: true, total_amount: rows[0].total_amount, paid_amount: rows[0].paid_amount });
+      return;
+    }
+
     // GET /contracts/:id/invoices — список привязанных инвойсов
     if (req.method === 'GET' && path.endsWith('/invoices')) {
       const id = path.split('/').filter(Boolean)[0];
