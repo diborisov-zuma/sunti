@@ -183,7 +183,7 @@
           <button class="btn btn-primary" id="btn-new-mission" style="font-size:0.82rem;padding:5px 14px">+ Mission</button>
         </div>
         <div id="missions-list">
-          <div class="empty-state"><div class="icon">📋</div><div>Loading...</div></div>
+          <div class="empty-state"><div class="icon">📋</div><div id="t-missions-loading">Loading...</div></div>
         </div>
       </div>
     </div>
@@ -272,10 +272,10 @@
 
       <div class="modal-field" id="mf-notify" style="display:flex;gap:16px">
         <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
-          <input type="checkbox" id="m-notify-tg-assignee"> Notify assignee TG
+          <input type="checkbox" id="m-notify-tg-assignee"> <span id="t-notify-assignee">Notify assignee TG</span>
         </label>
         <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
-          <input type="checkbox" id="m-notify-tg-watchers"> Notify watchers TG
+          <input type="checkbox" id="m-notify-tg-watchers"> <span id="t-notify-watchers">Notify watchers TG</span>
         </label>
       </div>
 
@@ -395,12 +395,15 @@
       };
 
       missions.forEach(m => {
+        // Closed missions (done/cancelled) always go to the collapsed "done" group,
+        // regardless of any API-provided group — a cancelled mission must never
+        // appear under Overdue/Today even if its due date is in the past.
+        if (m.status === 'done' || m.status === 'completed' || m.status === 'cancelled') { groups.done.push(m); return; }
         if (m.group) {
           // API may provide a computed group
           if (groups[m.group]) { groups[m.group].push(m); return; }
         }
         // Fallback: compute client-side
-        if (m.status === 'done' || m.status === 'completed') { groups.done.push(m); return; }
         if (m.is_watching && m.assignee_user_id !== currentMe.id) { groups.watching.push(m); return; }
         if (!m.due_at) { groups.nodate.push(m); return; }
         const due = (m.due_at.value || m.due_at).slice(0, 10);
@@ -506,13 +509,13 @@
 
       // Status
       html += `<div class="sp-field">
-        <label>${t('missionPriority')}</label>
+        <label>${t('missionStatus')}</label>
         <select id="sp-status" onchange="changeStatus(this.value)">
-          <option value="open"${m.status==='open'?' selected':''}>Open</option>
-          <option value="in_progress"${m.status==='in_progress'?' selected':''}>In Progress</option>
-          <option value="blocked"${m.status==='blocked'?' selected':''}>Blocked</option>
-          <option value="done"${m.status==='done'?' selected':''}>Done</option>
-          <option value="cancelled"${m.status==='cancelled'?' selected':''}>Cancelled</option>
+          <option value="open"${m.status==='open'?' selected':''}>${t('statusOpen')}</option>
+          <option value="in_progress"${m.status==='in_progress'?' selected':''}>${t('statusInProgress')}</option>
+          <option value="blocked"${m.status==='blocked'?' selected':''}>${t('statusBlocked')}</option>
+          <option value="done"${m.status==='done'?' selected':''}>${t('statusDone')}</option>
+          <option value="cancelled"${m.status==='cancelled'?' selected':''}>${t('statusCancelled')}</option>
         </select>
       </div>`;
 
@@ -520,10 +523,10 @@
       html += `<div class="sp-field">
         <label>${t('missionPriority')}</label>
         <select id="sp-priority" onchange="changePriority(this.value)">
-          <option value="low"${m.priority==='low'?' selected':''}>Low</option>
-          <option value="normal"${m.priority==='normal'?' selected':''}>Normal</option>
-          <option value="high"${m.priority==='high'?' selected':''}>High</option>
-          <option value="urgent"${m.priority==='urgent'?' selected':''}>Urgent</option>
+          <option value="low"${m.priority==='low'?' selected':''}>${t('priorityLow')}</option>
+          <option value="normal"${m.priority==='normal'?' selected':''}>${t('priorityNormal')}</option>
+          <option value="high"${m.priority==='high'?' selected':''}>${t('priorityHigh')}</option>
+          <option value="urgent"${m.priority==='urgent'?' selected':''}>${t('priorityUrgent')}</option>
         </select>
       </div>`;
 
@@ -564,10 +567,10 @@
       // Comments
       html += `<div class="sp-field">
         <label>${t('missionComments')}</label>
-        <div id="sp-comments"><div style="color:var(--m-muted);font-size:0.82rem">Loading...</div></div>
+        <div id="sp-comments"><div style="color:var(--m-muted);font-size:0.82rem">${t('loading')}</div></div>
         <div class="comment-form">
-          <input type="text" id="sp-comment-input" placeholder="Add a comment...">
-          <button onclick="postComment()">Send</button>
+          <input type="text" id="sp-comment-input" placeholder="${t('addComment')}">
+          <button onclick="postComment()">${t('sendBtn')}</button>
         </div>
       </div>`;
 
@@ -576,7 +579,7 @@
         <div class="collapsible-header" onclick="this.nextElementSibling.classList.toggle('collapsed')">
           ${t('missionHistory')} ▸
         </div>
-        <div class="collapsible-body collapsed" id="sp-history"><div style="color:var(--m-muted);font-size:0.82rem">Loading...</div></div>
+        <div class="collapsible-body collapsed" id="sp-history"><div style="color:var(--m-muted);font-size:0.82rem">${t('loading')}</div></div>
       </div>`;
 
       body.innerHTML = html;
@@ -616,7 +619,7 @@
       try {
         const comments = await apiFetch(`/mission_comments?mission_id=${missionId}`);
         const el = document.getElementById('sp-comments');
-        if (!comments.length) { el.innerHTML = '<div style="color:var(--m-muted);font-size:0.82rem">No comments</div>'; return; }
+        if (!comments.length) { el.innerHTML = `<div style="color:var(--m-muted);font-size:0.82rem">${t('noComments')}</div>`; return; }
         el.innerHTML = comments.map(c => `<div class="comment-item">
           <span class="comment-author">${escHtml(getUserName(c.author_id))}</span>
           <span class="comment-date">${fmtDateDMY(c.created_at)}</span>
@@ -694,7 +697,7 @@
           body: JSON.stringify({ status: val })
         });
         selectedMission.status = val;
-        showToast('Status updated');
+        showToast(t('statusUpdated'));
       } catch (e) { showToast(e.message, true); }
     }
 
@@ -706,7 +709,7 @@
           body: JSON.stringify({ priority: val })
         });
         selectedMission.priority = val;
-        showToast('Priority updated');
+        showToast(t('priorityUpdated'));
       } catch (e) { showToast(e.message, true); }
     }
 
@@ -718,7 +721,7 @@
           body: JSON.stringify({ due_at: val || null })
         });
         selectedMission.due_at = val || null;
-        showToast('Due date updated');
+        showToast(t('dueUpdated'));
       } catch (e) { showToast(e.message, true); }
     }
 
@@ -746,7 +749,7 @@
           method: 'PATCH',
           body: JSON.stringify(body)
         });
-        showToast('Status updated');
+        showToast(t('statusUpdated'));
         closeSidePanel();
         loadDashboard();
       } catch (e) { showToast(e.message, true); }
@@ -871,7 +874,7 @@
         if (tr.en) document.getElementById('m-title-en').value = tr.en;
         if (tr.ru) document.getElementById('m-title-ru').value = tr.ru;
         if (tr.th) document.getElementById('m-title-th').value = tr.th;
-      } catch (e) { showToast('Translation failed', true); }
+      } catch (e) { showToast(t('translationFailed'), true); }
     }
 
     async function translateDesc() {
@@ -890,7 +893,7 @@
         if (tr.en) document.getElementById('m-desc-en').value = tr.en;
         if (tr.ru) document.getElementById('m-desc-ru').value = tr.ru;
         if (tr.th) document.getElementById('m-desc-th').value = tr.th;
-      } catch (e) { showToast('Translation failed', true); }
+      } catch (e) { showToast(t('translationFailed'), true); }
     }
 
     // Entity search
@@ -978,7 +981,7 @@
         payload.entity_id = newMissionEntity.entity_id;
       }
       if (!payload.title_ru && !payload.title_en && !payload.title_th) {
-        showToast('Title is required', true);
+        showToast(t('titleRequired'), true);
         return;
       }
       try {
@@ -1027,6 +1030,17 @@
       document.getElementById('t-lbl-watchers').textContent = t('missionWatchers');
       document.getElementById('t-btn-cancel').textContent   = t('cancel');
       document.getElementById('t-btn-save').textContent     = t('save');
+      // Modal priority selector buttons
+      const prMap = { low: 'priorityLow', normal: 'priorityNormal', high: 'priorityHigh', urgent: 'priorityUrgent' };
+      document.querySelectorAll('#priority-selector button').forEach(b => {
+        const k = prMap[b.dataset.p];
+        if (k) b.textContent = t(k);
+      });
+      // Notify-TG labels + entity search placeholder
+      const naEl = document.getElementById('t-notify-assignee'); if (naEl) naEl.textContent = t('notifyAssigneeTg');
+      const nwEl = document.getElementById('t-notify-watchers'); if (nwEl) nwEl.textContent = t('notifyWatchersTg');
+      const esEl = document.getElementById('m-entity-search'); if (esEl) esEl.placeholder = t('search') + '...';
+      const mlEl = document.getElementById('t-missions-loading'); if (mlEl) mlEl.textContent = t('loading');
       if (missionsData.length) renderMissions();
     }
 
