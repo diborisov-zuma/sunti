@@ -1273,7 +1273,11 @@
             if (prodD === 0 && delD === 0 && !d.production_start && !d.delivery_start) return;
             const eta = computeETA(d);
             const lc = computeLifecycle(d);
-            const off = dayOffset(eta);
+            // Marker position = earliest date work must begin on the contract:
+            // production start, else delivery start, else fall back to ETA.
+            // (Color/risk logic below is unchanged and still based on ETA.)
+            const markerDateRaw = d.production_start || d.delivery_start;
+            const off = dayOffset(markerDateRaw ? (markerDateRaw.value || markerDateRaw) : eta);
             if (off >= 0 && off <= totalDays) {
               // needBy = task start (material needed before work begins)
               const needBy = s || barEnd;
