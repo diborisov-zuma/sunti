@@ -1,0 +1,151 @@
+const { BigQuery } = require('@google-cloud/bigquery');
+const { Storage }  = require('@google-cloud/storage');
+const { v4: uuidv4 } = require('uuid');
+
+const bigquery = new BigQuery();
+const storage  = new Storage();
+const PROJECT  = 'project-9718e7d4-4cd7-4f52-8d6';
+const DATASET  = 'sunti';
+const TABLE    = 'mission_files';
+const BUCKET   = 'sunti-site';
+const SIGN_TTL_MS = 10 * 60 * 1000;
+
+function setCors(res) {
+  res.set('Access-Control-Allow-Origin', '*');
+  res.set('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
+  res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+}
+
+async function verifyToken(req) {
+  const auth = req.headers.authorization;
+  if (!auth || !auth.startsWith('Bearer ')) return null;
+  const token = auth.split(' ')[1];
+  const r1 = await fetch(`https://www.googleapis.com/oauth2/v3/tokeninfo?access_token=${token}`);
+  if (r1.ok) { const info = await r1.json(); return info.email || null; }
+  const r2 = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${token}`);
+  if (r2.ok) { const info = await r2.json(); return info.email || null; }
+  return null;
+}
+
+function parseKey(url) {
+  const m = (url || '').match(/^https:\/\/storage\.googleapis\.com\/([^/]+)\/(.+)$/);
+  if (!m) return null;
+  return { bucket: m[1], key: decodeURIComponent(m[2]) };
+}
+
+function sanitize(name) {
+  return (name || 'file').replace(/[^\w.\-]+/g, '_');
+}
+
+exports.mission_files = async (req, res) => {
+  setCors(res);
+  if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
+
+  const email = await verifyToken(req);
+  if (!email) { res.status(401).json({ error: 'Unauthorized' }); return; }
+
+  const table = `\`${PROJECT}.${DATASET}.${TABLE}\``;
+  const path  = (req.url || '').split('?')[0];
+
+  try {
+    // POST /mission_files/signed-upload-url
+    if (req.method === 'POST' && path === '/signed-upload-url') {
+      const { mission_id, file_name, content_type } = req.body || {};
+      if (!mission_id || !file_name) {
+        res.status(400).json({ error: 'mission_id and file_name are required' });
+        return;
+      }
+      const key = `missions/${mission_id}/${Date.now()}_${sanitize(file_name)}`;
+      const [upload_url] = await storage.bucket(BUCKET).file(key).getSignedUrl({
+        version: 'v4', action: 'write',
+        expires: Date.now() + SIGN_TTL_MS,
+        contentType: content_type || 'application/octet-stream',
+      });
+      res.json({ upload_url, file_url: `https://storage.googleapis.com/${BUCKET}/${key}` });
+      return;
+    }
+
+    // GET /mission_files/<id>/signed-download-url
+    if (req.method === 'GET' && path.endsWith('/signed-download-url')) {
+      const id = path.split('/').filter(Boolean)[0];
+      if (!id) { res.status(400).json({ error: 'id is required' }); return; }
+      const [rows] = await bigquery.query({
+        query: `SELECT file_url, file_name FROM ${table} WHERE id = @id`,
+        params: { id },
+      });
+      if (!rows.length) { res.status(404).json({ error: 'Not found' }); return; }
+      const parsed = parseKey(rows[0].file_url);
+      if (!parsed) { res.status(500).json({ error: 'Bad file_url' }); return; }
+      const isView = req.query.view === 'true';
+      const signOpts = {
+        version: 'v4', action: 'read',
+        expires: Date.now() + SIGN_TTL_MS,
+      };
+      if (!isView) signOpts.responseDisposition = `attachment; filename="${encodeURIComponent(rows[0].file_name || 'file')}"`;
+      const [url] = await storage.bucket(parsed.bucket).file(parsed.key).getSignedUrl(signOpts);
+      res.json({ url });
+      return;
+    }
+
+    // GET /mission_files?mission_id=xxx
+    if (req.method === 'GET') {
+      const missionId = req.query.mission_id;
+      if (!missionId) { res.status(400).json({ error: 'mission_id is required' }); return; }
+      const [rows] = await bigquery.query({
+        query: `SELECT id, mission_id, file_name, file_url, file_size, uploaded_by, uploaded_at
+                FROM ${table} WHERE mission_id = @mission_id ORDER BY uploaded_at DESC`,
+        params: { mission_id: missionId },
+      });
+      res.json(rows);
+      return;
+    }
+
+    // POST — register file after signed upload
+    if (req.method === 'POST') {
+      const { mission_id, file_name, file_url, file_size } = req.body;
+      if (!mission_id || !file_url) {
+        res.status(400).json({ error: 'mission_id and file_url are required' });
+        return;
+      }
+      const id = uuidv4();
+      await bigquery.query({
+        query: `INSERT INTO ${table} (id, mission_id, file_name, file_url, file_size, uploaded_by, uploaded_at)
+                VALUES (@id, @mission_id, @file_name, @file_url, @file_size, @uploaded_by, CURRENT_TIMESTAMP())`,
+        params: {
+          id, mission_id,
+          file_name: file_name || '',
+          file_url,
+          file_size: parseInt(file_size || 0),
+          uploaded_by: email,
+        },
+      });
+      res.json({ success: true, id });
+      return;
+    }
+
+    // DELETE /mission_files/<id>
+    if (req.method === 'DELETE') {
+      const id = path.split('/').filter(Boolean).pop();
+      if (!id) { res.status(400).json({ error: 'id is required' }); return; }
+      const [rows] = await bigquery.query({
+        query: `SELECT file_url FROM ${table} WHERE id = @id`,
+        params: { id },
+      });
+      if (rows.length) {
+        const parsed = parseKey(rows[0].file_url);
+        if (parsed) {
+          try { await storage.bucket(parsed.bucket).file(parsed.key).delete({ ignoreNotFound: true }); }
+          catch (e) { console.error('GCS delete failed', e.message); }
+        }
+      }
+      await bigquery.query({ query: `DELETE FROM ${table} WHERE id = @id`, params: { id } });
+      res.json({ success: true });
+      return;
+    }
+
+    res.status(405).json({ error: 'Method not allowed' });
+  } catch(e) {
+    console.error(e);
+    res.status(500).json({ error: e.message });
+  }
+};

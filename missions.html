@@ -11,6 +11,8 @@
 <script src="_config.js"></script>
 <script src="_auth.js"></script>
 <script src="_header.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="_pdf_viewer.js"></script>
 <style>
   :root {
     --m-bg: #f5f7fa;
@@ -122,7 +124,8 @@
   }
   .modal-overlay.open { display: flex; }
   .modal-box {
-    background: #fff; border-radius: 12px; width: 580px; max-height: 90vh; overflow-y: auto;
+    background: #fff; border-radius: 12px;
+    width: min(920px, 94vw); max-height: 90vh; min-height: min(620px, 84vh); overflow-y: auto;
     box-shadow: 0 8px 32px rgba(0,0,0,0.18); padding: 24px;
   }
   .modal-box h3 { margin: 0 0 16px; font-size: 1.1rem; }
@@ -277,6 +280,13 @@
         <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
           <input type="checkbox" id="m-notify-tg-watchers"> <span id="t-notify-watchers">Notify watchers TG</span>
         </label>
+      </div>
+
+      <div class="modal-field" id="mf-files" style="display:none">
+        <label id="t-lbl-files">Files</label>
+        <div id="m-files-list" style="margin-bottom:8px"></div>
+        <input type="file" id="m-file-input" multiple style="display:none">
+        <button type="button" class="btn btn-outline" id="t-btn-attach" style="font-size:0.8rem;padding:5px 12px" onclick="document.getElementById('m-file-input').click()">📎 <span id="t-attach-label">Add file</span></button>
       </div>
 
       <div class="modal-actions">
@@ -764,6 +774,8 @@
       // Watchers + TG-notify only apply when creating a new mission
       document.getElementById('mf-watchers').style.display = '';
       document.getElementById('mf-notify').style.display = 'flex';
+      // Files attach to an existing mission only — hide until the mission is saved
+      document.getElementById('mf-files').style.display = 'none';
       // Reset form
       ['m-title-ru','m-title-en','m-title-th','m-desc-ru','m-desc-en','m-desc-th','m-due-date','m-entity-search'].forEach(id => {
         const el = document.getElementById(id);
@@ -818,6 +830,10 @@
       // Watchers + TG-notify are not editable via PATCH — hide in edit mode
       document.getElementById('mf-watchers').style.display = 'none';
       document.getElementById('mf-notify').style.display = 'none';
+      // Files — available for an existing mission
+      document.getElementById('mf-files').style.display = '';
+      document.getElementById('m-file-input').value = '';
+      loadMissionFiles(editingMissionId);
       switchTitleLang('ru');
       switchDescLang('ru');
     }
@@ -826,6 +842,109 @@
       editingMissionId = null;
       document.getElementById('modal-new-mission').classList.remove('open');
     }
+
+    // --- Mission file attachments (edit mode only) ---
+
+    async function loadMissionFiles(missionId) {
+      const el = document.getElementById('m-files-list');
+      if (!missionId) { el.innerHTML = ''; return; }
+      try {
+        const files = await apiFetch(`/mission_files?mission_id=${missionId}`);
+        renderMissionFiles(files);
+      } catch (e) {
+        el.innerHTML = `<div style="color:var(--m-red);font-size:0.8rem">${escHtml(e.message)}</div>`;
+      }
+    }
+
+    function renderMissionFiles(files) {
+      const el = document.getElementById('m-files-list');
+      if (!files || !files.length) {
+        el.innerHTML = '<div style="color:#bbb;font-size:0.82rem">—</div>';
+        return;
+      }
+      el.innerHTML = files.map(f => {
+        const fs = f.file_size > 1048576 ? (f.file_size/1048576).toFixed(1)+' MB' : Math.round((f.file_size||0)/1024)+' KB';
+        const isPdf = (f.file_name || '').toLowerCase().endsWith('.pdf');
+        const isImg = /\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i.test(f.file_name || '');
+        const canPreview = isPdf || isImg;
+        const previewAction = isPdf ? 'view-pdf' : 'view-image';
+        return `<div style="display:flex;align-items:center;gap:8px;padding:5px 0;font-size:0.84rem;border-bottom:1px solid #f0f0f0">
+          ${canPreview ? `<button type="button" style="background:none;border:none;cursor:pointer;font-size:1rem;padding:0" title="${isPdf ? 'PDF' : 'IMG'}" data-mfaction="${previewAction}" data-file-id="${f.id}">👁</button>` : '<span style="width:1rem;display:inline-block"></span>'}
+          <span style="flex:1;color:#333">${isPdf ? '📄' : (isImg ? '🖼' : '📎')} ${escHtml(f.file_name || '—')} <span style="color:#999">(${fs})</span></span>
+          <button type="button" class="btn btn-outline" style="padding:1px 7px;font-size:0.72rem" data-mfaction="download-file" data-file-id="${f.id}">${t('download')}</button>
+          <button type="button" class="btn btn-outline" style="padding:1px 7px;font-size:0.72rem;color:#c5221f" data-mfaction="delete-file" data-file-id="${f.id}">×</button>
+        </div>`;
+      }).join('');
+    }
+
+    async function uploadMissionFiles() {
+      const input = document.getElementById('m-file-input');
+      const files = Array.from(input.files || []);
+      if (!files.length || !editingMissionId) return;
+      showToast(t('uploading'));
+      for (const file of files) {
+        try {
+          const contentType = file.type || 'application/octet-stream';
+          const { upload_url, file_url } = await apiFetch('/mission_files/signed-upload-url', {
+            method: 'POST',
+            body: JSON.stringify({ mission_id: editingMissionId, file_name: file.name, content_type: contentType }),
+          });
+          await new Promise((resolve, reject) => {
+            const xhr = new XMLHttpRequest();
+            xhr.open('PUT', upload_url);
+            xhr.setRequestHeader('Content-Type', contentType);
+            xhr.onload = () => xhr.status === 200 ? resolve() : reject(new Error('Upload failed'));
+            xhr.onerror = () => reject(new Error('Upload error'));
+            xhr.send(file);
+          });
+          await apiFetch('/mission_files', {
+            method: 'POST',
+            body: JSON.stringify({ mission_id: editingMissionId, file_name: file.name, file_url, file_size: file.size }),
+          });
+        } catch (e) { showToast(e.message, true); }
+      }
+      input.value = '';
+      showToast(t('uploaded'));
+      loadMissionFiles(editingMissionId);
+    }
+
+    function showImageLightbox(url) {
+      let lb = document.getElementById('image-lightbox');
+      if (!lb) {
+        lb = document.createElement('div');
+        lb.id = 'image-lightbox';
+        lb.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.85);z-index:400;display:flex;align-items:center;justify-content:center;cursor:pointer';
+        lb.innerHTML = '<img style="max-width:90vw;max-height:90vh;border-radius:8px;box-shadow:0 4px 24px rgba(0,0,0,0.5)">';
+        lb.addEventListener('click', () => lb.style.display = 'none');
+        document.body.appendChild(lb);
+      }
+      lb.querySelector('img').src = url;
+      lb.style.display = 'flex';
+    }
+
+    document.getElementById('m-file-input').addEventListener('change', uploadMissionFiles);
+    document.getElementById('m-files-list').addEventListener('click', async e => {
+      const btn = e.target.closest('[data-mfaction]');
+      if (!btn) return;
+      const act = btn.dataset.mfaction;
+      const fileId = btn.dataset.fileId;
+      try {
+        if (act === 'view-pdf') {
+          const r = await apiFetch(`/mission_files/${fileId}/signed-download-url?view=true`);
+          if (r.url) openPdfViewer(r.url, 'PDF');
+        } else if (act === 'view-image') {
+          const r = await apiFetch(`/mission_files/${fileId}/signed-download-url?view=true`);
+          if (r.url) showImageLightbox(r.url);
+        } else if (act === 'download-file') {
+          const r = await apiFetch(`/mission_files/${fileId}/signed-download-url`);
+          if (r.url) window.open(r.url, '_blank');
+        } else if (act === 'delete-file') {
+          if (!confirm(t('confirmDelete'))) return;
+          await apiFetch(`/mission_files/${fileId}`, { method: 'DELETE' });
+          loadMissionFiles(editingMissionId);
+        }
+      } catch (err) { showToast(err.message, true); }
+    });
 
     function switchTitleLang(lang) {
       currentTitleLang = lang;
@@ -1041,6 +1160,8 @@
       const nwEl = document.getElementById('t-notify-watchers'); if (nwEl) nwEl.textContent = t('notifyWatchersTg');
       const esEl = document.getElementById('m-entity-search'); if (esEl) esEl.placeholder = t('search') + '...';
       const mlEl = document.getElementById('t-missions-loading'); if (mlEl) mlEl.textContent = t('loading');
+      const lf = document.getElementById('t-lbl-files'); if (lf) lf.textContent = t('file');
+      const al = document.getElementById('t-attach-label'); if (al) al.textContent = t('addFile');
       if (missionsData.length) renderMissions();
     }
 
