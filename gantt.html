@@ -2085,7 +2085,9 @@
               const lcColor = (lc === 'on_site' || lc === 'installed') ? 'green' : ((lc === 'on_delivery' || lc === 'in_transit') ? 'yellow' : '');
               return `<div class="ds-batch-row">
                 <span>Batch ${b.batch_number || (idx+1)}: ${b.qty || '?'} ${b.unit || ''}</span>
-                <span>prod ${b.production_days || 0}d · del ${b.delivery_days || 0}d</span>
+                <span>${t('ganttProductionStart')}: ${fmtDateDMY(b.production_start)}</span>
+                <span>${t('ganttProductionDays')}: ${b.production_days || 0}</span>
+                <span>${t('ganttDeliveryDays')}: ${b.delivery_days || 0}</span>
                 <span class="ds-lc ${lcColor}">${lifecycleLabels[lc] || lc}</span>
                 <span>ETA ${etaStr}</span>
                 <button class="btn btn-outline" style="padding:1px 5px;font-size:0.68rem" data-action="edit-ds" data-ds-id="${b.id}" data-line-item-id="${m.line_item_id || ''}" data-contract-id="${m.contract_id || ''}">✎</button>
