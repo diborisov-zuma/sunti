@@ -1058,7 +1058,11 @@
             if (prodD === 0 && delD === 0 && !d.production_start && !d.delivery_start) return;
             const eta = computeETA(d);
             const lc = computeLifecycle(d);
-            const off = dayOffset(eta);
+            // Marker position = earliest date work must begin on the contract:
+            // production start, else delivery start, else fall back to ETA.
+            // (Color/risk logic below is unchanged and still based on ETA.)
+            const markerDateRaw = d.production_start || d.delivery_start;
+            const off = dayOffset(markerDateRaw ? (markerDateRaw.value || markerDateRaw) : eta);
             if (off >= 0 && off <= totalDays) {
               const needBy = s || barEnd;
               let markerColor;
@@ -1367,6 +1371,9 @@
           } else { marginText = '\u2014'; marginCls = 'grey'; }
         }
 
+        const prodStartList = ds.map(d => d.production_start && (d.production_start.value || d.production_start)).filter(Boolean).sort();
+        const earliestProdStart = prodStartList.length ? prodStartList[0] : null;
+
         const sourceLabel = isWhole ? 'CONTRACT' : (m.contract_name || '');
 
         html += `<div class="sp-mat-card risk-${risk.color}">
@@ -1387,6 +1394,7 @@
             </div>
             <div class="sp-mat-grid">
               <div class="row"><span>Need by:</span><span class="v">${ps ? fmtDateDMY(ps) : '\u2014'}</span></div>
+              <div class="row"><span>${t('ganttProductionStart')}:</span><span class="v">${earliestProdStart ? fmtDateDMY(earliestProdStart) : '\u2014'}</span></div>
               <div class="row"><span>ETA:</span><span class="v${worstETA && ps && worstETA > new Date(ps) ? ' late' : ''}">${worstETA ? fmtDateDMY(worstETA) : '\u2014'}</span></div>
               <div class="row"><span>${t('ganttProductionDays')}:</span><span class="v">${ds.length ? Math.max(...ds.map(d => parseInt(d.production_days) || 0)) + 'd' : '\u2014'}</span></div>
               <div class="row"><span>${t('ganttDeliveryDays')}:</span><span class="v">${ds.length ? Math.max(...ds.map(d => parseInt(d.delivery_days) || 0)) + 'd' : '\u2014'}</span></div>
