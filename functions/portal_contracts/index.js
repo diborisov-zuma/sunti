@@ -7,11 +7,14 @@ const PROJECT  = 'project-9718e7d4-4cd7-4f52-8d6';
 const DATASET  = 'sunti';
 const SIGN_TTL_MS = 10 * 60 * 1000;
 
-// Project-documentation tables (read-only access from the portal)
-const docTable = `\`${PROJECT}.${DATASET}.project_docs\``;
-const verTable = `\`${PROJECT}.${DATASET}.project_doc_versions\``;
-const catTable = `\`${PROJECT}.${DATASET}.project_doc_categories\``;
-const vfTable  = `\`${PROJECT}.${DATASET}.project_doc_version_files\``;
+// Project-documentation tables (read-only access from the portal).
+// NB: names are deliberately prefixed (docCat*, not catTable) — the request
+// handler declares its own local `catTable` (= contracts `categories`) which
+// would otherwise shadow these inside the /docs block.
+const docDocsTable = `\`${PROJECT}.${DATASET}.project_docs\``;
+const docVerTable  = `\`${PROJECT}.${DATASET}.project_doc_versions\``;
+const docCatTable  = `\`${PROJECT}.${DATASET}.project_doc_categories\``;
+const docVfTable   = `\`${PROJECT}.${DATASET}.project_doc_version_files\``;
 
 function setCors(res) {
   res.set('Access-Control-Allow-Origin', '*');
@@ -147,7 +150,7 @@ exports.portal_contracts = async (req, res) => {
         let fileUrl, fileName, folderId;
         const [vf] = await bigquery.query({
           query: `SELECT vf.file_url, vf.file_name, d.folder_id
-                  FROM ${vfTable} vf JOIN ${docTable} d ON d.id = vf.document_id
+                  FROM ${docVfTable} vf JOIN ${docDocsTable} d ON d.id = vf.document_id
                   WHERE vf.id = @id`,
           params: { id: fileId },
         });
@@ -157,7 +160,7 @@ exports.portal_contracts = async (req, res) => {
           // legacy: file stored directly on the version row
           const [lg] = await bigquery.query({
             query: `SELECT v.file_url, v.file_name, d.folder_id
-                    FROM ${verTable} v JOIN ${docTable} d ON d.id = v.document_id
+                    FROM ${docVerTable} v JOIN ${docDocsTable} d ON d.id = v.document_id
                     WHERE v.id = @id`,
             params: { id: fileId },
           });
@@ -184,17 +187,17 @@ exports.portal_contracts = async (req, res) => {
       if (parts[1] === 'versions' && parts[3] === 'files') {
         const verId = parts[2];
         const [vrow] = await bigquery.query({
-          query: `SELECT d.folder_id FROM ${verTable} v JOIN ${docTable} d ON d.id = v.document_id WHERE v.id = @id`,
+          query: `SELECT d.folder_id FROM ${docVerTable} v JOIN ${docDocsTable} d ON d.id = v.document_id WHERE v.id = @id`,
           params: { id: verId },
         });
         if (!vrow.length || !folderIds.includes(vrow[0].folder_id)) { res.status(403).json({ error: 'Forbidden' }); return; }
         const [files] = await bigquery.query({
           query: `SELECT id, file_url, file_name, file_size, uploaded_at
-                  FROM ${vfTable} WHERE version_id = @verId ORDER BY uploaded_at ASC`,
+                  FROM ${docVfTable} WHERE version_id = @verId ORDER BY uploaded_at ASC`,
           params: { verId },
         });
         const [verRows] = await bigquery.query({
-          query: `SELECT id, file_name, file_size FROM ${verTable}
+          query: `SELECT id, file_name, file_size FROM ${docVerTable}
                   WHERE id = @id AND file_url IS NOT NULL AND file_url != ''`,
           params: { id: verId },
         });
@@ -207,14 +210,14 @@ exports.portal_contracts = async (req, res) => {
       if (parts.length === 3 && parts[2] === 'versions') {
         const docId = parts[1];
         const [drow] = await bigquery.query({
-          query: `SELECT folder_id FROM ${docTable} WHERE id = @id`,
+          query: `SELECT folder_id FROM ${docDocsTable} WHERE id = @id`,
           params: { id: docId },
         });
         if (!drow.length || !folderIds.includes(drow[0].folder_id)) { res.status(403).json({ error: 'Forbidden' }); return; }
         const [rows] = await bigquery.query({
           query: `SELECT v.id, v.document_id, v.version_number, v.file_name, v.file_size, v.notes, v.uploaded_at,
-                         (SELECT COUNT(*) FROM ${vfTable} vf WHERE vf.version_id = v.id) AS files_count
-                  FROM ${verTable} v WHERE v.document_id = @docId ORDER BY v.version_number DESC`,
+                         (SELECT COUNT(*) FROM ${docVfTable} vf WHERE vf.version_id = v.id) AS files_count
+                  FROM ${docVerTable} v WHERE v.document_id = @docId ORDER BY v.version_number DESC`,
           params: { docId },
         });
         res.json(rows);
@@ -227,7 +230,7 @@ exports.portal_contracts = async (req, res) => {
         if (!folderId) { res.status(400).json({ error: 'folder_id required' }); return; }
         if (!folderIds.includes(folderId)) { res.status(403).json({ error: 'Forbidden' }); return; }
         const [cats] = await bigquery.query({
-          query: `SELECT * FROM ${catTable} WHERE folder_id = @fid ORDER BY sort_order ASC`,
+          query: `SELECT * FROM ${docCatTable} WHERE folder_id = @fid ORDER BY sort_order ASC`,
           params: { fid: folderId },
         });
         const [rows] = await bigquery.query({
@@ -237,10 +240,10 @@ exports.portal_contracts = async (req, res) => {
                          v.file_name AS latest_file_name, v.file_size AS latest_file_size,
                          v.notes AS latest_notes, v.uploaded_at AS latest_uploaded_at,
                          v.id AS latest_version_id,
-                         (SELECT COUNT(*) FROM ${vfTable} vf WHERE vf.version_id = v.id) AS latest_files_count
-                  FROM ${docTable} d
-                  LEFT JOIN ${catTable} c ON d.category_id = c.id
-                  LEFT JOIN ${verTable} v ON v.document_id = d.id AND v.version_number = d.current_version
+                         (SELECT COUNT(*) FROM ${docVfTable} vf WHERE vf.version_id = v.id) AS latest_files_count
+                  FROM ${docDocsTable} d
+                  LEFT JOIN ${docCatTable} c ON d.category_id = c.id
+                  LEFT JOIN ${docVerTable} v ON v.document_id = d.id AND v.version_number = d.current_version
                   WHERE d.folder_id = @fid AND IFNULL(d.status, 'active') != 'archived'
                   ORDER BY c.sort_order ASC, d.sort_order ASC, d.name ASC`,
           params: { fid: folderId },
