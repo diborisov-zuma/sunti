@@ -301,8 +301,8 @@
     let currentPage        = 1;
     let pageSize           = 25;
     const today = new Date().toISOString().split('T')[0];
-    let filterDateFrom     = today;
-    let filterDateTo       = today;
+    let filterDateFrom     = '';
+    let filterDateTo       = '';
     let filterDirection    = 'all';
     let filterCategory     = 'all';
     let filterStatus       = 'active';
@@ -827,6 +827,14 @@
     function renderTransactions() {
       const tbody = document.getElementById('trx-tbody');
       if (!tbody) return;
+
+      // Project (folder) is mandatory — require a specific project before showing payments
+      if (!filterFolder || filterFolder === 'all') {
+        tbody.innerHTML = `<tr><td colspan="8" class="empty-state">${t('selectProject')}</td></tr>`;
+        document.getElementById('income-sum').textContent  = '—';
+        document.getElementById('expense-sum').textContent = '—';
+        return;
+      }
 
       const filtered = applyFilters(allTransactions);
       const totalCount = filtered.length;
