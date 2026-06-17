@@ -48,6 +48,9 @@
     .inv-table { width:100%;border-collapse:collapse; }
     .inv-table thead { background:#f8f8f8;border-bottom:1px solid #e8e8e8; }
     .inv-table th { padding:10px 14px;font-size:0.78rem;font-weight:600;color:#888;text-align:left;text-transform:uppercase;letter-spacing:0.04em; }
+    .inv-table th.sortable { cursor:pointer;user-select:none; }
+    .inv-table th.sortable:hover { color:#1a73e8; }
+    .sort-arrow { font-size:0.65rem;margin-left:3px;color:#1a73e8; }
     .inv-table td { padding:11px 14px;font-size:0.88rem;color:#333;border-bottom:1px solid #f0f0f0; }
     .inv-table tr.trx-main-row:last-child td { border-bottom:none; }
     .inv-table tr.trx-main-row:hover td { background:#fafafa; }
@@ -303,6 +306,8 @@
     const today = new Date().toISOString().split('T')[0];
     let filterDateFrom     = '';
     let filterDateTo       = '';
+    let sortBy             = 'date';   // 'date' | 'amount'
+    let sortDir            = 'desc';   // 'asc' | 'desc'
     let filterDirection    = 'all';
     let filterCategory     = 'all';
     let filterStatus       = 'active';
@@ -690,10 +695,10 @@
             <thead>
               <tr>
                 <th style="width:32px"></th>
-                <th>${t('date')}</th>
+                <th class="sortable" data-sort="date" id="th-date">${t('date')}<span class="sort-arrow" id="arrow-date"></span></th>
                 <th>${t('navFolders')}</th>
                 <th>${t('companyAccounts')}</th>
-                <th class="amount-col">${t('amount')}</th>
+                <th class="amount-col sortable" data-sort="amount" id="th-amount">${t('amount')}<span class="sort-arrow" id="arrow-amount"></span></th>
                 <th>${t('category')}</th>
                 <th>${t('description')}</th>
                 <th></th>
@@ -747,6 +752,19 @@
       document.getElementById('filter-status').addEventListener('change',    e => { filterStatus   = e.target.value; currentPage = 1; loadTransactions(); });
       document.getElementById('filter-direction').addEventListener('change', e => { filterDirection = e.target.value; currentPage = 1; renderTransactions(); });
       document.getElementById('page-size-select').addEventListener('change', e => { pageSize = parseInt(e.target.value); currentPage = 1; renderTransactions(); });
+
+      // Sortable columns: date & amount
+      ['date', 'amount'].forEach(key => {
+        const th = document.getElementById('th-' + key);
+        if (th) th.addEventListener('click', () => {
+          if (sortBy === key) sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+          else { sortBy = key; sortDir = 'desc'; }
+          currentPage = 1;
+          updateSortArrows();
+          renderTransactions();
+        });
+      });
+      updateSortArrows();
 
       document.getElementById('filter-company').value = filterCompany;
       document.getElementById('filter-company').addEventListener('change', e => {
@@ -824,6 +842,13 @@
       });
     }
 
+    function updateSortArrows() {
+      const da = document.getElementById('arrow-date');
+      const aa = document.getElementById('arrow-amount');
+      if (da) da.textContent = sortBy === 'date'   ? (sortDir === 'asc' ? '▲' : '▼') : '';
+      if (aa) aa.textContent = sortBy === 'amount' ? (sortDir === 'asc' ? '▲' : '▼') : '';
+    }
+
     function renderTransactions() {
       const tbody = document.getElementById('trx-tbody');
       if (!tbody) return;
@@ -837,6 +862,14 @@
       }
 
       const filtered = applyFilters(allTransactions);
+      filtered.sort((a, b) => {
+        let va, vb;
+        if (sortBy === 'amount') { va = parseFloat(a.amount || 0); vb = parseFloat(b.amount || 0); }
+        else { va = a.date ? (a.date.value || a.date) : ''; vb = b.date ? (b.date.value || b.date) : ''; }
+        if (va < vb) return sortDir === 'asc' ? -1 : 1;
+        if (va > vb) return sortDir === 'asc' ? 1 : -1;
+        return 0;
+      });
       const totalCount = filtered.length;
 
       let sumIncome = 0, sumExpense = 0;
