@@ -831,6 +831,7 @@
       document.getElementById('btn-add-phase').style.display = filterGroup ? '' : 'none';
       document.getElementById('btn-print-gantt').style.display = filterGroup ? '' : 'none';
       if (filterGroup) {
+        ganttFirstRender = true; // switching project → scroll to today (not restore previous)
         loadGanttData();
       } else {
         document.getElementById('gantt-container').innerHTML = '<div class="empty-state">' + t('ganttSelectProject') + '</div>';
@@ -865,8 +866,15 @@
 
     // ─── Load data ───
 
+    let ganttScrollSave  = null;   // {y, x} captured before a reload, restored after re-render
+    let ganttFirstRender = true;   // first render scrolls to "today"; later renders keep position
+
     async function loadGanttData() {
       const container = document.getElementById('gantt-container');
+      // Capture scroll position BEFORE the loading state collapses page height,
+      // so after re-render we can return the user to exactly where they were.
+      const _gbs = document.getElementById('gantt-body-scroll');
+      ganttScrollSave = { y: window.scrollY || window.pageYOffset || 0, x: _gbs ? _gbs.scrollLeft : 0 };
       container.innerHTML = '<div class="loading">' + t('loading') + '</div>';
       try {
         const qParam = filterGroup ? `group_id=${filterGroup}` : `folder_id=${filterFolder}`;
@@ -1324,11 +1332,21 @@
         headerScroll.addEventListener('scroll', () => {
           if (!syncing) { syncing = true; bodyScroll.scrollLeft = headerScroll.scrollLeft; syncing = false; }
         });
-        // Scroll to today
-        if (todayOff > 0) {
-          const scrollTo = Math.max(0, todayOff * dayW - bodyScroll.clientWidth / 3);
-          bodyScroll.scrollLeft = scrollTo;
-          headerScroll.scrollLeft = scrollTo;
+        if (ganttFirstRender) {
+          // First render: scroll to today
+          ganttFirstRender = false;
+          if (todayOff > 0) {
+            const scrollTo = Math.max(0, todayOff * dayW - bodyScroll.clientWidth / 3);
+            bodyScroll.scrollLeft = scrollTo;
+            headerScroll.scrollLeft = scrollTo;
+          }
+        } else if (ganttScrollSave) {
+          // Re-render after a save/reload: keep the user where they were
+          const sv = ganttScrollSave;
+          ganttScrollSave = null; // one-shot
+          bodyScroll.scrollLeft = sv.x;
+          headerScroll.scrollLeft = sv.x;
+          requestAnimationFrame(() => window.scrollTo(0, sv.y));
         }
       }
 
