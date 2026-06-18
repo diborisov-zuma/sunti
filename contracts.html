@@ -1138,15 +1138,20 @@
           apiFetch(`/invoice_files?invoice_id=${invoiceId}`),
         ]);
         invoiceTrx[invoiceId] = trxs;
-        renderInvoiceTrx(invoiceId, trxs, contractId, invFiles);
+        // Files attached to each payment (transaction)
+        const tfArr = await Promise.all(trxs.map(tx => apiFetch(`/transaction_files?transaction_id=${tx.id}`).catch(() => [])));
+        const tfMap = {};
+        trxs.forEach((tx, i) => { tfMap[tx.id] = tfArr[i] || []; });
+        renderInvoiceTrx(invoiceId, trxs, contractId, invFiles, tfMap);
       } catch(e) {
         inner.innerHTML = `<div style="color:#c33">${e.message}</div>`;
       }
     }
 
-    function renderInvoiceTrx(invoiceId, trxs, contractId, invFiles) {
+    function renderInvoiceTrx(invoiceId, trxs, contractId, invFiles, tfMap) {
       const inner = document.getElementById(`inv-inner-${invoiceId}`);
       if (!inner) return;
+      tfMap = tfMap || {};
 
       // Invoice files
       let html = renderFileList(invFiles, 'invoice', invoiceId, contractId);
@@ -1160,19 +1165,51 @@
       } else {
         html += `<table class="trx-mini-table"><thead><tr>
           <th>${t('date')}</th><th>${t('amount')}</th><th>${t('category')}</th>
-          <th>${t('description')}</th><th style="width:80px"></th>
+          <th>${t('description')}</th><th style="width:150px"></th>
         </tr></thead><tbody>`;
         trxs.forEach(tx => {
           const sign = tx.direction === 'expense' ? '-' : '';
           const cls = tx.direction === 'expense' ? 'expense' : 'income';
+          const txFiles = tfMap[tx.id] || [];
           html += `<tr>
             <td>${formatDate(tx.date)}</td>
             <td><span class="amount-col ${cls}">${sign}${fmt(tx.amount)}</span></td>
             <td style="font-size:0.78rem">${tx.category_name || '—'}</td>
             <td style="font-size:0.78rem;color:#666">${tx.description || '—'}</td>
-            <td><button class="btn btn-outline" style="padding:1px 6px;font-size:0.68rem"
-              data-action="add-file" data-entity-type="transaction" data-entity-id="${tx.id}" data-contract-id="${contractId}" data-folder-id="${tx.folder_id || ''}">${t('addFile')}</button></td>
+            <td style="white-space:nowrap">
+              <button class="btn btn-outline" style="padding:1px 6px;font-size:0.68rem"
+                data-action="add-file" data-entity-type="transaction" data-entity-id="${tx.id}" data-contract-id="${contractId}" data-folder-id="${tx.folder_id || ''}">📎</button>
+              <button class="btn btn-outline" style="padding:1px 6px;font-size:0.68rem"
+                data-action="edit-inv-trx" data-id="${tx.id}" data-inv-id="${invoiceId}" data-contract-id="${contractId}"
+                data-date="${tx.date ? (tx.date.value || tx.date) : ''}"
+                data-direction="${tx.direction}" data-amount="${tx.amount}"
+                data-account="${tx.account_id||''}" data-category="${tx.category_id||''}"
+                data-desc="${(tx.description||'').replace(/"/g,'&quot;')}">${t('edit')}</button>
+              <button class="btn btn-outline" style="padding:1px 6px;font-size:0.68rem;color:#c5221f"
+                data-action="delete-direct-trx" data-id="${tx.id}" data-contract-id="${contractId}">×</button>
+            </td>
           </tr>`;
+          if (txFiles.length) {
+            html += `<tr><td colspan="5" style="padding:2px 0 6px 16px">`;
+            txFiles.forEach(f => {
+              const size = f.file_size > 1048576 ? (f.file_size/1048576).toFixed(1)+' MB' : Math.round((f.file_size||0)/1024)+' KB';
+              const isPdf = (f.file_name || '').toLowerCase().endsWith('.pdf');
+              const isImg2 = /\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i.test(f.file_name || '');
+              const canPrev2 = isPdf || isImg2;
+              const prevAct2 = isPdf ? 'view-pdf' : 'view-image';
+              html += `<div style="display:flex;align-items:center;gap:6px;font-size:0.78rem;padding:1px 0">
+                ${canPrev2 ? `<button style="background:none;border:none;cursor:pointer;font-size:0.85rem;padding:0" title="${isPdf ? 'View PDF' : 'View image'}"
+                  data-action="${prevAct2}" data-entity-type="transaction" data-file-id="${f.id}" data-file-name="${(f.file_name||'').replace(/"/g,'&quot;')}">👁</button>` : '<span style="width:0.85rem;display:inline-block"></span>'}
+                <span style="flex:1;color:#333">${isPdf ? '📄' : (isImg2 ? '🖼' : '📎')} ${f.file_name || '—'} <span style="color:#999">(${size})</span></span>
+                <button class="btn btn-outline" style="padding:0px 5px;font-size:0.68rem"
+                  data-action="download-file" data-entity-type="transaction" data-file-id="${f.id}">${t('download')}</button>
+                <button class="btn btn-outline" style="padding:0px 5px;font-size:0.68rem;color:#c5221f;border-color:#c5221f"
+                  data-action="delete-file" data-entity-type="transaction" data-file-id="${f.id}"
+                  data-entity-id="${tx.id}" data-contract-id="${contractId}">×</button>
+              </div>`;
+            });
+            html += `</td></tr>`;
+          }
         });
         html += '</tbody></table>';
       }
@@ -1422,6 +1459,23 @@
         const contract = allContracts.find(c => c.id === contractId);
         currentTrxMode = 'edit'; currentTrxId = btn.dataset.id; currentTrxInvoiceId = null;
         window._directPaymentContractId = contractId;
+        document.getElementById('t-modal-trx-title').textContent = t('edit');
+        document.getElementById('tx-date').value = btn.dataset.date ? btn.dataset.date.split('T')[0] : '';
+        document.getElementById('tx-direction').value = btn.dataset.direction || 'expense';
+        document.getElementById('tx-amount').value = btn.dataset.amount;
+        document.getElementById('tx-desc').value = btn.dataset.desc || '';
+        fillAccountSelect(contract?.folder_id);
+        document.getElementById('tx-account').value = btn.dataset.account || '';
+        fillCategorySelect('tx-category', btn.dataset.category || '');
+        openModal('modal-trx');
+      }
+
+      if (action === 'edit-inv-trx') {
+        const contractId = btn.dataset.contractId;
+        const invoiceId = btn.dataset.invId;
+        const contract = allContracts.find(c => c.id === contractId);
+        currentTrxMode = 'edit'; currentTrxId = btn.dataset.id; currentTrxInvoiceId = invoiceId;
+        window._directPaymentContractId = null;
         document.getElementById('t-modal-trx-title').textContent = t('edit');
         document.getElementById('tx-date').value = btn.dataset.date ? btn.dataset.date.split('T')[0] : '';
         document.getElementById('tx-direction').value = btn.dataset.direction || 'expense';
