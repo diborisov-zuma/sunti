@@ -374,7 +374,8 @@
         document.getElementById('doc-name').value = '';
         document.getElementById('doc-desc').value = '';
         document.getElementById('doc-order').value = '0';
-        fillDocCategorySelect('');
+        // Pre-select the category currently chosen in the left sidebar (if any)
+        fillDocCategorySelect(selectedCategory || '');
         openModal('modal-doc');
       });
     }
