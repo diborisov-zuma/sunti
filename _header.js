@@ -221,6 +221,7 @@ function updateHeaderTexts() {
   // Global + Mission button
   const gmBtn = document.getElementById('global-new-mission');
   if (gmBtn) {
+    gmBtn.textContent = '+ ' + t('taskSingular');
     const meGm = typeof currentMe !== 'undefined' ? currentMe : null;
     gmBtn.style.display = meGm ? '' : 'none';
   }

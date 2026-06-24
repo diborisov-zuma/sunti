@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Sunti — Missions</title>
+<title>Sunti — Tasks</title>
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <link rel="stylesheet" href="style.css">
 <script src="https://accounts.google.com/gsi/client" async defer></script>
@@ -1137,6 +1137,7 @@
 
     function updateTexts() {
       updateHeaderTexts();
+      const nbtn = document.getElementById('btn-new-mission'); if (nbtn) nbtn.textContent = '+ ' + t('taskSingular');
       document.getElementById('t-guest-title').textContent  = t('guestTitle');
       document.getElementById('t-guest-sub').textContent    = t('guestSub');
       document.getElementById('t-modal-title').textContent  = t('missionNew');

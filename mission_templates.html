@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Sunti — Mission Templates</title>
+<title>Sunti — Task Templates</title>
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <link rel="stylesheet" href="style.css">
 <script src="https://accounts.google.com/gsi/client" async defer></script>
@@ -106,7 +106,7 @@
   <div id="app-view" style="display:none">
     <div class="mt-page">
       <div class="mt-toolbar">
-        <h2 id="t-page-title">Mission Templates</h2>
+        <h2 id="t-page-title">Task Templates</h2>
       </div>
 
       <div class="mt-tabs" id="mt-tabs">
@@ -171,7 +171,7 @@
       </div>
 
       <div class="modal-field">
-        <label>Mission spec (JSON)</label>
+        <label>Task spec (JSON)</label>
         <textarea id="tpl-mission-spec" rows="4" placeholder='{"priority":"normal","assignee_role":"accountant"}'></textarea>
       </div>
 
@@ -399,7 +399,7 @@
       try {
         const msVal = document.getElementById('tpl-mission-spec').value.trim();
         missionSpec = msVal ? JSON.parse(msVal) : null;
-      } catch (e) { showToast('Invalid mission spec JSON', true); return; }
+      } catch (e) { showToast('Invalid task spec JSON', true); return; }
 
       const payload = {
         name_ru: document.getElementById('tpl-name-ru').value,
