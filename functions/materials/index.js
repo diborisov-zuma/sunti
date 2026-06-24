@@ -392,6 +392,7 @@ exports.materials = async (req, res) => {
           id, name: b.name, description: b.description || '',
           status: b.status || 'pending_approval',
           sort_order: parseInt(b.sort_order || 0),
+          email,
         },
       });
       res.json({ success: true });
